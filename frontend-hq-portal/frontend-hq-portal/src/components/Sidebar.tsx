@@ -103,8 +103,8 @@ export function Sidebar() {
       </Box>
 
       {/* Core Navigation */}
-      <Box mb="md">
-        <Stack gap={2}>
+      <Box mb="sm">
+        <Stack gap={0}>
           {coreLinks.map((link) => (
             <NavLink
               key={link.path}
@@ -115,12 +115,13 @@ export function Sidebar() {
               styles={{
                 root: {
                   borderRadius: 6,
-                  padding: '8px 12px',
+                  padding: '6px 8px',
                   fontSize: 14,
+                  minHeight: 32,
                 },
                 label: {
                   fontSize: 14,
-                  fontWeight: 500,
+                  fontWeight: 400,
                 },
               }}
             />
@@ -129,8 +130,8 @@ export function Sidebar() {
       </Box>
 
       {/* Shortcuts Section */}
-      <Box mb="md">
-        <Group justify="space-between" mb={8} px={4}>
+      <Box mb="sm">
+        <Group justify="space-between" mb={4} px={4}>
           <Text size="xs" fw={600} c="dimmed" tt="uppercase">
             Shortcuts
           </Text>
@@ -138,7 +139,7 @@ export function Sidebar() {
             <IconSettings size={14} style={{ color: '#697386' }} />
           </UnstyledButton>
         </Group>
-        <Stack gap={2}>
+        <Stack gap={0}>
           {shortcuts.map((link) => (
             <NavLink
               key={link.path}
@@ -149,12 +150,13 @@ export function Sidebar() {
               styles={{
                 root: {
                   borderRadius: 6,
-                  padding: '8px 12px',
+                  padding: '6px 8px',
                   fontSize: 14,
+                  minHeight: 32,
                 },
                 label: {
                   fontSize: 14,
-                  fontWeight: 500,
+                  fontWeight: 400,
                 },
               }}
             />
@@ -162,32 +164,33 @@ export function Sidebar() {
         </Stack>
       </Box>
 
-      <Divider my="sm" />
+      <Divider my="xs" />
 
       {/* Products Section */}
-      <Box mb="md">
-        <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb={8} px={4}>
+      <Box mb="sm">
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb={4} px={4}>
           Products
         </Text>
-        <Stack gap={2}>
+        <Stack gap={0}>
           {products.map((product) => (
             <Box key={product.key}>
               <UnstyledButton
                 w="100%"
-                p="8px 12px"
+                p="6px 8px"
                 onClick={() => toggleProduct(product.key)}
                 style={(theme) => ({
                   borderRadius: 6,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
+                  minHeight: 32,
                   '&:hover': {
                     backgroundColor: theme.colors.gray[0],
                   },
                 })}
               >
                 <product.icon size={18} stroke={1.5} style={{ color: '#697386' }} />
-                <Text size="sm" fw={500} style={{ flex: 1 }}>
+                <Text size="sm" fw={400} style={{ flex: 1 }}>
                   {product.label}
                 </Text>
                 <IconChevronRight
@@ -219,7 +222,7 @@ export function Sidebar() {
         style={{
           borderTop: '1px solid #E3E8EE',
           backgroundColor: 'white',
-          padding: '12px 0',
+          paddingTop: 8,
         }}
       >
         <Menu shadow="md" width={260} position="top-start">

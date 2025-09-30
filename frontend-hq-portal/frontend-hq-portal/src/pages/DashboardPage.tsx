@@ -262,8 +262,18 @@ export function DashboardPage() {
             </Group>
           </Group>
 
-          {/* Filter Toolbar */}
-          <Group mb="xl" gap="sm">
+          {/* Sticky Filter Toolbar */}
+          <Box
+            style={{
+              position: 'sticky',
+              top: 60,
+              zIndex: 100,
+              backgroundColor: '#F6F9FC',
+              paddingBottom: 24,
+              marginBottom: 24,
+            }}
+          >
+            <Group gap="sm">
             <UnstyledButton
               px="md"
               py="xs"
@@ -329,7 +339,8 @@ export function DashboardPage() {
                 </ActionIcon>
               </Group>
             </UnstyledButton>
-          </Group>
+            </Group>
+          </Box>
 
           {/* Stats Cards Grid */}
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
