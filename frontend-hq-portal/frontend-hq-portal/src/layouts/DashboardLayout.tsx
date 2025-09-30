@@ -73,13 +73,22 @@ export function DashboardLayout() {
             flexShrink: 0,
           }}
         >
-          <Group h="100%" px="md" justify="space-between" gap="md">
-            <Group gap="md">
-              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+          <Group h="100%" px="md" gap="md" style={{ flex: 1 }}>
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
 
-              {/* Search - Desktop */}
+            {/* Search - Mobile (icon only) */}
+            <ActionIcon
+              hiddenFrom="sm"
+              variant="subtle"
+              color="gray"
+              size="lg"
+            >
+              <IconSearch size={20} />
+            </ActionIcon>
+
+            {/* Search - Desktop (flexible width) */}
+            <Box visibleFrom="sm" style={{ flex: 1 }}>
               <TextInput
-                visibleFrom="sm"
                 placeholder="Search"
                 leftSection={<IconSearch size={16} />}
                 rightSection={
@@ -98,7 +107,6 @@ export function DashboardLayout() {
                 }
                 styles={{
                   input: {
-                    width: 300,
                     borderRadius: 6,
                     border: '1px solid #E3E8EE',
                     fontSize: 14,
@@ -108,35 +116,10 @@ export function DashboardLayout() {
                   },
                 }}
               />
-
-              {/* Search - Mobile (icon only) */}
-              <ActionIcon
-                hiddenFrom="sm"
-                variant="subtle"
-                color="gray"
-                size="lg"
-              >
-                <IconSearch size={20} />
-              </ActionIcon>
-            </Group>
+            </Box>
 
             {/* Right side tools */}
             <Group gap="xs">
-              {/* Test Mode Badge */}
-              <Badge
-                size="sm"
-                variant="light"
-                style={{
-                  backgroundColor: '#FFE6CC',
-                  color: '#8B5000',
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  padding: '4px 8px',
-                }}
-              >
-                Test mode has moved.
-              </Badge>
-
               <ActionIcon variant="subtle" color="gray" size="lg">
                 <IconApps size={20} />
               </ActionIcon>
@@ -151,16 +134,6 @@ export function DashboardLayout() {
 
               <ActionIcon variant="subtle" color="gray" size="lg">
                 <IconSettings size={20} />
-              </ActionIcon>
-
-              <ActionIcon
-                variant="filled"
-                size="lg"
-                style={{
-                  backgroundColor: '#5469D4',
-                }}
-              >
-                <IconPlus size={20} />
               </ActionIcon>
             </Group>
           </Group>
