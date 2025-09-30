@@ -1,4 +1,4 @@
-import { Stack, NavLink, Box, Text, UnstyledButton, Group, Collapse, Divider, Avatar, Menu } from '@mantine/core'
+import { Stack, NavLink, Box, Text, UnstyledButton, Group, Collapse, Divider, Avatar, Menu, ActionIcon } from '@mantine/core'
 import {
   IconHome,
   IconWallet,
@@ -18,11 +18,12 @@ import {
   IconDots,
   IconLogout,
   IconUser,
+  IconX,
 } from '@tabler/icons-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [expandedProducts, setExpandedProducts] = useState<string[]>([])
@@ -59,6 +60,20 @@ export function Sidebar() {
 
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Close button - Mobile only */}
+      {onClose && (
+        <Box mb="xs" hiddenFrom="sm">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="lg"
+            onClick={onClose}
+          >
+            <IconX size={20} />
+          </ActionIcon>
+        </Box>
+      )}
+
       {/* Scrollable Content */}
       <Box style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         <Stack gap={0}>
@@ -76,28 +91,58 @@ export function Sidebar() {
           })}
         >
           <Group gap="sm">
-            <Box
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 6,
-                backgroundColor: '#5469D4',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontWeight: 600,
-                fontSize: 14,
-              }}
-            >
-              C
+            {/* Desktop avatar */}
+            <Box visibleFrom="sm">
+              <Box
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 6,
+                  backgroundColor: '#5469D4',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: 14,
+                }}
+              >
+                C
+              </Box>
+            </Box>
+            {/* Mobile avatar */}
+            <Box hiddenFrom="sm">
+              <Box
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 8,
+                  backgroundColor: '#5469D4',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: 20,
+                }}
+              >
+                C
+              </Box>
             </Box>
             <Box style={{ flex: 1 }}>
-              <Text size="sm" fw={500} lineClamp={1}>
+              <Text size="sm" fw={500} lineClamp={1} visibleFrom="sm">
+                Caterlord QSR
+              </Text>
+              <Text size="md" fw={600} lineClamp={1} hiddenFrom="sm">
                 Caterlord QSR
               </Text>
             </Box>
-            <IconChevronRight size={16} style={{ color: '#697386' }} />
+            <Box visibleFrom="sm">
+              <IconChevronRight size={16} style={{ color: '#697386' }} />
+            </Box>
+            <Box hiddenFrom="sm">
+              <IconChevronRight size={20} style={{ color: '#697386' }} />
+            </Box>
           </Group>
         </UnstyledButton>
       </Box>

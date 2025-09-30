@@ -57,7 +57,7 @@ export function DashboardLayout() {
             p="md"
             onClick={(e) => e.stopPropagation()}
           >
-            <Sidebar />
+            <Sidebar onClose={toggle} />
           </Box>
         </Box>
       )}
@@ -77,8 +77,9 @@ export function DashboardLayout() {
             <Group gap="md">
               <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
 
-              {/* Search */}
+              {/* Search - Desktop */}
               <TextInput
+                visibleFrom="sm"
                 placeholder="Search"
                 leftSection={<IconSearch size={16} />}
                 rightSection={
@@ -107,6 +108,16 @@ export function DashboardLayout() {
                   },
                 }}
               />
+
+              {/* Search - Mobile (icon only) */}
+              <ActionIcon
+                hiddenFrom="sm"
+                variant="subtle"
+                color="gray"
+                size="lg"
+              >
+                <IconSearch size={20} />
+              </ActionIcon>
             </Group>
 
             {/* Right side tools */}
