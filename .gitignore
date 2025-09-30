@@ -231,3 +231,6 @@ secrets/
 # Claude configuration
 .claude/agents/tsundere-maid-coder.md
 CLAUDE-RESPONSE.md
+
+# Playwright MCP screenshots
+.playwright-mcp/
