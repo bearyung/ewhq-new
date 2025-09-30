@@ -1,0 +1,122 @@
+using Microsoft.EntityFrameworkCore;
+using EWHQ.Api.Models.Entities;
+using EWHQ.Api.Data.Attributes;
+using System.Reflection;
+using System.ComponentModel.DataAnnotations;
+
+namespace EWHQ.Api.Data;
+
+/// <summary>
+/// Database context for EWHQ Portal (POS system) data
+/// </summary>
+public class EWHQDbContext : DbContext
+{
+    public EWHQDbContext(DbContextOptions<EWHQDbContext> options) : base(options)
+    {
+    }
+
+    // Core entities for EWHQ Portal
+    public DbSet<AccountMaster> AccountMasters { get; set; }
+    public DbSet<Shop> Shops { get; set; }
+    
+    // Transaction entities (to be uncommented as needed)
+    // public DbSet<User> Users { get; set; }
+    // public DbSet<Department> Departments { get; set; }
+    // public DbSet<ItemCategory> ItemCategories { get; set; }
+    // public DbSet<ItemMaster> ItemMasters { get; set; }
+    // public DbSet<TxSalesHeader> TxSalesHeaders { get; set; }
+    // public DbSet<TxSalesDetail> TxSalesDetails { get; set; }
+    // public DbSet<TxPayment> TxPayments { get; set; }
+    
+    // Member entities
+    // public DbSet<MemberHeader> MemberHeaders { get; set; }
+    // public DbSet<MemberDetail> MemberDetails { get; set; }
+    
+    // Stock entities
+    // public DbSet<StockLevelShopDetail> StockLevelShopDetails { get; set; }
+    // public DbSet<StockOrderHeader> StockOrderHeaders { get; set; }
+    // public DbSet<StockTakeHeader> StockTakeHeaders { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // Configure composite keys
+        modelBuilder.Entity<Shop>()
+            .HasKey(s => new { s.ShopId, s.AccountId });
+
+        modelBuilder.Entity<Shop>()
+            .Property(s => s.ShopId)
+            .ValueGeneratedOnAdd();
+
+        // Configure composite keys for other entities when uncommented
+        // modelBuilder.Entity<User>()
+        //     .HasKey(u => new { u.UserId, u.AccountId, u.ShopId });
+
+        // modelBuilder.Entity<Department>()
+        //     .HasKey(d => new { d.DepartmentId, d.AccountId });
+
+        // modelBuilder.Entity<ItemCategory>()
+        //     .HasKey(ic => new { ic.CategoryId, ic.AccountId });
+
+        // modelBuilder.Entity<ItemMaster>()
+        //     .HasKey(im => new { im.ItemId, im.AccountId });
+
+        // modelBuilder.Entity<MemberHeader>()
+        //     .HasKey(mh => new { mh.MemberHeaderId, mh.AccountId });
+
+        // modelBuilder.Entity<MemberDetail>()
+        //     .HasKey(md => new { md.MemberDetailId, md.AccountId, md.ShopId });
+
+        // modelBuilder.Entity<StockOrderHeader>()
+        //     .HasKey(soh => new { soh.OrderHeaderId, soh.AccountId });
+
+        // modelBuilder.Entity<StockTakeHeader>()
+        //     .HasKey(sth => new { sth.StockTakeHeaderId, sth.AccountId, sth.ShopId });
+
+        // modelBuilder.Entity<TxSalesHeader>()
+        //     .HasKey(tsh => new { tsh.TxSalesHeaderId, tsh.AccountId, tsh.ShopId });
+
+        // modelBuilder.Entity<TxSalesDetail>()
+        //     .HasKey(tsd => new { tsd.TxSalesDetailId, tsd.AccountId, tsd.ShopId });
+
+        // modelBuilder.Entity<TxPayment>()
+        //     .HasKey(tp => new { tp.TxPaymentId, tp.AccountId, tp.ShopId });
+
+        // modelBuilder.Entity<StockLevelShopDetail>()
+        //     .HasKey(sl => new { sl.AccountId, sl.ShopId, sl.RawMaterialId });
+
+        // Apply database-specific configurations
+        ApplyDatabaseSpecificConfigurations(modelBuilder);
+    }
+    
+    private void ApplyDatabaseSpecificConfigurations(ModelBuilder modelBuilder)
+    {
+        var isPostgreSQL = Database.IsNpgsql();
+        
+        // Configure string properties with MaxLengthUnlimited attribute
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.PropertyInfo != null)
+                {
+                    var maxLengthAttr = property.PropertyInfo.GetCustomAttribute<MaxLengthAttribute>();
+                    if (maxLengthAttr is MaxLengthUnlimitedAttribute)
+                    {
+                        if (isPostgreSQL)
+                        {
+                            // For PostgreSQL, use text type
+                            property.SetColumnType("text");
+                        }
+                        else
+                        {
+                            // For SQL Server, use nvarchar(max)
+                            property.SetColumnType("nvarchar(max)");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

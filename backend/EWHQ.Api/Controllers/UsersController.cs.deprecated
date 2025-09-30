@@ -1,0 +1,429 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using EWHQ.Api.Data;
+using EWHQ.Api.Identity;
+using EWHQ.Api.Models.Admin;
+using System.Security.Claims;
+
+namespace EWHQ.Api.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class UsersController : ControllerBase
+{
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly AdminDbContext _adminContext;
+    private readonly ILogger<UsersController> _logger;
+
+    public UsersController(
+        UserManager<ApplicationUser> userManager,
+        AdminDbContext adminContext,
+        ILogger<UsersController> logger)
+    {
+        _userManager = userManager;
+        _adminContext = adminContext;
+        _logger = logger;
+    }
+
+    private string GetCurrentUserId()
+    {
+        return User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+    }
+
+    private bool IsAuthorizedToViewAllUsers()
+    {
+        return User.IsInRole("SuperAdmin") || 
+               User.IsInRole("Admin") || 
+               User.HasClaim("UserType", "Admin") ||
+               User.HasClaim("UserType", "Distributor") ||
+               User.HasClaim("UserType", "Reseller");
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<UserListResponse>> GetUsers(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] string? userType = null,
+        [FromQuery] string? teamId = null,
+        [FromQuery] bool? isActive = null)
+    {
+        if (!IsAuthorizedToViewAllUsers())
+        {
+            return Forbid();
+        }
+
+        var query = _userManager.Users.AsQueryable();
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            query = query.Where(u => 
+                u.Email.Contains(searchTerm) ||
+                (u.FirstName != null && u.FirstName.Contains(searchTerm)) ||
+                (u.LastName != null && u.LastName.Contains(searchTerm)));
+        }
+
+        // Apply user type filter
+        if (!string.IsNullOrWhiteSpace(userType) && userType != "all")
+        {
+            query = query.Where(u => u.UserType == userType);
+        }
+
+        // Apply active status filter
+        if (isActive.HasValue)
+        {
+            if (isActive.Value)
+            {
+                query = query.Where(u => u.LockoutEnd == null || u.LockoutEnd < DateTimeOffset.Now);
+            }
+            else
+            {
+                query = query.Where(u => u.LockoutEnd != null && u.LockoutEnd >= DateTimeOffset.Now);
+            }
+        }
+
+        // Get total count before pagination
+        var totalCount = await query.CountAsync();
+
+        // Apply pagination
+        var users = await query
+            .OrderBy(u => u.LastName ?? u.Email)
+            .ThenBy(u => u.FirstName ?? u.Email)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        // Get user roles and teams
+        var userDtos = new List<UserDto>();
+        foreach (var user in users)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+            var teams = await _adminContext.TeamMembers
+                .Where(tm => tm.UserId == user.Id && tm.IsActive)
+                .Include(tm => tm.Team)
+                .Select(tm => new UserTeamInfo
+                {
+                    TeamId = tm.TeamId,
+                    TeamName = tm.Team.Name,
+                    Role = tm.Role.ToString()
+                })
+                .ToListAsync();
+
+            // Apply team filter if specified
+            if (!string.IsNullOrWhiteSpace(teamId) && teamId != "all")
+            {
+                if (!teams.Any(t => t.TeamId == teamId))
+                    continue;
+            }
+
+            userDtos.Add(new UserDto
+            {
+                Id = user.Id,
+                Email = user.Email ?? string.Empty,
+                FirstName = user.FirstName ?? string.Empty,
+                LastName = user.LastName ?? string.Empty,
+                UserType = user.UserType,
+                Roles = roles.ToList(),
+                Teams = teams,
+                IsActive = user.LockoutEnd == null || user.LockoutEnd < DateTimeOffset.Now,
+                CreatedAt = user.CreatedAt,
+                LastLoginAt = user.LastLoginAt
+            });
+        }
+
+        return Ok(new UserListResponse
+        {
+            Users = userDtos,
+            TotalCount = totalCount,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+        });
+    }
+
+    [HttpGet("{id}")]
+    public async Task<ActionResult<UserDetailDto>> GetUser(string id)
+    {
+        if (!IsAuthorizedToViewAllUsers())
+        {
+            return Forbid();
+        }
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var teams = await _adminContext.TeamMembers
+            .Where(tm => tm.UserId == user.Id && tm.IsActive)
+            .Include(tm => tm.Team)
+            .Select(tm => new UserTeamInfo
+            {
+                TeamId = tm.TeamId,
+                TeamName = tm.Team.Name,
+                Role = tm.Role.ToString()
+            })
+            .ToListAsync();
+
+        var userDetail = new UserDetailDto
+        {
+            Id = user.Id,
+            Email = user.Email ?? string.Empty,
+            FirstName = user.FirstName ?? string.Empty,
+            LastName = user.LastName ?? string.Empty,
+            UserType = user.UserType,
+            Roles = roles.ToList(),
+            Teams = teams,
+            IsActive = user.LockoutEnd == null || user.LockoutEnd < DateTimeOffset.Now,
+            EmailConfirmed = user.EmailConfirmed,
+            PhoneNumber = user.PhoneNumber,
+            PhoneNumberConfirmed = user.PhoneNumberConfirmed,
+            TwoFactorEnabled = user.TwoFactorEnabled,
+            LockoutEnd = user.LockoutEnd,
+            LockoutEnabled = user.LockoutEnabled,
+            AccessFailedCount = user.AccessFailedCount,
+            CreatedAt = user.CreatedAt,
+            LastLoginAt = user.LastLoginAt
+        };
+
+        return Ok(userDetail);
+    }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    public async Task<IActionResult> UpdateUser(string id, UpdateUserRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        // Update user properties
+        user.FirstName = request.FirstName;
+        user.LastName = request.LastName;
+        user.PhoneNumber = request.PhoneNumber;
+
+        // Update user type if SuperAdmin
+        if (User.IsInRole("SuperAdmin") && !string.IsNullOrWhiteSpace(request.UserType))
+        {
+            user.UserType = request.UserType;
+        }
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors);
+        }
+
+        // Update roles if SuperAdmin
+        if (User.IsInRole("SuperAdmin") && request.Roles != null)
+        {
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            await _userManager.RemoveFromRolesAsync(user, currentRoles);
+            await _userManager.AddToRolesAsync(user, request.Roles);
+        }
+
+        return Ok();
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "SuperAdmin")]
+    public async Task<IActionResult> DeleteUser(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        // Prevent deleting own account
+        if (user.Id == GetCurrentUserId())
+        {
+            return BadRequest(new { message = "Cannot delete your own account" });
+        }
+
+        // Actually delete the user
+        var result = await _userManager.DeleteAsync(user);
+        
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors);
+        }
+
+        return NoContent();
+    }
+
+    [HttpPost("{id}/activate")]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    public async Task<IActionResult> ActivateUser(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        // Enable the user account by removing lockout
+        user.LockoutEnd = null;
+        var result = await _userManager.UpdateAsync(user);
+        
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors);
+        }
+
+        return Ok();
+    }
+
+    [HttpPost("{id}/deactivate")]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    public async Task<IActionResult> DeactivateUser(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        // Prevent deactivating own account
+        if (user.Id == GetCurrentUserId())
+        {
+            return BadRequest(new { message = "Cannot deactivate your own account" });
+        }
+
+        // Disable the user account by setting lockout
+        user.LockoutEnd = DateTimeOffset.MaxValue;
+        var result = await _userManager.UpdateAsync(user);
+        
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors);
+        }
+
+        return Ok();
+    }
+
+    [HttpPost("{id}/reset-password")]
+    [Authorize(Roles = "SuperAdmin")]
+    public async Task<IActionResult> ResetUserPassword(string id, ResetPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await _userManager.ResetPasswordAsync(user, token, request.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors);
+        }
+
+        return Ok();
+    }
+
+    [HttpGet("export")]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    public async Task<IActionResult> ExportUsers([FromQuery] string format = "csv")
+    {
+        if (!IsAuthorizedToViewAllUsers())
+        {
+            return Forbid();
+        }
+
+        var users = await _userManager.Users
+            .Where(u => u.LockoutEnd == null || u.LockoutEnd < DateTimeOffset.Now)
+            .OrderBy(u => u.LastName ?? u.Email)
+            .ThenBy(u => u.FirstName ?? u.Email)
+            .ToListAsync();
+
+        if (format.ToLower() == "csv")
+        {
+            var csv = "Id,Email,FirstName,LastName,UserType,IsActive,CreatedAt,LastLoginAt\n";
+            foreach (var user in users)
+            {
+                var isActive = user.LockoutEnd == null || user.LockoutEnd < DateTimeOffset.Now;
+                csv += $"{user.Id},{user.Email},{user.FirstName},{user.LastName},{user.UserType},{isActive},{user.CreatedAt:yyyy-MM-dd},{user.LastLoginAt:yyyy-MM-dd}\n";
+            }
+
+            return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", $"users_{DateTime.Now:yyyyMMdd}.csv");
+        }
+
+        return BadRequest(new { message = "Unsupported export format" });
+    }
+}
+
+// DTOs
+public class UserDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string UserType { get; set; } = string.Empty;
+    public List<string> Roles { get; set; } = new();
+    public List<UserTeamInfo> Teams { get; set; } = new();
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? LastLoginAt { get; set; }
+}
+
+public class UserTeamInfo
+{
+    public string TeamId { get; set; } = string.Empty;
+    public string TeamName { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+}
+
+public class UserDetailDto : UserDto
+{
+    public bool EmailConfirmed { get; set; }
+    public string? PhoneNumber { get; set; }
+    public bool PhoneNumberConfirmed { get; set; }
+    public bool TwoFactorEnabled { get; set; }
+    public DateTimeOffset? LockoutEnd { get; set; }
+    public bool LockoutEnabled { get; set; }
+    public int AccessFailedCount { get; set; }
+}
+
+public class UserListResponse
+{
+    public List<UserDto> Users { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int PageNumber { get; set; }
+    public int PageSize { get; set; }
+    public int TotalPages { get; set; }
+}
+
+public class UpdateUserRequest
+{
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string? PhoneNumber { get; set; }
+    public string? UserType { get; set; }
+    public List<string>? Roles { get; set; }
+}
+
+public class ResetPasswordRequest
+{
+    public string NewPassword { get; set; } = string.Empty;
+}

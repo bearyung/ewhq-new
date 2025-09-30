@@ -1,0 +1,126 @@
+using Microsoft.AspNetCore.Identity;
+using EWHQ.Api.Identity;
+
+namespace EWHQ.Api.Services;
+
+public class DatabaseSeeder
+{
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly RoleManager<IdentityRole> _roleManager;
+    private readonly ILogger<DatabaseSeeder> _logger;
+
+    public DatabaseSeeder(
+        UserManager<ApplicationUser> userManager,
+        RoleManager<IdentityRole> roleManager,
+        ILogger<DatabaseSeeder> logger)
+    {
+        _userManager = userManager;
+        _roleManager = roleManager;
+        _logger = logger;
+    }
+
+    public async Task SeedRolesAsync()
+    {
+        string[] roleNames = { "SuperAdmin", "Admin", "Reseller", "Distributor" };
+        
+        foreach (var roleName in roleNames)
+        {
+            if (!await _roleManager.RoleExistsAsync(roleName))
+            {
+                await _roleManager.CreateAsync(new IdentityRole(roleName));
+                _logger.LogInformation($"Created role: {roleName}");
+            }
+        }
+    }
+
+    public async Task<(bool Success, string Message, string? Password)> CreateSuperAdminAsync(
+        string email, 
+        string firstName, 
+        string lastName,
+        string? password = null)
+    {
+        try
+        {
+            // Check if super admin already exists
+            var existingAdmin = await _userManager.FindByEmailAsync(email);
+            if (existingAdmin != null)
+            {
+                var isInRole = await _userManager.IsInRoleAsync(existingAdmin, "SuperAdmin");
+                if (isInRole)
+                {
+                    return (false, $"Super admin with email '{email}' already exists.", null);
+                }
+            }
+
+            // Generate secure password if not provided
+            if (string.IsNullOrEmpty(password))
+            {
+                password = GenerateSecurePassword();
+            }
+
+            // Create new user
+            var user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                FirstName = firstName,
+                LastName = lastName,
+                EmailConfirmed = true,
+                UserType = "SuperAdmin", // Set user type for super admin
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var result = await _userManager.CreateAsync(user, password);
+            
+            if (result.Succeeded)
+            {
+                // Ensure SuperAdmin role exists
+                await SeedRolesAsync();
+                
+                // Add user to SuperAdmin role
+                await _userManager.AddToRoleAsync(user, "SuperAdmin");
+                
+                _logger.LogInformation($"Super admin created successfully: {email}");
+                return (true, "Super admin created successfully!", password);
+            }
+            else
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                _logger.LogError($"Failed to create super admin: {errors}");
+                return (false, $"Failed to create super admin: {errors}", null);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating super admin");
+            return (false, $"Error: {ex.Message}", null);
+        }
+    }
+
+    private string GenerateSecurePassword()
+    {
+        const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const string lowercase = "abcdefghijklmnopqrstuvwxyz";
+        const string digits = "0123456789";
+        const string special = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+        
+        var random = new Random();
+        var password = new char[12];
+        
+        // Ensure at least one of each required character type
+        password[0] = uppercase[random.Next(uppercase.Length)];
+        password[1] = lowercase[random.Next(lowercase.Length)];
+        password[2] = digits[random.Next(digits.Length)];
+        password[3] = special[random.Next(special.Length)];
+        
+        // Fill the rest randomly
+        var allChars = uppercase + lowercase + digits + special;
+        for (int i = 4; i < password.Length; i++)
+        {
+            password[i] = allChars[random.Next(allChars.Length)];
+        }
+        
+        // Shuffle the password
+        return new string(password.OrderBy(x => random.Next()).ToArray());
+    }
+}
