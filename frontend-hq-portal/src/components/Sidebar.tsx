@@ -81,7 +81,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
 
   // Section 1: Common items (always visible)
   const commonItems = [
-    { icon: IconHome, label: 'Dashboard', path: '/dashboard' },
+    { icon: IconHome, label: 'Dashboard', path: '/' },
     { icon: IconCashRegister, label: 'POS System', path: '/pos' },
     { icon: IconReceipt, label: 'Orders', path: '/orders' },
     { icon: IconPackage, label: 'Products', path: '/products' },
@@ -186,27 +186,30 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
           {/* Section 1: Common Items */}
           <Box mb="sm">
             <Stack gap={0}>
-              {commonItems.map((link) => (
-                <NavLink
-                  key={link.path}
-                  label={link.label}
-                  leftSection={<link.icon size={18} stroke={1.5} />}
-                  active={location.pathname === link.path}
-                  onClick={() => navigate(link.path)}
-                  styles={{
-                    root: {
-                      borderRadius: 6,
-                      padding: '6px 8px',
-                      fontSize: 14,
-                      minHeight: 32,
-                    },
-                    label: {
-                      fontSize: 14,
-                      fontWeight: 400,
-                    },
-                  }}
-                />
-              ))}
+              {commonItems.map((link) => {
+                const isActive = location.pathname === link.path;
+                return (
+                  <NavLink
+                    key={link.path}
+                    label={link.label}
+                    leftSection={<link.icon size={18} stroke={1.5} />}
+                    active={isActive}
+                    onClick={() => navigate(link.path)}
+                    styles={{
+                      root: {
+                        borderRadius: 6,
+                        padding: '6px 8px',
+                        fontSize: 14,
+                        minHeight: 32,
+                      },
+                      label: {
+                        fontSize: 14,
+                        fontWeight: isActive ? 600 : 400,
+                      },
+                    }}
+                  />
+                );
+              })}
             </Stack>
           </Box>
 
@@ -243,27 +246,30 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
               </Paper>
             ) : (
               <Stack gap={0}>
-                {bookmarks.map((bookmark) => (
-                  <NavLink
-                    key={bookmark.path}
-                    label={bookmark.label}
-                    leftSection={<IconStar size={16} stroke={1.5} />}
-                    active={location.pathname === bookmark.path}
-                    onClick={() => navigate(bookmark.path)}
-                    styles={{
-                      root: {
-                        borderRadius: 6,
-                        padding: '6px 8px',
-                        fontSize: 14,
-                        minHeight: 32,
-                      },
-                      label: {
-                        fontSize: 14,
-                        fontWeight: 400,
-                      },
-                    }}
-                  />
-                ))}
+                {bookmarks.map((bookmark) => {
+                  const isActive = location.pathname === bookmark.path;
+                  return (
+                    <NavLink
+                      key={bookmark.path}
+                      label={bookmark.label}
+                      leftSection={<IconStar size={16} stroke={1.5} />}
+                      active={isActive}
+                      onClick={() => navigate(bookmark.path)}
+                      styles={{
+                        root: {
+                          borderRadius: 6,
+                          padding: '6px 8px',
+                          fontSize: 14,
+                          minHeight: 32,
+                        },
+                        label: {
+                          fontSize: 14,
+                          fontWeight: isActive ? 600 : 400,
+                        },
+                      }}
+                    />
+                  );
+                })}
               </Stack>
             )}
           </Box>
@@ -315,26 +321,29 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                   <Collapse in={expandedSections.includes(section.key)}>
                     <Box pl={32} py={2}>
                       <Stack gap={0}>
-                        {section.items.map((item) => (
-                          <NavLink
-                            key={item.path}
-                            label={item.label}
-                            active={location.pathname === item.path}
-                            onClick={() => navigate(item.path)}
-                            styles={{
-                              root: {
-                                borderRadius: 6,
-                                padding: '6px 8px',
-                                fontSize: 14,
-                                minHeight: 32,
-                              },
-                              label: {
-                                fontSize: 14,
-                                fontWeight: 400,
-                              },
-                            }}
-                          />
-                        ))}
+                        {section.items.map((item) => {
+                          const isActive = location.pathname === item.path;
+                          return (
+                            <NavLink
+                              key={item.path}
+                              label={item.label}
+                              active={isActive}
+                              onClick={() => navigate(item.path)}
+                              styles={{
+                                root: {
+                                  borderRadius: 6,
+                                  padding: '6px 8px',
+                                  fontSize: 14,
+                                  minHeight: 32,
+                                },
+                                label: {
+                                  fontSize: 14,
+                                  fontWeight: isActive ? 600 : 400,
+                                },
+                              }}
+                            />
+                          );
+                        })}
                       </Stack>
                     </Box>
                   </Collapse>

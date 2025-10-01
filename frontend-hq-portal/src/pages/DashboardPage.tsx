@@ -53,44 +53,6 @@ export function DashboardPage() {
 
   return (
     <Box>
-      {/* User Welcome Alert */}
-      {user && (
-        <Box p="xl" style={{ backgroundColor: '#f8f9fa' }}>
-          <Container size="xl">
-            <Alert
-              icon={<IconUser />}
-              title={`Welcome back, ${user.firstName || user.email?.split('@')[0] || 'User'}!`}
-              color="blue"
-              variant="light"
-              styles={{
-                root: { backgroundColor: 'white', border: '1px solid #E3E8EE' }
-              }}
-            >
-              <Stack gap="xs">
-                <Text size="sm">
-                  Logged in as: <strong>{user.email}</strong>
-                </Text>
-                {user.roles && user.roles.length > 0 && (
-                  <Group gap="xs">
-                    <Text size="sm">Roles:</Text>
-                    {user.roles.map(role => (
-                      <Badge key={role} size="sm" variant="light">
-                        {role}
-                      </Badge>
-                    ))}
-                  </Group>
-                )}
-                {user.identityProvider && (
-                  <Text size="sm" c="dimmed">
-                    Sign-in method: {user.identityProvider === 'auth0' ? 'Email/Password' : user.identityProvider}
-                  </Text>
-                )}
-              </Stack>
-            </Alert>
-          </Container>
-        </Box>
-      )}
-
       {/* Today Section */}
       <Box p="xl" style={{ backgroundColor: 'white', borderBottom: '1px solid #E3E8EE' }}>
         <Container size="xl">
