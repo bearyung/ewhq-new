@@ -23,6 +23,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../contexts/Auth0Context'
+import { TenantSelector } from './TenantSelector'
 
 export function Sidebar({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate()
@@ -105,74 +106,9 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       {/* Scrollable Content */}
       <Box style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         <Stack gap={0}>
-      {/* Account Switcher */}
+      {/* Tenant Selector */}
       <Box mb="md">
-        <UnstyledButton
-          w="100%"
-          p="xs"
-          style={(theme) => ({
-            borderRadius: theme.radius.md,
-            border: `1px solid ${theme.colors.gray[3]}`,
-            '&:hover': {
-              backgroundColor: theme.colors.gray[0],
-            },
-          })}
-        >
-          <Group gap="sm">
-            {/* Desktop avatar */}
-            <Box visibleFrom="sm">
-              <Box
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 6,
-                  backgroundColor: '#5469D4',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: 600,
-                  fontSize: 14,
-                }}
-              >
-                C
-              </Box>
-            </Box>
-            {/* Mobile avatar */}
-            <Box hiddenFrom="sm">
-              <Box
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 8,
-                  backgroundColor: '#5469D4',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: 600,
-                  fontSize: 20,
-                }}
-              >
-                C
-              </Box>
-            </Box>
-            <Box style={{ flex: 1 }}>
-              <Text size="sm" fw={500} lineClamp={1} visibleFrom="sm">
-                Caterlord QSR
-              </Text>
-              <Text size="md" fw={600} lineClamp={1} hiddenFrom="sm">
-                Caterlord QSR
-              </Text>
-            </Box>
-            <Box visibleFrom="sm">
-              <IconChevronRight size={16} style={{ color: '#697386' }} />
-            </Box>
-            <Box hiddenFrom="sm">
-              <IconChevronRight size={20} style={{ color: '#697386' }} />
-            </Box>
-          </Group>
-        </UnstyledButton>
+        <TenantSelector />
       </Box>
 
       {/* Core Navigation */}
