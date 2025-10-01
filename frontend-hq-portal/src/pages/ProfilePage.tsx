@@ -63,9 +63,9 @@ export function ProfilePage() {
 
     try {
       const token = await getAccessToken();
-      const apiUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5125';
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5125/api';
 
-      const response = await fetch(`${apiUrl}/api/auth0/profile`, {
+      const response = await fetch(`${apiUrl}/auth0/profile`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -79,10 +79,15 @@ export function ProfilePage() {
       });
 
       if (response.ok) {
+        const updatedData = await response.json();
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
         setIsEditing(false);
-        // Refresh user context
-        window.location.reload();
+        // Update the form with the new values from server
+        setProfileForm({
+          firstName: updatedData.firstName || profileForm.firstName,
+          lastName: updatedData.lastName || profileForm.lastName,
+          email: profileForm.email,
+        });
       } else {
         throw new Error('Failed to update profile');
       }
@@ -109,9 +114,9 @@ export function ProfilePage() {
 
     try {
       const token = await getAccessToken();
-      const apiUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5125';
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5125/api';
 
-      const response = await fetch(`${apiUrl}/api/auth0/change-password`, {
+      const response = await fetch(`${apiUrl}/auth0/change-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
