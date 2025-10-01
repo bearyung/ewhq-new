@@ -13,6 +13,7 @@ import {
   PasswordInput,
   Checkbox,
   Alert,
+  Grid,
 } from '@mantine/core'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -176,10 +177,10 @@ export function LoginPage() {
               </Alert>
             )}
 
-            {/* Two Column Layout */}
-            <Group gap="xl" align="stretch" style={{ alignItems: 'flex-start' }}>
-              {/* Left Column - Email/Password Form */}
-              <Box style={{ flex: '0 0 70%', minWidth: 0 }}>
+            {/* Two Column Layout using Grid */}
+            <Grid gutter="xl">
+              {/* Left Column - Email/Password Form - 70% */}
+              <Grid.Col span={8.4}>
                 <form onSubmit={handleSubmit}>
                   <Stack gap="md">
                 {/* Sign Up Fields */}
@@ -283,13 +284,10 @@ export function LoginPage() {
                     </Button>
                   </Stack>
                 </form>
-              </Box>
+              </Grid.Col>
 
-              {/* Divider */}
-              <Divider orientation="vertical" />
-
-              {/* Right Column - Social Login Buttons */}
-              <Box style={{ flex: '0 0 30%', minWidth: 0 }}>
+              {/* Right Column - Social Login Buttons - 30% */}
+              <Grid.Col span={3.6}>
                 <Stack gap="sm">
                   <Text size="xs" c="dimmed" mb="xs">Or continue with</Text>
 
@@ -353,8 +351,8 @@ export function LoginPage() {
                     X (Twitter)
                   </Button>
                 </Stack>
-              </Box>
-            </Group>
+              </Grid.Col>
+            </Grid>
 
             {/* Sign up / Sign in toggle */}
             <Box
