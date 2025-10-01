@@ -164,20 +164,24 @@ export function LoginPage() {
             backgroundColor: 'white',
           }}
         >
-          <form onSubmit={handleSubmit}>
-            <Stack gap="lg">
-              <Title order={2} ta="center" fw={600}>
-                {isSignUp ? 'Create your account' : 'Sign in to your account'}
-              </Title>
+          <Stack gap="lg">
+            <Title order={2} ta="center" fw={600}>
+              {isSignUp ? 'Create your account' : 'Sign in to your account'}
+            </Title>
 
-              {/* Error Alert */}
-              {error && (
-                <Alert icon={<IconAlertCircle size={16} />} color="red" variant="light">
-                  {error}
-                </Alert>
-              )}
+            {/* Error Alert */}
+            {error && (
+              <Alert icon={<IconAlertCircle size={16} />} color="red" variant="light">
+                {error}
+              </Alert>
+            )}
 
-              <Stack gap="md">
+            {/* Two Column Layout */}
+            <Group gap="xl" align="stretch" style={{ alignItems: 'flex-start' }}>
+              {/* Left Column - Email/Password Form */}
+              <Box style={{ flex: 1, minWidth: 0 }}>
+                <form onSubmit={handleSubmit}>
+                  <Stack gap="md">
                 {/* Sign Up Fields */}
                 {isSignUp && (
                   <>
@@ -264,88 +268,96 @@ export function LoginPage() {
                   />
                 )}
 
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  size="md"
-                  radius="md"
-                  fullWidth
-                  loading={loading}
-                  style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  }}
-                >
-                  {isSignUp ? 'Sign up' : 'Sign in'}
-                </Button>
-
-                <Divider label="OR" labelPosition="center" />
-
-                {/* Social Login Buttons */}
-                  <Stack gap="sm">
+                    {/* Submit Button */}
                     <Button
-                      variant="default"
+                      type="submit"
                       size="md"
                       radius="md"
                       fullWidth
-                      leftSection={<FaGoogle size={18} />}
-                      onClick={() => handleSocialLogin('google-oauth2')}
-                      style={{ justifyContent: 'flex-start' }}
+                      loading={loading}
+                      style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      }}
                     >
-                      Sign {isSignUp ? 'up' : 'in'} with Google
-                    </Button>
-
-                    <Button
-                      variant="default"
-                      size="md"
-                      radius="md"
-                      fullWidth
-                      leftSection={<FaMicrosoft size={18} />}
-                      onClick={() => handleSocialLogin('windowslive')}
-                      style={{ justifyContent: 'flex-start' }}
-                    >
-                      Sign {isSignUp ? 'up' : 'in'} with Microsoft
-                    </Button>
-
-                    <Button
-                      variant="default"
-                      size="md"
-                      radius="md"
-                      fullWidth
-                      leftSection={<FaApple size={18} />}
-                      onClick={() => handleSocialLogin('apple')}
-                      style={{ justifyContent: 'flex-start' }}
-                    >
-                      Sign {isSignUp ? 'up' : 'in'} with Apple
-                    </Button>
-
-                    <Button
-                      variant="default"
-                      size="md"
-                      radius="md"
-                      fullWidth
-                      leftSection={<FaFacebookF size={18} />}
-                      onClick={() => handleSocialLogin('facebook')}
-                      style={{ justifyContent: 'flex-start' }}
-                    >
-                      Sign {isSignUp ? 'up' : 'in'} with Facebook
-                    </Button>
-
-                    <Button
-                      variant="default"
-                      size="md"
-                      radius="md"
-                      fullWidth
-                      leftSection={<FaXTwitter size={18} />}
-                      onClick={() => handleSocialLogin('twitter')}
-                      style={{ justifyContent: 'flex-start' }}
-                    >
-                      Sign {isSignUp ? 'up' : 'in'} with X
+                      {isSignUp ? 'Sign up' : 'Sign in'}
                     </Button>
                   </Stack>
+                </form>
+              </Box>
+
+              {/* Divider */}
+              <Divider orientation="vertical" />
+
+              {/* Right Column - Social Login Buttons */}
+              <Box style={{ flex: 1, minWidth: 0 }}>
+                <Stack gap="sm">
+                  <Text size="xs" c="dimmed" mb="xs">Or continue with</Text>
+
+                  <Button
+                    variant="default"
+                    size="md"
+                    radius="md"
+                    fullWidth
+                    leftSection={<FaGoogle size={18} />}
+                    onClick={() => handleSocialLogin('google-oauth2')}
+                    style={{ justifyContent: 'flex-start' }}
+                  >
+                    Google
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="md"
+                    radius="md"
+                    fullWidth
+                    leftSection={<FaMicrosoft size={18} />}
+                    onClick={() => handleSocialLogin('windowslive')}
+                    style={{ justifyContent: 'flex-start' }}
+                  >
+                    Microsoft
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="md"
+                    radius="md"
+                    fullWidth
+                    leftSection={<FaApple size={18} />}
+                    onClick={() => handleSocialLogin('apple')}
+                    style={{ justifyContent: 'flex-start' }}
+                  >
+                    Apple
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="md"
+                    radius="md"
+                    fullWidth
+                    leftSection={<FaFacebookF size={18} />}
+                    onClick={() => handleSocialLogin('facebook')}
+                    style={{ justifyContent: 'flex-start' }}
+                  >
+                    Facebook
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="md"
+                    radius="md"
+                    fullWidth
+                    leftSection={<FaXTwitter size={18} />}
+                    onClick={() => handleSocialLogin('twitter')}
+                    style={{ justifyContent: 'flex-start' }}
+                  >
+                    X (Twitter)
+                  </Button>
                 </Stack>
-              </Stack>
-            </form>
-          <Box
+              </Box>
+            </Group>
+
+            {/* Sign up / Sign in toggle */}
+            <Box
             p="md"
             style={{
               backgroundColor: '#f8f9fa',
@@ -370,6 +382,7 @@ export function LoginPage() {
               </Anchor>
             </Group>
           </Box>
+          </Stack>
         </Paper>
 
         <Box mt="xl" ta="center">
