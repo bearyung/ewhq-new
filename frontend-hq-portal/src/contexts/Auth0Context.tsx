@@ -30,6 +30,7 @@ interface Auth0ContextType {
   isAdmin: () => boolean;
   hasRole: (role: string) => boolean;
   hasTenantAssociation: () => boolean;
+  updateUserProfile: (firstName: string, lastName: string) => void;
 }
 
 const Auth0Context = createContext<Auth0ContextType | undefined>(undefined);
@@ -215,6 +216,17 @@ export const Auth0ContextProvider: React.FC<Auth0ContextProviderProps> = ({ chil
     );
   };
 
+  // Function to update user profile locally after successful API update
+  const updateUserProfile = (firstName: string, lastName: string) => {
+    if (userProfile) {
+      setUserProfile({
+        ...userProfile,
+        firstName,
+        lastName,
+      });
+    }
+  };
+
   const value: Auth0ContextType = {
     isAuthenticated,
     // Only show loading while Auth0 is loading OR while we're authenticated and loading the profile
@@ -228,6 +240,7 @@ export const Auth0ContextProvider: React.FC<Auth0ContextProviderProps> = ({ chil
     isAdmin,
     hasRole,
     hasTenantAssociation,
+    updateUserProfile,
   };
 
   return <Auth0Context.Provider value={value}>{children}</Auth0Context.Provider>;

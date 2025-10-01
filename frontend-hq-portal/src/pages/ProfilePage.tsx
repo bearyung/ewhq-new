@@ -37,7 +37,7 @@ import { useNavigate } from 'react-router-dom';
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { user, getAccessToken } = useAuth();
+  const { user, getAccessToken, updateUserProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<string | null>('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -83,11 +83,15 @@ export function ProfilePage() {
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
         setIsEditing(false);
         // Update the form with the new values from server
+        const newFirstName = updatedData.firstName || profileForm.firstName;
+        const newLastName = updatedData.lastName || profileForm.lastName;
         setProfileForm({
-          firstName: updatedData.firstName || profileForm.firstName,
-          lastName: updatedData.lastName || profileForm.lastName,
+          firstName: newFirstName,
+          lastName: newLastName,
           email: profileForm.email,
         });
+        // Update the context so sidebar and other components reflect the change
+        updateUserProfile(newFirstName, newLastName);
       } else {
         throw new Error('Failed to update profile');
       }
