@@ -22,11 +22,39 @@ import {
 } from '@tabler/icons-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
+import { useAuth } from '../contexts/Auth0Context'
 
 export function Sidebar({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [expandedProducts, setExpandedProducts] = useState<string[]>([])
+  const { user, logout } = useAuth()
+
+  // Get user initials
+  const getUserInitials = () => {
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    } else if (user?.email) {
+      return user.email[0].toUpperCase()
+    }
+    return 'U'
+  }
+
+  // Get display name
+  const getDisplayName = () => {
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName} ${user.lastName}`
+    } else if (user?.firstName) {
+      return user.firstName
+    } else if (user?.email) {
+      return user.email.split('@')[0]
+    }
+    return 'User'
+  }
+
+  const handleLogout = () => {
+    logout()
+  }
 
   const coreLinks = [
     { icon: IconHome, label: 'Home', path: '/' },
@@ -291,14 +319,14 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                     backgroundColor: '#5469D4',
                   }}
                 >
-                  MY
+                  {getUserInitials()}
                 </Avatar>
                 <Box style={{ flex: 1, minWidth: 0 }}>
                   <Text size="sm" fw={600} lineClamp={1}>
-                    Michael Yung
+                    {getDisplayName()}
                   </Text>
                   <Text size="xs" c="dimmed" lineClamp={1}>
-                    bearyung@gmail.com
+                    {user?.email || 'user@example.com'}
                   </Text>
                 </Box>
                 <IconChevronRight size={16} style={{ color: '#697386' }} />
@@ -315,7 +343,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
               Settings
             </Menu.Item>
             <Menu.Divider />
-            <Menu.Item color="red" leftSection={<IconLogout size={16} />}>
+            <Menu.Item color="red" leftSection={<IconLogout size={16} />} onClick={handleLogout}>
               Logout
             </Menu.Item>
           </Menu.Dropdown>
