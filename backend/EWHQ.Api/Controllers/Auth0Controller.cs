@@ -92,10 +92,25 @@ public class Auth0Controller : ControllerBase
         dynamic fullUserProfile = null;
         string userType = "Standard";
 
+        string customFirstName = null;
+        string customLastName = null;
+
         if (userProfileResponse.IsSuccessStatusCode)
         {
             var profileJson = await userProfileResponse.Content.ReadAsStringAsync();
             fullUserProfile = JsonConvert.DeserializeObject(profileJson);
+
+            // Check for custom profile in user_metadata (for social login users who updated their name)
+            var userMetadata = fullUserProfile?.user_metadata;
+            if (userMetadata != null)
+            {
+                if (userMetadata.custom_profile == true)
+                {
+                    customFirstName = (string)userMetadata.first_name;
+                    customLastName = (string)userMetadata.last_name;
+                    _logger.LogInformation($"Found custom profile for {auth0UserId}: {customFirstName} {customLastName}");
+                }
+            }
 
             // Check if user is authorized for Admin Portal
             var adminClientId = Environment.GetEnvironmentVariable("AUTH0_ADMIN_CLIENT_ID");
@@ -136,8 +151,8 @@ public class Auth0Controller : ControllerBase
             user = new ApplicationUser
             {
                 Email = email,
-                FirstName = ExtractFirstName(name),
-                LastName = ExtractLastName(name),
+                FirstName = !string.IsNullOrEmpty(customFirstName) ? customFirstName : ExtractFirstName(name),
+                LastName = !string.IsNullOrEmpty(customLastName) ? customLastName : ExtractLastName(name),
                 UserType = userType,
                 Auth0UserId = auth0UserId,
                 IdentityProvider = identityProvider,
@@ -155,8 +170,9 @@ public class Auth0Controller : ControllerBase
         {
             // Update existing user
             user.Email = email;
-            user.FirstName = ExtractFirstName(name);
-            user.LastName = ExtractLastName(name);
+            // Use custom name from user_metadata if available, otherwise use Auth0 profile name
+            user.FirstName = !string.IsNullOrEmpty(customFirstName) ? customFirstName : ExtractFirstName(name);
+            user.LastName = !string.IsNullOrEmpty(customLastName) ? customLastName : ExtractLastName(name);
             user.UserType = userType;
             user.IdentityProvider = identityProvider;
             user.UpdatedAt = DateTime.UtcNow;
