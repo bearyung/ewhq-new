@@ -105,7 +105,7 @@ export function LoginPage() {
           justifyContent: 'center',
         }}
       >
-        <Container size={720} px="md">
+        <Container size={860} px="md">
           <Paper radius="md" p="xl" shadow="xl" style={{ backgroundColor: 'white' }}>
             <Stack gap="lg">
               <Title order={2} ta="center" fw={600}>
@@ -143,20 +143,36 @@ export function LoginPage() {
         position: 'relative',
       }}
     >
-      {/* Logo */}
+      {/* Logo - Responsive positioning */}
+      <Box
+        style={{
+          position: 'absolute',
+          top: 20,
+          left: 20,
+          zIndex: 10,
+        }}
+        hiddenFrom="sm"
+      >
+        <Text size="lg" fw={700} c="white">
+          EWHQ
+        </Text>
+      </Box>
+
+      {/* Logo - Desktop */}
       <Box
         style={{
           position: 'absolute',
           top: 32,
           left: 32,
         }}
+        visibleFrom="sm"
       >
         <Text size="xl" fw={700} c="white">
           EWHQ
         </Text>
       </Box>
 
-      <Container size={720} px="md">
+      <Container size={860} px="md" pt={{ base: 60, sm: 0 }}>
         <Paper
           radius="md"
           p="xl"
@@ -177,10 +193,10 @@ export function LoginPage() {
               </Alert>
             )}
 
-            {/* Two Column Layout using Grid */}
-            <Grid gutter="xl">
-              {/* Left Column - Email/Password Form - 60% */}
-              <Grid.Col span={7.2}>
+            {/* Two Column Layout using Grid - Responsive */}
+            <Grid gutter={0} style={{ position: 'relative' }}>
+              {/* Left Column - Email/Password Form - 60% on desktop, full width on mobile */}
+              <Grid.Col span={{ base: 12, sm: 7.2 }} pr={{ sm: 'xl' }}>
                 <form onSubmit={handleSubmit}>
                   <Stack gap="md">
                 {/* Sign Up Fields */}
@@ -286,8 +302,27 @@ export function LoginPage() {
                 </form>
               </Grid.Col>
 
-              {/* Right Column - Social Login Buttons - 40% */}
-              <Grid.Col span={4.8}>
+              {/* Vertical Divider - Only visible on desktop */}
+              <Box
+                visibleFrom="sm"
+                style={{
+                  position: 'absolute',
+                  left: 'calc(60% + 12px)',
+                  top: 20,
+                  bottom: 20,
+                  width: 2,
+                  backgroundColor: '#DDE3EC',
+                  opacity: 0.5,
+                }}
+              />
+
+              {/* Horizontal Divider - Only visible on mobile */}
+              <Grid.Col span={12} hiddenFrom="sm">
+                <Divider my="xl" />
+              </Grid.Col>
+
+              {/* Right Column - Social Login Buttons - 40% on desktop, full width on mobile */}
+              <Grid.Col span={{ base: 12, sm: 4.8 }} pl={{ sm: 'xl' }}>
                 <Stack gap="sm">
                   <Text size="xs" c="dimmed" mb="xs">Or continue with</Text>
 
