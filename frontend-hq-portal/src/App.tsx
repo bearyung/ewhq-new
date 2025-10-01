@@ -1,32 +1,69 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Auth0ProviderWithHistory } from './components/Auth0ProviderWithHistory'
-import { Auth0ContextProvider } from './contexts/Auth0Context'
+import { Auth0ContextProvider, useAuth } from './contexts/Auth0Context'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardLayout } from './layouts/DashboardLayout'
 import { DashboardPage } from './pages/DashboardPage'
 import { useAuth0 } from '@auth0/auth0-react'
+import { useEffect, useState } from 'react'
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading: authLoading } = useAuth0();
+  const { user, loading: userLoading } = useAuth();
 
-  if (isLoading) {
+  // Show loading while Auth0 or user profile is loading
+  if (authLoading || userLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
       </div>
     );
   }
 
+  // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
+  // Wait for user profile to be loaded
+  if (isAuthenticated && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Both auth and user profile are ready
   return <>{children}</>;
 }
 
 // Callback Component for Auth0
 function CallbackPage() {
+  const navigate = useNavigate();
+  const { isAuthenticated, isLoading } = useAuth0();
+  const { user, loading: userLoading } = useAuth();
+
+  useEffect(() => {
+    // Wait for both Auth0 authentication and user profile sync
+    if (!isLoading && !userLoading) {
+      if (isAuthenticated && user) {
+        // Both auth and user profile are ready, navigate to dashboard
+        navigate('/', { replace: true });
+      } else if (!isAuthenticated && !isLoading) {
+        // Authentication failed, go back to login
+        navigate('/login', { replace: true });
+      }
+    }
+  }, [isAuthenticated, isLoading, user, userLoading, navigate]);
+
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
