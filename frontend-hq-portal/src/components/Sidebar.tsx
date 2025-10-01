@@ -336,7 +336,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
 
           <Menu.Dropdown>
             <Menu.Label>Account</Menu.Label>
-            <Menu.Item leftSection={<IconUser size={16} />}>
+            <Menu.Item leftSection={<IconUser size={16} />} onClick={() => navigate('/profile')}>
               Profile
             </Menu.Item>
             <Menu.Item leftSection={<IconSettings size={16} />}>
