@@ -104,7 +104,7 @@ export function LoginPage() {
           justifyContent: 'center',
         }}
       >
-        <Container size={480} px="md">
+        <Container size={720} px="md">
           <Paper radius="md" p="xl" shadow="xl" style={{ backgroundColor: 'white' }}>
             <Stack gap="lg">
               <Title order={2} ta="center" fw={600}>
@@ -155,7 +155,7 @@ export function LoginPage() {
         </Text>
       </Box>
 
-      <Container size={480} px="md">
+      <Container size={720} px="md">
         <Paper
           radius="md"
           p="xl"
@@ -179,7 +179,7 @@ export function LoginPage() {
             {/* Two Column Layout */}
             <Group gap="xl" align="stretch" style={{ alignItems: 'flex-start' }}>
               {/* Left Column - Email/Password Form */}
-              <Box style={{ flex: 1, minWidth: 0 }}>
+              <Box style={{ flex: '0 0 70%', minWidth: 0 }}>
                 <form onSubmit={handleSubmit}>
                   <Stack gap="md">
                 {/* Sign Up Fields */}
@@ -289,7 +289,7 @@ export function LoginPage() {
               <Divider orientation="vertical" />
 
               {/* Right Column - Social Login Buttons */}
-              <Box style={{ flex: 1, minWidth: 0 }}>
+              <Box style={{ flex: '0 0 30%', minWidth: 0 }}>
                 <Stack gap="sm">
                   <Text size="xs" c="dimmed" mb="xs">Or continue with</Text>
 
