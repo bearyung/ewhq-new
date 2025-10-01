@@ -4,14 +4,15 @@ import { Auth0ContextProvider, useAuth } from './contexts/Auth0Context'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardLayout } from './layouts/DashboardLayout'
 import { DashboardPage } from './pages/DashboardPage'
+import OnboardingWizard from './pages/OnboardingWizard'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { useAuth0 } from '@auth0/auth0-react'
 import { useEffect, useState } from 'react'
 
 // Protected Route Component
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children, requireTenant = true }: { children: React.ReactNode, requireTenant?: boolean }) {
   const { isAuthenticated, isLoading: authLoading } = useAuth0();
-  const { user, loading: userLoading } = useAuth();
+  const { user, loading: userLoading, hasTenantAssociation } = useAuth();
 
   // Show loading while Auth0 or user profile is loading
   if (authLoading || userLoading) {
@@ -28,6 +29,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <LoadingSpinner message="Syncing your profile..." />;
   }
 
+  // Check tenant association if required
+  if (requireTenant && user && !hasTenantAssociation()) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   // Both auth and user profile are ready
   return <>{children}</>;
 }
@@ -36,20 +42,26 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function CallbackPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading } = useAuth0();
-  const { user, loading: userLoading } = useAuth();
+  const { user, loading: userLoading, hasTenantAssociation } = useAuth();
 
   useEffect(() => {
     // Wait for both Auth0 authentication and user profile sync
     if (!isLoading && !userLoading) {
       if (isAuthenticated && user) {
-        // Both auth and user profile are ready, navigate to dashboard
-        navigate('/', { replace: true });
+        // Check if user has tenant association
+        if (hasTenantAssociation()) {
+          // Has tenant, go to dashboard
+          navigate('/', { replace: true });
+        } else {
+          // No tenant, go to onboarding
+          navigate('/onboarding', { replace: true });
+        }
       } else if (!isAuthenticated && !isLoading) {
         // Authentication failed, go back to login
         navigate('/login', { replace: true });
       }
     }
-  }, [isAuthenticated, isLoading, user, userLoading, navigate]);
+  }, [isAuthenticated, isLoading, user, userLoading, hasTenantAssociation, navigate]);
 
   return <LoadingSpinner message="Completing sign in..." />;
 }
@@ -62,6 +74,11 @@ function AppContent() {
     <Routes>
       <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" replace />} />
       <Route path="/callback" element={<CallbackPage />} />
+      <Route path="/onboarding" element={
+        <ProtectedRoute requireTenant={false}>
+          <OnboardingWizard />
+        </ProtectedRoute>
+      } />
       <Route path="/" element={
         <ProtectedRoute>
           <DashboardLayout />
