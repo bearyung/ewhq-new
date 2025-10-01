@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { Auth0ProviderWithHistory } from './components/Auth0ProviderWithHistory'
 import { Auth0ContextProvider, useAuth } from './contexts/Auth0Context'
 import { BrandProvider } from './contexts/BrandContext'
+import { BookmarkProvider } from './contexts/BookmarkContext'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardLayout } from './layouts/DashboardLayout'
 import { DashboardPage } from './pages/DashboardPage'
@@ -102,7 +103,9 @@ function App() {
       <Auth0ProviderWithHistory>
         <Auth0ContextProvider>
           <BrandProvider>
-            <AppContent />
+            <BookmarkProvider>
+              <AppContent />
+            </BookmarkProvider>
           </BrandProvider>
         </Auth0ContextProvider>
       </Auth0ProviderWithHistory>

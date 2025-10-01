@@ -1,7 +1,7 @@
-import { Stack, NavLink, Box, Text, UnstyledButton, Group, Collapse, Divider, Avatar, Menu, ActionIcon } from '@mantine/core'
+import { Stack, NavLink, Box, Text, UnstyledButton, Group, Collapse, Divider, Avatar, Menu, ActionIcon, Paper } from '@mantine/core'
 import {
   IconHome,
-  IconWallet,
+  IconCashRegister,
   IconReceipt,
   IconUsers,
   IconPackage,
@@ -9,27 +9,49 @@ import {
   IconTerminal,
   IconCreditCard,
   IconLink,
-  IconUsers as IconConnectedAccounts,
   IconChevronRight,
   IconSettings,
-  IconPlug,
-  IconCash,
   IconChartBar,
-  IconDots,
   IconLogout,
   IconUser,
   IconX,
+  IconBuildingStore,
+  IconMenu2,
+  IconTable,
+  IconUserCheck,
+  IconClock,
+  IconCash,
+  IconFileInvoice,
+  IconReceiptTax,
+  IconPigMoney,
+  IconBoxSeam,
+  IconTruckDelivery,
+  IconSoup,
+  IconUsersGroup,
+  IconTicket,
+  IconPercentage,
+  IconMotorbike,
+  IconDevices,
+  IconCloudComputing,
+  IconWallet,
+  IconBuildingBank,
+  IconBrandSlack,
+  IconAdjustments,
+  IconStar,
+  IconStarOff,
 } from '@tabler/icons-react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/Auth0Context'
+import { useBookmarks } from '../contexts/BookmarkContext'
 import { TenantSelector } from './TenantSelector'
 
 export function Sidebar({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [expandedProducts, setExpandedProducts] = useState<string[]>([])
+  const [expandedSections, setExpandedSections] = useState<string[]>([])
   const { user, logout } = useAuth()
+  const { bookmarks } = useBookmarks()
 
   // Get user initials
   const getUserInitials = () => {
@@ -57,32 +79,82 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     logout()
   }
 
-  const coreLinks = [
-    { icon: IconHome, label: 'Home', path: '/' },
-    { icon: IconWallet, label: 'Balances', path: '/balances' },
-    { icon: IconReceipt, label: 'Transactions', path: '/transactions' },
-    { icon: IconUsers, label: 'Customers', path: '/customers' },
-    { icon: IconPackage, label: 'Product catalogue', path: '/products' },
+  // Section 1: Common items (always visible)
+  const commonItems = [
+    { icon: IconHome, label: 'Dashboard', path: '/dashboard' },
+    { icon: IconCashRegister, label: 'POS System', path: '/pos' },
+    { icon: IconReceipt, label: 'Orders', path: '/orders' },
+    { icon: IconPackage, label: 'Products', path: '/products' },
+    { icon: IconChartBar, label: 'Reports', path: '/reports' },
   ]
 
-  const shortcuts = [
-    { icon: IconFileText, label: 'Tax forms', path: '/tax-forms' },
-    { icon: IconTerminal, label: 'Terminal', path: '/terminal' },
-    { icon: IconCreditCard, label: 'Billing overview', path: '/billing' },
-    { icon: IconLink, label: 'Connect overview', path: '/connect' },
-    { icon: IconConnectedAccounts, label: 'Connected accounts', path: '/connected-accounts' },
+  // Section 3: Full menu items (expandable)
+  const fullMenuSections = [
+    {
+      key: 'operations',
+      label: 'Operations',
+      items: [
+        { icon: IconBuildingStore, label: 'Stores', path: '/stores' },
+        { icon: IconMenu2, label: 'Menus', path: '/menus' },
+        { icon: IconTable, label: 'Tables', path: '/tables' },
+        { icon: IconUserCheck, label: 'Staff', path: '/staff' },
+        { icon: IconClock, label: 'Shifts', path: '/shifts' },
+      ]
+    },
+    {
+      key: 'finance',
+      label: 'Finance',
+      items: [
+        { icon: IconWallet, label: 'Payments', path: '/payments' },
+        { icon: IconFileInvoice, label: 'Invoices', path: '/invoices' },
+        { icon: IconReceiptTax, label: 'Taxation', path: '/taxation' },
+        { icon: IconPigMoney, label: 'Cash Management', path: '/cash-management' },
+      ]
+    },
+    {
+      key: 'inventory',
+      label: 'Inventory',
+      items: [
+        { icon: IconBoxSeam, label: 'Inventory Overview', path: '/inventory' },
+        { icon: IconTruckDelivery, label: 'Stock Orders', path: '/stock-orders' },
+        { icon: IconPackage, label: 'Raw Materials', path: '/raw-materials' },
+        { icon: IconUsers, label: 'Suppliers', path: '/suppliers' },
+      ]
+    },
+    {
+      key: 'customers',
+      label: 'Customer Relations',
+      items: [
+        { icon: IconUsers, label: 'Customers', path: '/customers' },
+        { icon: IconUsersGroup, label: 'Members', path: '/members' },
+        { icon: IconTicket, label: 'Coupons', path: '/coupons' },
+        { icon: IconPercentage, label: 'Promotions', path: '/promotions' },
+      ]
+    },
+    {
+      key: 'delivery',
+      label: 'Delivery & Takeaway',
+      items: [
+        { icon: IconMotorbike, label: 'Delivery', path: '/delivery' },
+        { icon: IconSoup, label: 'Kitchen Display', path: '/kitchen' },
+        { icon: IconCloudComputing, label: 'Online Orders', path: '/online-orders' },
+        { icon: IconDevices, label: 'Self-Ordering', path: '/self-ordering' },
+      ]
+    },
+    {
+      key: 'integrations',
+      label: 'Integrations & Settings',
+      items: [
+        { icon: IconLink, label: 'Integrations', path: '/integrations' },
+        { icon: IconBuildingBank, label: 'Payment Gateway', path: '/payment-gateway' },
+        { icon: IconBrandSlack, label: 'Brand Management', path: '/brand-management' },
+        { icon: IconAdjustments, label: 'Settings', path: '/settings' },
+      ]
+    },
   ]
 
-  const products = [
-    { icon: IconLink, label: 'Connect', key: 'connect' },
-    { icon: IconCash, label: 'Payments', key: 'payments' },
-    { icon: IconCreditCard, label: 'Billing', key: 'billing' },
-    { icon: IconChartBar, label: 'Reporting', key: 'reporting' },
-    { icon: IconDots, label: 'More', key: 'more' },
-  ]
-
-  const toggleProduct = (key: string) => {
-    setExpandedProducts(prev =>
+  const toggleSection = (key: string) => {
+    setExpandedSections(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     )
   }
@@ -106,123 +178,170 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       {/* Scrollable Content */}
       <Box style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         <Stack gap={0}>
-      {/* Tenant Selector */}
-      <Box mb="md">
-        <TenantSelector />
-      </Box>
+          {/* Tenant Selector */}
+          <Box mb="md">
+            <TenantSelector />
+          </Box>
 
-      {/* Core Navigation */}
-      <Box mb="sm">
-        <Stack gap={0}>
-          {coreLinks.map((link) => (
-            <NavLink
-              key={link.path}
-              label={link.label}
-              leftSection={<link.icon size={18} stroke={1.5} />}
-              active={location.pathname === link.path}
-              onClick={() => navigate(link.path)}
-              styles={{
-                root: {
-                  borderRadius: 6,
-                  padding: '6px 8px',
-                  fontSize: 14,
-                  minHeight: 32,
-                },
-                label: {
-                  fontSize: 14,
-                  fontWeight: 400,
-                },
-              }}
-            />
-          ))}
-        </Stack>
-      </Box>
-
-      {/* Shortcuts Section */}
-      <Box mb="sm">
-        <Group justify="space-between" mb={4} px={4}>
-          <Text size="xs" fw={600} c="dimmed" tt="uppercase">
-            Shortcuts
-          </Text>
-          <UnstyledButton>
-            <IconSettings size={14} style={{ color: '#697386' }} />
-          </UnstyledButton>
-        </Group>
-        <Stack gap={0}>
-          {shortcuts.map((link) => (
-            <NavLink
-              key={link.path}
-              label={link.label}
-              leftSection={<link.icon size={18} stroke={1.5} />}
-              active={location.pathname === link.path}
-              onClick={() => navigate(link.path)}
-              styles={{
-                root: {
-                  borderRadius: 6,
-                  padding: '6px 8px',
-                  fontSize: 14,
-                  minHeight: 32,
-                },
-                label: {
-                  fontSize: 14,
-                  fontWeight: 400,
-                },
-              }}
-            />
-          ))}
-        </Stack>
-      </Box>
-
-      <Divider my="xs" />
-
-      {/* Products Section */}
-      <Box mb="sm">
-        <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb={4} px={4}>
-          Products
-        </Text>
-        <Stack gap={0}>
-          {products.map((product) => (
-            <Box key={product.key}>
-              <UnstyledButton
-                w="100%"
-                p="6px 8px"
-                onClick={() => toggleProduct(product.key)}
-                style={(theme) => ({
-                  borderRadius: 6,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  minHeight: 32,
-                  '&:hover': {
-                    backgroundColor: theme.colors.gray[0],
-                  },
-                })}
-              >
-                <product.icon size={18} stroke={1.5} style={{ color: '#697386' }} />
-                <Text size="sm" fw={400} style={{ flex: 1 }}>
-                  {product.label}
-                </Text>
-                <IconChevronRight
-                  size={14}
-                  style={{
-                    color: '#697386',
-                    transform: expandedProducts.includes(product.key) ? 'rotate(90deg)' : 'none',
-                    transition: 'transform 0.2s',
+          {/* Section 1: Common Items */}
+          <Box mb="sm">
+            <Stack gap={0}>
+              {commonItems.map((link) => (
+                <NavLink
+                  key={link.path}
+                  label={link.label}
+                  leftSection={<link.icon size={18} stroke={1.5} />}
+                  active={location.pathname === link.path}
+                  onClick={() => navigate(link.path)}
+                  styles={{
+                    root: {
+                      borderRadius: 6,
+                      padding: '6px 8px',
+                      fontSize: 14,
+                      minHeight: 32,
+                    },
+                    label: {
+                      fontSize: 14,
+                      fontWeight: 400,
+                    },
                   }}
                 />
-              </UnstyledButton>
-              <Collapse in={expandedProducts.includes(product.key)}>
-                <Box pl="md" py="xs">
-                  <Text size="xs" c="dimmed">
-                    {product.label} submenu items
-                  </Text>
-                </Box>
-              </Collapse>
-            </Box>
-          ))}
-        </Stack>
-      </Box>
+              ))}
+            </Stack>
+          </Box>
 
+          <Divider my="xs" />
+
+          {/* Section 2: User Shortcuts */}
+          <Box mb="sm">
+            <Group justify="space-between" mb={8} px={4}>
+              <Text size="xs" fw={600} c="dimmed" tt="uppercase">
+                Shortcuts
+              </Text>
+              <UnstyledButton>
+                <IconSettings size={14} style={{ color: '#697386' }} />
+              </UnstyledButton>
+            </Group>
+
+            {bookmarks.length === 0 ? (
+              <Paper
+                p="md"
+                mx="xs"
+                style={(theme) => ({
+                  backgroundColor: theme.colors.gray[0],
+                  border: `1px dashed ${theme.colors.gray[3]}`,
+                  textAlign: 'center',
+                })}
+              >
+                <IconStarOff size={24} style={{ color: '#ADB5BD', marginBottom: 8 }} />
+                <Text size="xs" c="dimmed">
+                  Add page shortcuts here by
+                </Text>
+                <Text size="xs" c="dimmed">
+                  clicking the <IconStar size={12} style={{ display: 'inline' }} /> icon on any page
+                </Text>
+              </Paper>
+            ) : (
+              <Stack gap={0}>
+                {bookmarks.map((bookmark) => (
+                  <NavLink
+                    key={bookmark.path}
+                    label={bookmark.label}
+                    leftSection={<IconStar size={16} stroke={1.5} />}
+                    active={location.pathname === bookmark.path}
+                    onClick={() => navigate(bookmark.path)}
+                    styles={{
+                      root: {
+                        borderRadius: 6,
+                        padding: '6px 8px',
+                        fontSize: 14,
+                        minHeight: 32,
+                      },
+                      label: {
+                        fontSize: 14,
+                        fontWeight: 400,
+                      },
+                    }}
+                  />
+                ))}
+              </Stack>
+            )}
+          </Box>
+
+          <Divider my="xs" />
+
+          {/* Section 3: Management (Full Menu) */}
+          <Box mb="sm">
+            <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb={8} px={4}>
+              Management
+            </Text>
+            <Stack gap={0}>
+              {fullMenuSections.map((section) => (
+                <Box key={section.key}>
+                  <NavLink
+                    label={section.label}
+                    leftSection={
+                      section.key === 'operations' ? <IconBuildingStore size={18} stroke={1.5} /> :
+                      section.key === 'finance' ? <IconWallet size={18} stroke={1.5} /> :
+                      section.key === 'inventory' ? <IconBoxSeam size={18} stroke={1.5} /> :
+                      section.key === 'customers' ? <IconUsersGroup size={18} stroke={1.5} /> :
+                      section.key === 'delivery' ? <IconMotorbike size={18} stroke={1.5} /> :
+                      <IconLink size={18} stroke={1.5} />
+                    }
+                    rightSection={
+                      <IconChevronRight
+                        size={14}
+                        style={{
+                          color: '#697386',
+                          transform: expandedSections.includes(section.key) ? 'rotate(90deg)' : 'none',
+                          transition: 'transform 0.2s',
+                        }}
+                      />
+                    }
+                    onClick={() => toggleSection(section.key)}
+                    styles={{
+                      root: {
+                        borderRadius: 6,
+                        padding: '6px 8px',
+                        fontSize: 14,
+                        minHeight: 32,
+                      },
+                      label: {
+                        fontSize: 14,
+                        fontWeight: 400,
+                      },
+                    }}
+                  />
+                  <Collapse in={expandedSections.includes(section.key)}>
+                    <Box pl={32} py={2}>
+                      <Stack gap={0}>
+                        {section.items.map((item) => (
+                          <NavLink
+                            key={item.path}
+                            label={item.label}
+                            active={location.pathname === item.path}
+                            onClick={() => navigate(item.path)}
+                            styles={{
+                              root: {
+                                borderRadius: 6,
+                                padding: '6px 8px',
+                                fontSize: 14,
+                                minHeight: 32,
+                              },
+                              label: {
+                                fontSize: 14,
+                                fontWeight: 400,
+                              },
+                            }}
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  </Collapse>
+                </Box>
+              ))}
+            </Stack>
+          </Box>
         </Stack>
       </Box>
 
