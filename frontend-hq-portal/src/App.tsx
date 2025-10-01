@@ -4,6 +4,7 @@ import { Auth0ContextProvider, useAuth } from './contexts/Auth0Context'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardLayout } from './layouts/DashboardLayout'
 import { DashboardPage } from './pages/DashboardPage'
+import { LoadingSpinner } from './components/LoadingSpinner'
 import { useAuth0 } from '@auth0/auth0-react'
 import { useEffect, useState } from 'react'
 
@@ -14,14 +15,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   // Show loading while Auth0 or user profile is loading
   if (authLoading || userLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your profile...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading your profile..." />;
   }
 
   // Redirect to login if not authenticated
@@ -31,14 +25,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   // Wait for user profile to be loaded
   if (isAuthenticated && !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your profile...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Syncing your profile..." />;
   }
 
   // Both auth and user profile are ready
@@ -64,14 +51,7 @@ function CallbackPage() {
     }
   }, [isAuthenticated, isLoading, user, userLoading, navigate]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Completing sign in...</p>
-      </div>
-    </div>
-  );
+  return <LoadingSpinner message="Completing sign in..." />;
 }
 
 // App Content with Auth0 hooks available
