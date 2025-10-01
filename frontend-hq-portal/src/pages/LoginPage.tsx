@@ -179,8 +179,8 @@ export function LoginPage() {
 
             {/* Two Column Layout using Grid */}
             <Grid gutter="xl">
-              {/* Left Column - Email/Password Form - 70% */}
-              <Grid.Col span={8.4}>
+              {/* Left Column - Email/Password Form - 60% */}
+              <Grid.Col span={7.2}>
                 <form onSubmit={handleSubmit}>
                   <Stack gap="md">
                 {/* Sign Up Fields */}
@@ -286,8 +286,8 @@ export function LoginPage() {
                 </form>
               </Grid.Col>
 
-              {/* Right Column - Social Login Buttons - 30% */}
-              <Grid.Col span={3.6}>
+              {/* Right Column - Social Login Buttons - 40% */}
+              <Grid.Col span={4.8}>
                 <Stack gap="sm">
                   <Text size="xs" c="dimmed" mb="xs">Or continue with</Text>
 
