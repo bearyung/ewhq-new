@@ -4,6 +4,7 @@ import { Auth0ContextProvider, useAuth } from './contexts/Auth0Context'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardLayout } from './layouts/DashboardLayout'
 import { DashboardPage } from './pages/DashboardPage'
+import { ProfilePage } from './pages/ProfilePage'
 import OnboardingWizard from './pages/OnboardingWizard'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { useAuth0 } from '@auth0/auth0-react'
@@ -85,6 +86,7 @@ function AppContent() {
         </ProtectedRoute>
       }>
         <Route index element={<DashboardPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
     </Routes>
