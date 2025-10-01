@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Auth0ProviderWithHistory } from './components/Auth0ProviderWithHistory'
 import { Auth0ContextProvider, useAuth } from './contexts/Auth0Context'
+import { BrandProvider } from './contexts/BrandContext'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardLayout } from './layouts/DashboardLayout'
 import { DashboardPage } from './pages/DashboardPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { OrganizationManagementPage } from './pages/OrganizationManagementPage'
 import OnboardingWizard from './pages/OnboardingWizard'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { useAuth0 } from '@auth0/auth0-react'
@@ -87,6 +89,7 @@ function AppContent() {
       }>
         <Route index element={<DashboardPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="organization-management" element={<OrganizationManagementPage />} />
       </Route>
       <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
     </Routes>
@@ -98,7 +101,9 @@ function App() {
     <BrowserRouter>
       <Auth0ProviderWithHistory>
         <Auth0ContextProvider>
-          <AppContent />
+          <BrandProvider>
+            <AppContent />
+          </BrandProvider>
         </Auth0ContextProvider>
       </Auth0ProviderWithHistory>
     </BrowserRouter>
