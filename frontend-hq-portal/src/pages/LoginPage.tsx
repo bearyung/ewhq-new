@@ -1,21 +1,136 @@
 import {
   Box,
   Button,
-  Checkbox,
   Container,
   Divider,
   Paper,
-  PasswordInput,
   Stack,
   Text,
-  TextInput,
   Title,
   Anchor,
   Group,
+  TextInput,
+  PasswordInput,
+  Checkbox,
+  Alert,
 } from '@mantine/core'
-import { IconBrandGoogle } from '@tabler/icons-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/Auth0Context'
+import { IconAlertCircle } from '@tabler/icons-react'
+import {
+  FaGoogle,
+  FaMicrosoft,
+  FaApple,
+  FaXTwitter,
+  FaFacebookF
+} from 'react-icons/fa6'
+import auth0Service from '../services/auth0Service'
 
 export function LoginPage() {
+  const navigate = useNavigate();
+  const { loginWithRedirect, loginWithSocial } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+
+  const handleSocialLogin = (connection: string) => {
+    loginWithSocial(connection);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        // Sign up flow
+        await auth0Service.signup(email, password, firstName, lastName);
+        // After signup, automatically log in
+        await handleDirectLogin();
+      } else {
+        // Direct login
+        await handleDirectLogin();
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during authentication');
+      setLoading(false);
+    }
+  };
+
+  const handleDirectLogin = async () => {
+    // Note: Resource Owner Password Grant might need to be enabled in Auth0
+    // For now, fallback to Universal Login
+    loginWithRedirect({
+      screen_hint: isSignUp ? 'signup' : 'login',
+      login_hint: email,
+    });
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Please enter your email address first');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      await auth0Service.forgotPassword(email);
+      setShowForgotPassword(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send password reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (showForgotPassword) {
+    return (
+      <Box
+        style={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Container size={480} px="md">
+          <Paper radius="md" p="xl" shadow="xl" style={{ backgroundColor: 'white' }}>
+            <Stack gap="lg">
+              <Title order={2} ta="center" fw={600}>
+                Check your email
+              </Title>
+              <Text ta="center" c="dimmed">
+                We've sent password reset instructions to {email}
+              </Text>
+              <Button
+                variant="light"
+                fullWidth
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setEmail('');
+                  setPassword('');
+                }}
+              >
+                Back to login
+              </Button>
+            </Stack>
+          </Paper>
+        </Container>
+      </Box>
+    );
+  }
+
   return (
     <Box
       style={{
@@ -49,105 +164,212 @@ export function LoginPage() {
             backgroundColor: 'white',
           }}
         >
-          <Stack gap="lg">
-            <Title order={2} ta="center" fw={600}>
-              Sign in to your account
-            </Title>
+          <form onSubmit={handleSubmit}>
+            <Stack gap="lg">
+              <Title order={2} ta="center" fw={600}>
+                {isSignUp ? 'Create your account' : 'Sign in to your account'}
+              </Title>
 
-            <Stack gap="md">
-              <TextInput
-                label="Email"
-                placeholder=""
-                size="md"
-                styles={{
-                  label: {
-                    marginBottom: 8,
-                    fontWeight: 500,
-                  },
-                }}
-              />
+              {/* Error Alert */}
+              {error && (
+                <Alert icon={<IconAlertCircle size={16} />} color="red" variant="light">
+                  {error}
+                </Alert>
+              )}
 
-              <Box>
-                <Group justify="space-between" mb={8}>
-                  <Text size="sm" fw={500}>
-                    Password
-                  </Text>
-                  <Anchor size="sm" c="indigo">
-                    Forgot your password?
-                  </Anchor>
-                </Group>
-                <PasswordInput
-                  placeholder=""
+              <Stack gap="md">
+                {/* Sign Up Fields */}
+                {isSignUp && (
+                  <>
+                    <TextInput
+                      label="First Name"
+                      placeholder="John"
+                      size="md"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.currentTarget.value)}
+                      styles={{
+                        label: {
+                          marginBottom: 8,
+                          fontWeight: 500,
+                        },
+                      }}
+                    />
+                    <TextInput
+                      label="Last Name"
+                      placeholder="Doe"
+                      size="md"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.currentTarget.value)}
+                      styles={{
+                        label: {
+                          marginBottom: 8,
+                          fontWeight: 500,
+                        },
+                      }}
+                    />
+                  </>
+                )}
+
+                {/* Email Field */}
+                <TextInput
+                  label="Email"
+                  placeholder="your@email.com"
                   size="md"
+                  required
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.currentTarget.value)}
+                  styles={{
+                    label: {
+                      marginBottom: 8,
+                      fontWeight: 500,
+                    },
+                  }}
                 />
-              </Box>
 
-              <Checkbox
-                label="Remember me on this device"
-                defaultChecked
-              />
+                {/* Password Field */}
+                <Box>
+                  {!isSignUp && (
+                    <Group justify="space-between" mb={8}>
+                      <Text size="sm" fw={500}>
+                        Password
+                      </Text>
+                      <Anchor size="sm" c="indigo" onClick={handleForgotPassword}>
+                        Forgot your password?
+                      </Anchor>
+                    </Group>
+                  )}
+                  <PasswordInput
+                    label={isSignUp ? "Password" : undefined}
+                    placeholder="••••••••"
+                    size="md"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.currentTarget.value)}
+                    styles={isSignUp ? {
+                      label: {
+                        marginBottom: 8,
+                        fontWeight: 500,
+                      },
+                    } : undefined}
+                  />
+                </Box>
 
-              <Button
-                size="md"
-                radius="md"
-                fullWidth
-                style={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                }}
-              >
-                Sign in
-              </Button>
+                {/* Remember Me */}
+                {!isSignUp && (
+                  <Checkbox
+                    label="Remember me on this device"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.currentTarget.checked)}
+                  />
+                )}
 
-              <Divider label="OR" labelPosition="center" />
-
-              <Stack gap="sm">
+                {/* Submit Button */}
                 <Button
-                  variant="default"
+                  type="submit"
                   size="md"
                   radius="md"
                   fullWidth
-                  leftSection={<IconBrandGoogle size={18} />}
+                  loading={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  }}
                 >
-                  Sign in with Google
+                  {isSignUp ? 'Sign up' : 'Sign in'}
                 </Button>
 
-                <Button
-                  variant="default"
-                  size="md"
-                  radius="md"
-                  fullWidth
-                >
-                  Sign in with passkey
-                </Button>
+                <Divider label="OR" labelPosition="center" />
 
-                <Button
-                  variant="default"
-                  size="md"
-                  radius="md"
-                  fullWidth
-                >
-                  Sign in with SSO
-                </Button>
+                {/* Social Login Buttons */}
+                  <Stack gap="sm">
+                    <Button
+                      variant="default"
+                      size="md"
+                      radius="md"
+                      fullWidth
+                      leftSection={<FaGoogle size={18} />}
+                      onClick={() => handleSocialLogin('google-oauth2')}
+                      style={{ justifyContent: 'flex-start' }}
+                    >
+                      Sign {isSignUp ? 'up' : 'in'} with Google
+                    </Button>
+
+                    <Button
+                      variant="default"
+                      size="md"
+                      radius="md"
+                      fullWidth
+                      leftSection={<FaMicrosoft size={18} />}
+                      onClick={() => handleSocialLogin('windowslive')}
+                      style={{ justifyContent: 'flex-start' }}
+                    >
+                      Sign {isSignUp ? 'up' : 'in'} with Microsoft
+                    </Button>
+
+                    <Button
+                      variant="default"
+                      size="md"
+                      radius="md"
+                      fullWidth
+                      leftSection={<FaApple size={18} />}
+                      onClick={() => handleSocialLogin('apple')}
+                      style={{ justifyContent: 'flex-start' }}
+                    >
+                      Sign {isSignUp ? 'up' : 'in'} with Apple
+                    </Button>
+
+                    <Button
+                      variant="default"
+                      size="md"
+                      radius="md"
+                      fullWidth
+                      leftSection={<FaFacebookF size={18} />}
+                      onClick={() => handleSocialLogin('facebook')}
+                      style={{ justifyContent: 'flex-start' }}
+                    >
+                      Sign {isSignUp ? 'up' : 'in'} with Facebook
+                    </Button>
+
+                    <Button
+                      variant="default"
+                      size="md"
+                      radius="md"
+                      fullWidth
+                      leftSection={<FaXTwitter size={18} />}
+                      onClick={() => handleSocialLogin('twitter')}
+                      style={{ justifyContent: 'flex-start' }}
+                    >
+                      Sign {isSignUp ? 'up' : 'in'} with X
+                    </Button>
+                  </Stack>
+                </Stack>
               </Stack>
-            </Stack>
-
-            <Box
-              p="md"
-              style={{
-                backgroundColor: '#f8f9fa',
-                borderRadius: 8,
-              }}
-            >
-              <Group gap="xs">
-                <Text size="sm" c="dimmed">
-                  New to EWHQ?
-                </Text>
-                <Anchor size="sm" c="indigo" fw={500}>
-                  Create account
-                </Anchor>
-              </Group>
-            </Box>
-          </Stack>
+            </form>
+          <Box
+            p="md"
+            style={{
+              backgroundColor: '#f8f9fa',
+              borderRadius: 8,
+            }}
+          >
+            <Group gap="xs" justify="center">
+              <Text size="sm" c="dimmed">
+                {isSignUp ? 'Already have an account?' : 'New to EWHQ?'}
+              </Text>
+              <Anchor
+                size="sm"
+                c="indigo"
+                fw={500}
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setError('');
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {isSignUp ? 'Sign in' : 'Create account'}
+              </Anchor>
+            </Group>
+          </Box>
         </Paper>
 
         <Box mt="xl" ta="center">
