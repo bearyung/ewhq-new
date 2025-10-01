@@ -9,6 +9,8 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { OrganizationManagementPage } from './pages/OrganizationManagementPage'
 import OnboardingWizard from './pages/OnboardingWizard'
+import { MenuPage } from './pages/MenuPage'
+import { MenuCategoriesPage } from './pages/MenuCategoriesPage'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { useAuth0 } from '@auth0/auth0-react'
 import { useEffect, useState } from 'react'
@@ -91,6 +93,8 @@ function AppContent() {
         <Route index element={<DashboardPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="organization-management" element={<OrganizationManagementPage />} />
+        <Route path="menus" element={<MenuPage />} />
+        <Route path="menus/categories" element={<MenuCategoriesPage />} />
       </Route>
       <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
     </Routes>
