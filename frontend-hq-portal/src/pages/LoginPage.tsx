@@ -105,7 +105,7 @@ export function LoginPage() {
           justifyContent: 'center',
         }}
       >
-        <Container size={860} px="md">
+        <Container size={980} px="md">
           <Paper radius="md" p="xl" shadow="xl" style={{ backgroundColor: 'white' }}>
             <Stack gap="lg">
               <Title order={2} ta="center" fw={600}>
@@ -172,7 +172,7 @@ export function LoginPage() {
         </Text>
       </Box>
 
-      <Container size={860} px="md" pt={{ base: 60, sm: 0 }}>
+      <Container size={980} px="md" pt={{ base: 60, sm: 0 }}>
         <Paper
           radius="md"
           p="xl"
