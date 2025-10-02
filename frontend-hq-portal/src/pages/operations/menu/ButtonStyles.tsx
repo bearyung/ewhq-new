@@ -28,7 +28,7 @@ import {
   IconAlertCircle,
   IconDownload
 } from '@tabler/icons-react';
-import { BreadcrumbWithDropdown } from '../../../components/BreadcrumbWithDropdown';
+import { MenuBreadcrumb } from '../../../components/MenuBreadcrumb';
 import { useBrands } from '../../../contexts/BrandContext';
 import buttonStyleService from '../../../services/buttonStyleService';
 import type { ButtonStyle, CreateButtonStyle, UpdateButtonStyle } from '../../../types/buttonStyle';
@@ -236,25 +236,7 @@ const ButtonStylesPage: React.FC = () => {
         }}
       >
         <Container size="xl" px="xl" style={{ marginInline: 0 }}>
-          <BreadcrumbWithDropdown
-            items={[
-              { label: 'Dashboard', path: '/' },
-              { label: 'Menu Management', path: '/menus' },
-              {
-                label: 'Button Styles',
-                isDropdown: true,
-                dropdownItems: [
-                  { label: 'Categories', path: '/menus/categories' },
-                  { label: 'Virtual Categories', path: '/menus/virtual-categories' },
-                  { label: 'Menu Items', path: '/menus/items' },
-                  { label: 'Modifiers', path: '/menus/modifiers' },
-                  { label: 'Promotions', path: '/menus/promotions' },
-                  { label: 'Discounts', path: '/menus/discounts' },
-                  { label: 'Button Styles', path: '/operations/menu/button-styles' },
-                ],
-              },
-            ]}
-          />
+          <MenuBreadcrumb />
         </Container>
       </Box>
 
