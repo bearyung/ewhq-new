@@ -21,7 +21,8 @@ class ApiService {
       throw new Error(`API request failed: ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    return { data };
   }
 
   async post(endpoint: string, data: any) {
@@ -39,7 +40,8 @@ class ApiService {
       throw new Error(`API request failed: ${response.statusText}`);
     }
 
-    return response.json();
+    const responseData = await response.json();
+    return { data: responseData };
   }
 
   async put(endpoint: string, data: any) {
