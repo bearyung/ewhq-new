@@ -17,15 +17,18 @@ import {
   Center,
   ActionIcon,
   Badge,
-  ColorInput
+  ColorInput,
+  Container
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
   IconPlus,
   IconEdit,
   IconTrash,
-  IconAlertCircle
+  IconAlertCircle,
+  IconDownload
 } from '@tabler/icons-react';
+import { BreadcrumbWithDropdown } from '../../../components/BreadcrumbWithDropdown';
 import { useBrands } from '../../../contexts/BrandContext';
 import buttonStyleService from '../../../services/buttonStyleService';
 import type { ButtonStyle, CreateButtonStyle, UpdateButtonStyle } from '../../../types/buttonStyle';
@@ -218,19 +221,90 @@ const ButtonStylesPage: React.FC = () => {
   }
 
   return (
-    <Box p="xl">
-      <Group justify="space-between" mb="lg">
-        <Title order={2}>Button Styles</Title>
-        <Button
-          leftSection={<IconPlus size={16} />}
-          onClick={handleAdd}
-          color="green"
-        >
-          New Button Style
-        </Button>
-      </Group>
+    <Box>
+      {/* Sticky Breadcrumbs */}
+      <Box
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          backgroundColor: 'white',
+          borderBottom: '1px solid #E3E8EE',
+          minHeight: 48,
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <Container size="xl" px="xl" style={{ marginInline: 0 }}>
+          <BreadcrumbWithDropdown
+            items={[
+              { label: 'Dashboard', path: '/' },
+              { label: 'Menu Management', path: '/menus' },
+              {
+                label: 'Button Styles',
+                isDropdown: true,
+                dropdownItems: [
+                  { label: 'Categories', path: '/menus/categories' },
+                  { label: 'Virtual Categories', path: '/menus/virtual-categories' },
+                  { label: 'Menu Items', path: '/menus/items' },
+                  { label: 'Modifiers', path: '/menus/modifiers' },
+                  { label: 'Promotions', path: '/menus/promotions' },
+                  { label: 'Discounts', path: '/menus/discounts' },
+                  { label: 'Button Styles', path: '/operations/menu/button-styles' },
+                ],
+              },
+            ]}
+          />
+        </Container>
+      </Box>
 
-      <Paper withBorder shadow="sm">
+      {/* Page Header - Non-sticky */}
+      <Box
+        pt="xl"
+        px="xl"
+        pb="xl"
+        style={{
+          backgroundColor: 'white',
+        }}
+      >
+        <Container size="xl">
+          <Group justify="space-between">
+            <Box>
+              <Title order={1} size={28} fw={600}>
+                Button Styles
+              </Title>
+              <Text size="sm" c="dimmed" mt={4}>
+                Customize menu button appearance and layout
+              </Text>
+            </Box>
+
+            <Group gap="sm">
+              <Button
+                variant="default"
+                leftSection={<IconDownload size={16} />}
+                style={{ border: '1px solid #E3E8EE' }}
+              >
+                Export
+              </Button>
+              <Button
+                leftSection={<IconPlus size={16} />}
+                style={{
+                  backgroundColor: '#5469D4',
+                  color: 'white',
+                }}
+                onClick={handleAdd}
+              >
+                Add Button Style
+              </Button>
+            </Group>
+          </Group>
+        </Container>
+      </Box>
+
+      {/* Main Content Area */}
+      <Box style={{ backgroundColor: '#F6F9FC', minHeight: 'calc(100vh - 200px)' }}>
+        <Container size="xl" py="xl">
+          <Paper withBorder shadow="sm" style={{ backgroundColor: 'white' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -332,6 +406,8 @@ const ButtonStylesPage: React.FC = () => {
           </Table.Tbody>
         </Table>
       </Paper>
+        </Container>
+      </Box>
 
       {/* Add/Edit Modal */}
       <Modal
