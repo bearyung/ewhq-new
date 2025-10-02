@@ -101,7 +101,7 @@ const menuSections = [
     color: 'violet',
     description: 'Customize menu button appearance and layout',
     stats: '4 styles',
-    path: '/operations/menu/button-styles',
+    path: '/menus/button-styles',
   },
 ]
 

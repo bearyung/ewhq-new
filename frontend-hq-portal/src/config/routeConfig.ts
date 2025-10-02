@@ -52,7 +52,7 @@ export const ROUTE_CONFIG: RouteItem[] = [
         label: 'Discounts',
       },
       {
-        path: '/operations/menu/button-styles',
+        path: '/menus/button-styles',
         label: 'Button Styles',
       },
     ],

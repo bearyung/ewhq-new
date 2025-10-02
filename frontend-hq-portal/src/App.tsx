@@ -96,7 +96,7 @@ function AppContent() {
         <Route path="organization-management" element={<OrganizationManagementPage />} />
         <Route path="menus" element={<MenuPage />} />
         <Route path="menus/categories" element={<MenuCategoriesPage />} />
-        <Route path="operations/menu/button-styles" element={<ButtonStylesPage />} />
+        <Route path="menus/button-styles" element={<ButtonStylesPage />} />
       </Route>
       <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
     </Routes>
