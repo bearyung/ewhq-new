@@ -60,6 +60,23 @@ const ButtonStylesPage: React.FC = () => {
   const { selectedBrand } = useBrands();
   const selectedBrandId = selectedBrand ? parseInt(selectedBrand) : null;
 
+  // Calculate text color based on background luminance
+  const getContrastTextColor = (bgColor: string | null | undefined): string => {
+    if (!bgColor) return '#000000';
+
+    // Convert hex to RGB
+    const hex = bgColor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+    // Calculate relative luminance (WCAG formula)
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+    // Return black for light backgrounds, white for dark backgrounds
+    return luminance > 0.5 ? '#000000' : '#FFFFFF';
+  };
+
   useEffect(() => {
     if (selectedBrandId) {
       fetchButtonStyles();
@@ -480,7 +497,7 @@ const ButtonStylesPage: React.FC = () => {
                         justifyContent: 'center',
                         fontSize: `${Math.min(style.fontSize, 14)}px`,
                         fontWeight: 500,
-                        color: style.fontColor || '#000000'
+                        color: getContrastTextColor(convertHexColor(style.backgroundColorTop))
                       }}
                     >
                       {style.styleName}
@@ -563,7 +580,8 @@ const ButtonStylesPage: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: `${formData.fontSize}px`,
-                  fontWeight: 500
+                  fontWeight: 500,
+                  color: getContrastTextColor(convertHexColor(formData.backgroundColorTop))
                 }}
               >
                 {formData.styleName || 'Button'}
