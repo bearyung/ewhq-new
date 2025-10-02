@@ -9,23 +9,17 @@ import {
   Button,
   TextInput,
   ActionIcon,
-  Table,
   Badge,
   Menu,
   Switch,
-  Breadcrumbs,
   Anchor,
   UnstyledButton,
-  Avatar,
   Checkbox,
   Tooltip,
   Drawer,
-  Select,
   Textarea,
-  NumberInput,
   ColorSwatch,
   Grid,
-  Image,
   FileButton,
 } from '@mantine/core'
 import {
@@ -33,7 +27,6 @@ import {
   IconPlus,
   IconFilter,
   IconDownload,
-  IconChevronRight,
   IconDots,
   IconEdit,
   IconTrash,
@@ -42,17 +35,26 @@ import {
   IconEyeOff,
   IconGripVertical,
   IconPhoto,
-  IconUpload,
-  IconX,
   IconCheck,
   IconAlertCircle,
 } from '@tabler/icons-react'
 import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { AutoBreadcrumb } from '../components/AutoBreadcrumb'
 
+// Category type
+interface Category {
+  id: number
+  name: string
+  description: string
+  items: number
+  visible: boolean
+  order: number
+  color: string
+  image: string | null
+}
+
 // Sample data for categories
-const categoriesData = [
+const categoriesData: Category[] = [
   {
     id: 1,
     name: 'Appetizers',
@@ -96,11 +98,10 @@ const categoriesData = [
 ]
 
 export function MenuCategoriesPage() {
-  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<number[]>([])
   const [drawerOpened, setDrawerOpened] = useState(false)
-  const [editingCategory, setEditingCategory] = useState<any>(null)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const resetRef = useRef<() => void>(null)
   const [file, setFile] = useState<File | null>(null)
 
@@ -112,7 +113,7 @@ export function MenuCategoriesPage() {
     visible: true,
   })
 
-  const handleEdit = (category: any) => {
+  const handleEdit = (category: Category) => {
     setEditingCategory(category)
     setFormData({
       name: category.name,

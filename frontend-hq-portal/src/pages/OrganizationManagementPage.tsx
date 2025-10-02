@@ -10,7 +10,6 @@ import {
   Button,
   Card,
   Badge,
-  Table,
   ActionIcon,
   Modal,
   TextInput,

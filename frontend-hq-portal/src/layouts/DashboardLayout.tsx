@@ -1,4 +1,4 @@
-import { Box, Group, TextInput, ActionIcon, Badge, Burger } from '@mantine/core'
+import { Box, Group, TextInput, ActionIcon, Burger } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../components/Sidebar'
@@ -8,7 +8,6 @@ import {
   IconHelp,
   IconBell,
   IconSettings,
-  IconPlus,
 } from '@tabler/icons-react'
 
 export function DashboardLayout() {

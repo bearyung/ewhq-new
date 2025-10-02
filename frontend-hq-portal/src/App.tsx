@@ -14,7 +14,7 @@ import { MenuCategoriesPage } from './pages/MenuCategoriesPage'
 import ButtonStylesPage from './pages/operations/menu/ButtonStyles'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { useAuth0 } from '@auth0/auth0-react'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 
 // Protected Route Component
 function ProtectedRoute({ children, requireTenant = true }: { children: React.ReactNode, requireTenant?: boolean }) {

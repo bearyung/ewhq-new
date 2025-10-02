@@ -19,11 +19,16 @@ interface UserProfile {
   }>;
 }
 
+interface LoginOptions {
+  screen_hint?: string;
+  login_hint?: string;
+}
+
 interface Auth0ContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   user: UserProfile | null;
-  loginWithRedirect: (options?: any) => void;
+  loginWithRedirect: (options?: LoginOptions) => void;
   loginWithSocial: (connection: string) => void;
   logout: () => void;
   getAccessToken: () => Promise<string>;
@@ -35,6 +40,7 @@ interface Auth0ContextType {
 
 const Auth0Context = createContext<Auth0ContextType | undefined>(undefined);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(Auth0Context);
   if (!context) {
@@ -58,7 +64,6 @@ export const Auth0ContextProvider: React.FC<Auth0ContextProviderProps> = ({ chil
   } = useAuth0();
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
   const [profileLoadAttempted, setProfileLoadAttempted] = useState(false);
 
   // Cache the Auth0 token for API calls
@@ -89,7 +94,6 @@ export const Auth0ContextProvider: React.FC<Auth0ContextProviderProps> = ({ chil
   useEffect(() => {
     const syncUserProfile = async () => {
       if (isAuthenticated && auth0User) {
-        setProfileLoading(true);
         setProfileLoadAttempted(false);
         try {
           const token = await getAccessTokenSilently();
@@ -105,7 +109,7 @@ export const Auth0ContextProvider: React.FC<Auth0ContextProviderProps> = ({ chil
           });
 
           if (syncResponse.ok) {
-            const syncData = await syncResponse.json();
+            await syncResponse.json();
 
             // Get full profile
             const profileResponse = await fetch(`${apiUrl}/api/auth0/profile`, {
@@ -146,7 +150,6 @@ export const Auth0ContextProvider: React.FC<Auth0ContextProviderProps> = ({ chil
             setUserProfile(fallbackProfile);
           }
         } finally {
-          setProfileLoading(false);
           setProfileLoadAttempted(true);
         }
       } else if (!auth0Loading && !isAuthenticated) {
@@ -159,9 +162,12 @@ export const Auth0ContextProvider: React.FC<Auth0ContextProviderProps> = ({ chil
     syncUserProfile();
   }, [isAuthenticated, auth0User, getAccessTokenSilently, auth0Loading]);
 
-  const loginWithRedirect = (options?: any) => {
+  const loginWithRedirect = (options?: LoginOptions) => {
     auth0LoginWithRedirect({
-      ...options,
+      authorizationParams: {
+        screen_hint: options?.screen_hint,
+        login_hint: options?.login_hint,
+      },
       appState: {
         returnTo: window.location.pathname,
       },

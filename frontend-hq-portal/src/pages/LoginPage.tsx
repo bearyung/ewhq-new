@@ -16,7 +16,6 @@ import {
   Grid,
 } from '@mantine/core'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/Auth0Context'
 import { IconAlertCircle } from '@tabler/icons-react'
 import {
@@ -29,7 +28,6 @@ import {
 import auth0Service from '../services/auth0Service'
 
 export function LoginPage() {
-  const navigate = useNavigate();
   const { loginWithRedirect, loginWithSocial } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -60,8 +58,9 @@ export function LoginPage() {
         // Direct login
         await handleDirectLogin();
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during authentication');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred during authentication';
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -87,8 +86,9 @@ export function LoginPage() {
     try {
       await auth0Service.forgotPassword(email);
       setShowForgotPassword(true);
-    } catch (err: any) {
-      setError(err.message || 'Failed to send password reset email');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send password reset email';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

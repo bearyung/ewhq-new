@@ -13,7 +13,6 @@ import {
   Anchor,
   ActionIcon,
   SimpleGrid,
-  Alert,
 } from '@mantine/core'
 import {
   IconChevronDown,
@@ -22,7 +21,6 @@ import {
   IconPlus,
   IconEdit,
   IconSparkles,
-  IconUser,
 } from '@tabler/icons-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { useAuth } from '../contexts/Auth0Context'
@@ -49,7 +47,7 @@ const weeklyData = [
 ]
 
 export function DashboardPage() {
-  const { user, isAdmin, hasRole } = useAuth();
+  useAuth();
 
   return (
     <Box>

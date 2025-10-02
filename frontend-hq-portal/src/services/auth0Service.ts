@@ -28,8 +28,8 @@ class Auth0Service {
       );
 
       return response.data;
-    } catch (error: any) {
-      if (error.response?.data?.error_description) {
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.data?.error_description) {
         throw new Error(error.response.data.error_description);
       }
       throw error;
@@ -59,8 +59,8 @@ class Auth0Service {
       );
 
       return response.data;
-    } catch (error: any) {
-      if (error.response?.data?.description) {
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.data?.description) {
         throw new Error(error.response.data.description);
       }
       throw error;
@@ -85,8 +85,8 @@ class Auth0Service {
       );
 
       return response.data;
-    } catch (error: any) {
-      if (error.response?.data?.description) {
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.data?.description) {
         throw new Error(error.response.data.description);
       }
       throw error;
@@ -95,20 +95,16 @@ class Auth0Service {
 
   // Get user info from token
   async getUserInfo(accessToken: string) {
-    try {
-      const response = await axios.get(
-        `https://${this.domain}/userinfo`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
+    const response = await axios.get(
+      `https://${this.domain}/userinfo`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
         }
-      );
+      }
+    );
 
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    return response.data;
   }
 }
 

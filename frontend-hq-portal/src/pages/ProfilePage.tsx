@@ -17,9 +17,7 @@ import {
   PasswordInput,
   Grid,
   Box,
-  ActionIcon,
   Loader,
-  Flex,
 } from '@mantine/core';
 import {
   IconUser,
@@ -95,7 +93,7 @@ export function ProfilePage() {
       } else {
         throw new Error('Failed to update profile');
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
     } finally {
       setLoading(false);
@@ -142,7 +140,7 @@ export function ProfilePage() {
       } else {
         throw new Error('Failed to change password');
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to change password. Please check your current password.' });
     } finally {
       setLoading(false);
