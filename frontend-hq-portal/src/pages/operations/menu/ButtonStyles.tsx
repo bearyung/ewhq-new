@@ -28,7 +28,7 @@ import {
   IconAlertCircle,
   IconDownload
 } from '@tabler/icons-react';
-import { MenuBreadcrumb } from '../../../components/MenuBreadcrumb';
+import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../contexts/BrandContext';
 import buttonStyleService from '../../../services/buttonStyleService';
 import type { ButtonStyle, CreateButtonStyle, UpdateButtonStyle } from '../../../types/buttonStyle';
@@ -236,7 +236,7 @@ const ButtonStylesPage: React.FC = () => {
         }}
       >
         <Container size="xl" px="xl" style={{ marginInline: 0 }}>
-          <MenuBreadcrumb />
+          <AutoBreadcrumb />
         </Container>
       </Box>
 

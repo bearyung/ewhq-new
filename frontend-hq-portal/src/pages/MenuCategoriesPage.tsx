@@ -49,7 +49,7 @@ import {
 } from '@tabler/icons-react'
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MenuBreadcrumb } from '../components/MenuBreadcrumb'
+import { AutoBreadcrumb } from '../components/AutoBreadcrumb'
 
 // Sample data for categories
 const categoriesData = [
@@ -162,7 +162,7 @@ export function MenuCategoriesPage() {
         }}
       >
         <Container size="xl" px="xl" style={{ marginInline: 0 }}>
-          <MenuBreadcrumb />
+          <AutoBreadcrumb />
         </Container>
       </Box>
 
