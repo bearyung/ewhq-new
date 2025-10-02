@@ -287,6 +287,9 @@ public class EWHQDbContext : DbContext
         modelBuilder.Entity<ButtonStyleMaster>()
             .HasKey(e => new { e.ButtonStyleId, e.AccountId });
 
+        modelBuilder.Entity<ButtonStyleMaster>()
+            .ToTable(tb => tb.HasTrigger("trigger_ButtonStyleMaster_UpdatedDate"));
+
         modelBuilder.Entity<CashDrawerHeader>()
             .HasKey(e => new { e.CashDrawerCode, e.AccountId, e.ShopId });
 

@@ -159,6 +159,26 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     )
   }
 
+  // Auto-expand sections when a subitem is active
+  useEffect(() => {
+    const sectionsToExpand: string[] = []
+
+    fullMenuSections.forEach((section) => {
+      const hasActiveItem = section.items.some((item) =>
+        location.pathname === item.path ||
+        (item.path !== '/' && location.pathname.startsWith(item.path + '/'))
+      )
+
+      if (hasActiveItem && !expandedSections.includes(section.key)) {
+        sectionsToExpand.push(section.key)
+      }
+    })
+
+    if (sectionsToExpand.length > 0) {
+      setExpandedSections(prev => [...new Set([...prev, ...sectionsToExpand])])
+    }
+  }, [location.pathname])
+
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Close button - Mobile only */}

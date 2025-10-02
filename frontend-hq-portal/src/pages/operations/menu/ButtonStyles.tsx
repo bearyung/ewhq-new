@@ -18,7 +18,8 @@ import {
   ActionIcon,
   Badge,
   ColorInput,
-  Container
+  Container,
+  Loader
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -26,7 +27,10 @@ import {
   IconEdit,
   IconTrash,
   IconAlertCircle,
-  IconDownload
+  IconDownload,
+  IconChevronUp,
+  IconChevronDown,
+  IconSearch
 } from '@tabler/icons-react';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../contexts/BrandContext';
@@ -36,9 +40,14 @@ import type { ButtonStyle, CreateButtonStyle, UpdateButtonStyle } from '../../..
 const ButtonStylesPage: React.FC = () => {
   const [buttonStyles, setButtonStyles] = useState<ButtonStyle[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<ButtonStyle | null>(null);
+  const [sortBy, setSortBy] = useState<'id' | 'name' | 'color'>('id');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [filterText, setFilterText] = useState('');
   const [formData, setFormData] = useState<CreateButtonStyle>({
     styleName: '',
     backgroundColorTop: '#FFFFFF',
@@ -135,20 +144,37 @@ const ButtonStylesPage: React.FC = () => {
   const handleSave = async () => {
     if (!selectedBrandId) return;
 
+    setSaving(true);
     try {
       if (selectedStyle) {
+        // Update existing button style
         await buttonStyleService.updateButtonStyle(
           selectedBrandId,
           selectedStyle.buttonStyleId,
           formData as UpdateButtonStyle
         );
+
+        // Update the item in the local state
+        setButtonStyles(prevStyles =>
+          prevStyles.map(style =>
+            style.buttonStyleId === selectedStyle.buttonStyleId
+              ? { ...style, ...formData }
+              : style
+          )
+        );
+
         notifications.show({
           title: 'Success',
           message: 'Button style updated successfully',
           color: 'green'
         });
       } else {
-        await buttonStyleService.createButtonStyle(selectedBrandId, formData);
+        // Create new button style
+        const createdStyle = await buttonStyleService.createButtonStyle(selectedBrandId, formData);
+
+        // Add the new item to the local state
+        setButtonStyles(prevStyles => [...prevStyles, createdStyle]);
+
         notifications.show({
           title: 'Success',
           message: 'Button style created successfully',
@@ -156,7 +182,6 @@ const ButtonStylesPage: React.FC = () => {
         });
       }
       setDialogOpen(false);
-      fetchButtonStyles();
     } catch (error) {
       console.error('Failed to save button style:', error);
       notifications.show({
@@ -164,21 +189,29 @@ const ButtonStylesPage: React.FC = () => {
         message: 'Failed to save button style',
         color: 'red'
       });
+    } finally {
+      setSaving(false);
     }
   };
 
   const confirmDelete = async () => {
     if (!selectedBrandId || !selectedStyle) return;
 
+    setDeleting(true);
     try {
       await buttonStyleService.deleteButtonStyle(selectedBrandId, selectedStyle.buttonStyleId);
+
+      // Remove the item from the local state
+      setButtonStyles(prevStyles =>
+        prevStyles.filter(style => style.buttonStyleId !== selectedStyle.buttonStyleId)
+      );
+
       notifications.show({
         title: 'Success',
         message: 'Button style deleted successfully',
         color: 'green'
       });
       setDeleteDialogOpen(false);
-      fetchButtonStyles();
     } catch (error) {
       console.error('Failed to delete button style:', error);
       notifications.show({
@@ -186,6 +219,8 @@ const ButtonStylesPage: React.FC = () => {
         message: 'Failed to delete button style',
         color: 'red'
       });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -205,6 +240,48 @@ const ButtonStylesPage: React.FC = () => {
     }
     return color;
   };
+
+  const handleSort = (column: 'id' | 'name' | 'color') => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const filteredAndSortedStyles = React.useMemo(() => {
+    let filtered = buttonStyles;
+
+    // Apply filter
+    if (filterText) {
+      filtered = filtered.filter(style =>
+        style.styleName.toLowerCase().includes(filterText.toLowerCase()) ||
+        style.buttonStyleId.toString().includes(filterText)
+      );
+    }
+
+    // Apply sort
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case 'id':
+          comparison = a.buttonStyleId - b.buttonStyleId;
+          break;
+        case 'name':
+          comparison = a.styleName.localeCompare(b.styleName);
+          break;
+        case 'color':
+          comparison = (a.backgroundColorTop || '').localeCompare(b.backgroundColorTop || '');
+          break;
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [buttonStyles, filterText, sortBy, sortOrder]);
 
   if (!selectedBrand) {
     return (
@@ -287,29 +364,99 @@ const ButtonStylesPage: React.FC = () => {
       <Box style={{ backgroundColor: '#F6F9FC', minHeight: 'calc(100vh - 200px)' }}>
         <Container size="xl" py="xl">
           <Paper withBorder shadow="sm" style={{ backgroundColor: 'white' }}>
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th style={{ width: '80px' }}>ID</Table.Th>
-              <Table.Th>Style Name</Table.Th>
-              <Table.Th>Preview</Table.Th>
-              <Table.Th>Color Code</Table.Th>
-              <Table.Th>Dimensions</Table.Th>
-              <Table.Th>Font Size</Table.Th>
-              <Table.Th style={{ width: '100px', textAlign: 'center' }}>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {!buttonStyles || buttonStyles.length === 0 ? (
-              <Table.Tr>
-                <Table.Td colSpan={7}>
-                  <Text ta="center" c="dimmed" py="lg">
-                    No button styles found. Create your first button style!
-                  </Text>
-                </Table.Td>
-              </Table.Tr>
-            ) : (
-              buttonStyles.map((style) => (
+            {/* Filter Bar */}
+            <Box p="md" style={{ borderBottom: '1px solid #E3E8EE' }}>
+              <TextInput
+                placeholder="Search by name or ID..."
+                leftSection={<IconSearch size={16} />}
+                value={filterText}
+                onChange={(e) => setFilterText(e.currentTarget.value)}
+                styles={{
+                  input: {
+                    border: '1px solid #E3E8EE',
+                    '&:focus': {
+                      borderColor: '#5469D4',
+                    },
+                  },
+                }}
+              />
+            </Box>
+
+            {/* Table with horizontal scroll */}
+            <Box style={{ overflow: 'auto' }}>
+              <Table striped highlightOnHover style={{ minWidth: '800px' }}>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th
+                      style={{ width: '80px', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('id')}
+                    >
+                      <Group gap="xs">
+                        ID
+                        {sortBy === 'id' && (
+                          sortOrder === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />
+                        )}
+                      </Group>
+                    </Table.Th>
+                    <Table.Th
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('name')}
+                    >
+                      <Group gap="xs">
+                        Style Name
+                        {sortBy === 'name' && (
+                          sortOrder === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />
+                        )}
+                      </Group>
+                    </Table.Th>
+                    <Table.Th>Preview</Table.Th>
+                    <Table.Th
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('color')}
+                    >
+                      <Group gap="xs">
+                        Color Code
+                        {sortBy === 'color' && (
+                          sortOrder === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />
+                        )}
+                      </Group>
+                    </Table.Th>
+                    <Table.Th
+                      style={{
+                        width: '100px',
+                        textAlign: 'center',
+                        position: 'sticky',
+                        right: 0,
+                        backgroundColor: 'white',
+                        boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+                      }}
+                    >
+                      Actions
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {loading ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={5}>
+                        <Center py="xl">
+                          <Stack align="center" gap="md">
+                            <Loader size="lg" />
+                            <Text c="dimmed">Loading button styles...</Text>
+                          </Stack>
+                        </Center>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : !filteredAndSortedStyles || filteredAndSortedStyles.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={5}>
+                        <Text ta="center" c="dimmed" py="lg">
+                          {filterText ? 'No button styles match your search.' : 'No button styles found. Create your first button style!'}
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : (
+                    filteredAndSortedStyles.map((style) => (
                 <Table.Tr key={style.buttonStyleId}>
                   <Table.Td>{style.buttonStyleId}</Table.Td>
                   <Table.Td>
@@ -355,13 +502,14 @@ const ButtonStylesPage: React.FC = () => {
                       </Text>
                     </Group>
                   </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">{style.width} × {style.height}px</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">{style.fontSize}pt</Text>
-                  </Table.Td>
-                  <Table.Td>
+                  <Table.Td
+                    style={{
+                      position: 'sticky',
+                      right: 0,
+                      backgroundColor: 'white',
+                      boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+                    }}
+                  >
                     <Group gap="xs" justify="center">
                       <ActionIcon
                         variant="subtle"
@@ -387,6 +535,7 @@ const ButtonStylesPage: React.FC = () => {
             )}
           </Table.Tbody>
         </Table>
+            </Box>
       </Paper>
         </Container>
       </Box>
@@ -427,22 +576,13 @@ const ButtonStylesPage: React.FC = () => {
 
           {/* Form Fields */}
           <Grid>
-            <Grid.Col span={6}>
+            <Grid.Col span={12}>
               <TextInput
                 label="Style Name"
                 placeholder="e.g., Primary Button"
                 value={formData.styleName}
                 onChange={(e) => setFormData({ ...formData, styleName: e.currentTarget.value })}
                 required
-              />
-            </Grid.Col>
-
-            <Grid.Col span={6}>
-              <TextInput
-                label="Alternative Name"
-                placeholder="Optional alternative name"
-                value={formData.styleNameAlt || ''}
-                onChange={(e) => setFormData({ ...formData, styleNameAlt: e.currentTarget.value })}
               />
             </Grid.Col>
 
@@ -457,53 +597,16 @@ const ButtonStylesPage: React.FC = () => {
                 format="hex"
               />
             </Grid.Col>
-
-            <Grid.Col span={4}>
-              <NumberInput
-                label="Font Size (pt)"
-                value={formData.fontSize}
-                onChange={(value) => setFormData({ ...formData, fontSize: value || 22 })}
-                min={8}
-                max={72}
-              />
-            </Grid.Col>
-
-            <Grid.Col span={4}>
-              <NumberInput
-                label="Width (px)"
-                value={formData.width || 115}
-                onChange={(value) => setFormData({ ...formData, width: value || 115 })}
-                min={50}
-                max={500}
-              />
-            </Grid.Col>
-
-            <Grid.Col span={4}>
-              <NumberInput
-                label="Height (px)"
-                value={formData.height || 84}
-                onChange={(value) => setFormData({ ...formData, height: value || 84 })}
-                min={30}
-                max={300}
-              />
-            </Grid.Col>
-
-            <Grid.Col span={12}>
-              <Checkbox
-                label="Enabled"
-                checked={formData.enabled}
-                onChange={(e) => setFormData({ ...formData, enabled: e.currentTarget.checked })}
-              />
-            </Grid.Col>
           </Grid>
 
           <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={() => setDialogOpen(false)}>
+            <Button variant="default" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!formData.styleName.trim()}
+              disabled={!formData.styleName.trim() || saving}
+              loading={saving}
               color="green"
             >
               {selectedStyle ? 'Update' : 'Create'}
@@ -524,10 +627,10 @@ const ButtonStylesPage: React.FC = () => {
           This action cannot be undone.
         </Text>
         <Group justify="flex-end">
-          <Button variant="default" onClick={() => setDeleteDialogOpen(false)}>
+          <Button variant="default" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
             Cancel
           </Button>
-          <Button color="red" onClick={confirmDelete}>
+          <Button color="red" onClick={confirmDelete} loading={deleting} disabled={deleting}>
             Delete
           </Button>
         </Group>

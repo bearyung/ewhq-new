@@ -138,14 +138,8 @@ public class ButtonStylesController : ControllerBase
         {
             var (context, accountId) = await _posContextService.GetContextAndAccountIdForBrandAsync(brandId);
 
-            // Get next ButtonStyleId for this account
-            var maxId = await context.ButtonStyleMasters
-                .Where(bs => bs.AccountId == accountId)
-                .MaxAsync(bs => (int?)bs.ButtonStyleId) ?? 0;
-
             var buttonStyle = new ButtonStyleMaster
             {
-                ButtonStyleId = maxId + 1,
                 AccountId = accountId,
                 StyleName = createDto.StyleName,
                 StyleNameAlt = createDto.StyleNameAlt,
