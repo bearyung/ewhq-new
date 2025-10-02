@@ -15,8 +15,7 @@ public class ItemCategory
     public int AccountId { get; set; }
 
     [MaxLength(50)]
-    [Required]
-    public string CategoryName { get; set; } = string.Empty;
+    public string? CategoryName { get; set; }
 
     [MaxLength(100)]
     public string? CategoryNameAlt { get; set; }
@@ -38,17 +37,15 @@ public class ItemCategory
 
     public bool Enabled { get; set; }
 
-    public DateTime CreatedDate { get; set; }
+    public DateTime? CreatedDate { get; set; }
 
     [MaxLength(50)]
-    [Required]
-    public string CreatedBy { get; set; } = string.Empty;
+    public string? CreatedBy { get; set; }
 
-    public DateTime ModifiedDate { get; set; }
+    public DateTime? ModifiedDate { get; set; }
 
     [MaxLength(50)]
-    [Required]
-    public string ModifiedBy { get; set; } = string.Empty;
+    public string? ModifiedBy { get; set; }
 
     [MaxLength(50)]
     public string? PrinterName2 { get; set; }

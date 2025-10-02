@@ -229,21 +229,55 @@ public class ItemCategoriesController : ControllerBase
                 return NotFound(new { message = "Item category not found" });
             }
 
-            category.CategoryName = updateDto.CategoryName;
-            category.CategoryNameAlt = updateDto.CategoryNameAlt;
+            // Only update fields that are provided (not null/default in DTO)
+            if (!string.IsNullOrEmpty(updateDto.CategoryName))
+                category.CategoryName = updateDto.CategoryName;
+
+            if (updateDto.CategoryNameAlt != null)
+                category.CategoryNameAlt = updateDto.CategoryNameAlt;
+
             category.DisplayIndex = updateDto.DisplayIndex;
-            category.ParentCategoryId = updateDto.ParentCategoryId;
+
+            if (updateDto.ParentCategoryId.HasValue || updateDto.ParentCategoryId == null)
+                category.ParentCategoryId = updateDto.ParentCategoryId;
+
             category.IsTerminal = updateDto.IsTerminal;
             category.IsPublicDisplay = updateDto.IsPublicDisplay;
-            category.ButtonStyleId = updateDto.ButtonStyleId;
-            category.PrinterName = updateDto.PrinterName;
+
+            if (updateDto.ButtonStyleId.HasValue || updateDto.ButtonStyleId == null)
+                category.ButtonStyleId = updateDto.ButtonStyleId;
+
+            if (updateDto.PrinterName != null)
+                category.PrinterName = updateDto.PrinterName;
+
             category.IsModifier = updateDto.IsModifier;
             category.Enabled = updateDto.Enabled;
-            category.CategoryTypeId = updateDto.CategoryTypeId;
-            category.ImageFileName = updateDto.ImageFileName;
-            category.IsSelfOrderingDisplay = updateDto.IsSelfOrderingDisplay;
-            category.IsOnlineStoreDisplay = updateDto.IsOnlineStoreDisplay;
-            category.CategoryCode = updateDto.CategoryCode;
+
+            if (updateDto.CategoryTypeId.HasValue || updateDto.CategoryTypeId == null)
+                category.CategoryTypeId = updateDto.CategoryTypeId;
+
+            if (updateDto.ImageFileName != null)
+                category.ImageFileName = updateDto.ImageFileName;
+
+            if (updateDto.IsSelfOrderingDisplay.HasValue)
+                category.IsSelfOrderingDisplay = updateDto.IsSelfOrderingDisplay;
+
+            if (updateDto.IsOnlineStoreDisplay.HasValue)
+                category.IsOnlineStoreDisplay = updateDto.IsOnlineStoreDisplay;
+
+            if (updateDto.CategoryCode != null)
+                category.CategoryCode = updateDto.CategoryCode;
+
+            // Ensure required fields have values (handle legacy data with NULLs)
+            if (string.IsNullOrEmpty(category.CategoryName))
+                category.CategoryName = "Unnamed Category";
+
+            if (!category.CreatedDate.HasValue)
+                category.CreatedDate = DateTime.UtcNow;
+
+            if (string.IsNullOrEmpty(category.CreatedBy))
+                category.CreatedBy = "System";
+
             category.ModifiedDate = DateTime.UtcNow;
             category.ModifiedBy = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
 

@@ -33,20 +33,206 @@ import {
   IconChevronRight,
   IconSearch,
   IconList,
-  IconHierarchy
+  IconHierarchy,
+  IconGripVertical,
+  IconDeviceFloppy,
+  IconRotateClockwise2
 } from '@tabler/icons-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay
+} from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { AutoBreadcrumb } from '../components/AutoBreadcrumb';
 import { useBrands } from '../contexts/BrandContext';
 import itemCategoryService from '../services/itemCategoryService';
+import buttonStyleService from '../services/buttonStyleService';
 import type { ItemCategory, CreateItemCategory, UpdateItemCategory } from '../types/itemCategory';
+import type { ButtonStyle } from '../types/buttonStyle';
 
 interface CategoryTreeNode extends ItemCategory {
   children: CategoryTreeNode[];
   level: number;
 }
 
+// Sortable row component for drag and drop
+interface SortableRowProps {
+  category: CategoryTreeNode;
+  expandedCategories: Set<number>;
+  toggleExpand: (id: number) => void;
+  onEdit: (category: ItemCategory) => void;
+  onDelete: (category: ItemCategory) => void;
+  buttonStyles: ButtonStyle[];
+  getButtonStyleById: (buttonStyleId?: number) => ButtonStyle | undefined;
+  getButtonStyleColor: (style: ButtonStyle) => string;
+  isDragging?: boolean;
+}
+
+const SortableRow: React.FC<SortableRowProps> = ({
+  category,
+  expandedCategories,
+  toggleExpand,
+  onEdit,
+  onDelete,
+  buttonStyles,
+  getButtonStyleById,
+  getButtonStyleColor,
+  isDragging = false
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isSortableDragging
+  } = useSortable({ id: category.categoryId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isSortableDragging ? 0.5 : 1,
+    backgroundColor: isSortableDragging ? '#f0f0f0' : 'white',
+  };
+
+  return (
+    <Table.Tr ref={setNodeRef} style={style}>
+      <Table.Td style={{ width: '40px', padding: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div
+            {...attributes}
+            {...listeners}
+            style={{
+              cursor: 'grab',
+              touchAction: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '4px'
+            }}
+          >
+            <IconGripVertical size={16} style={{ color: '#868e96' }} />
+          </div>
+        </div>
+      </Table.Td>
+      <Table.Td style={{ width: '50px' }}>
+        {category.children.length > 0 && (
+          <ActionIcon
+            variant="subtle"
+            size="sm"
+            onClick={() => toggleExpand(category.categoryId)}
+          >
+            {expandedCategories.has(category.categoryId) ? (
+              <IconChevronDown size={16} />
+            ) : (
+              <IconChevronRight size={16} />
+            )}
+          </ActionIcon>
+        )}
+      </Table.Td>
+      <Table.Td>{category.categoryId}</Table.Td>
+      <Table.Td>
+        <Box style={{ paddingLeft: `${category.level * 24}px` }}>
+          <Text fw={500} size="sm">
+            {category.categoryName}
+          </Text>
+          {category.categoryNameAlt && (
+            <Text size="xs" c="dimmed">
+              {category.categoryNameAlt}
+            </Text>
+          )}
+        </Box>
+      </Table.Td>
+      <Table.Td>
+        <Badge variant="light" color="blue">
+          {category.displayIndex}
+        </Badge>
+      </Table.Td>
+      <Table.Td>
+        {(() => {
+          const style = getButtonStyleById(category.buttonStyleId);
+          if (!style) {
+            return (
+              <Box
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '4px',
+                  backgroundColor: '#E0E0E0',
+                  border: '1px dashed #999'
+                }}
+                title="No style"
+              />
+            );
+          }
+          return (
+            <Box
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '4px',
+                backgroundColor: getButtonStyleColor(style),
+                border: '1px solid rgba(0,0,0,0.1)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              }}
+              title={style.styleName}
+            />
+          );
+        })()}
+      </Table.Td>
+      <Table.Td>
+        <Badge
+          variant="light"
+          color={category.isPublicDisplay ? 'green' : 'gray'}
+        >
+          {category.isPublicDisplay ? 'Visible' : 'Hidden'}
+        </Badge>
+      </Table.Td>
+      <Table.Td
+        style={{
+          position: 'sticky',
+          right: 0,
+          backgroundColor: 'white',
+          boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+        }}
+      >
+        <Group gap="xs" justify="center">
+          <ActionIcon
+            variant="subtle"
+            color="blue"
+            onClick={() => onEdit(category)}
+          >
+            <IconEdit size={16} />
+          </ActionIcon>
+          <ActionIcon
+            variant="subtle"
+            color="red"
+            onClick={() => onDelete(category)}
+          >
+            <IconTrash size={16} />
+          </ActionIcon>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
+  );
+};
+
 const MenuCategoriesPage: React.FC = () => {
   const [categories, setCategories] = useState<ItemCategory[]>([]);
+  const [originalCategories, setOriginalCategories] = useState<ItemCategory[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -58,23 +244,46 @@ const MenuCategoriesPage: React.FC = () => {
   const [filterText, setFilterText] = useState('');
   const [viewMode, setViewMode] = useState<'flat' | 'tree'>('flat');
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
+  const [activeId, setActiveId] = useState<number | null>(null);
   const [formData, setFormData] = useState<CreateItemCategory>({
     categoryName: '',
     categoryNameAlt: '',
     displayIndex: 0,
     isTerminal: true,
     isPublicDisplay: true,
-    enabled: true,
+    isModifier: false,
     isSelfOrderingDisplay: true,
     isOnlineStoreDisplay: true
   });
+  const [buttonStyles, setButtonStyles] = useState<ButtonStyle[]>([]);
+  const [loadingButtonStyles, setLoadingButtonStyles] = useState(false);
 
   const { selectedBrand } = useBrands();
   const selectedBrandId = selectedBrand ? parseInt(selectedBrand) : null;
 
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required before drag starts
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     if (selectedBrandId) {
       fetchCategories();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBrandId]);
+
+  // Fetch button styles when dialog opens or when page loads
+  useEffect(() => {
+    if (selectedBrandId) {
+      fetchButtonStyles();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBrandId]);
@@ -86,9 +295,14 @@ const MenuCategoriesPage: React.FC = () => {
     try {
       const data = await itemCategoryService.getItemCategories(selectedBrandId);
       setCategories(data || []);
+      // Deep clone the data to ensure originalCategories is truly independent
+      setOriginalCategories(JSON.parse(JSON.stringify(data || [])));
+      setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
       setCategories([]);
+      setOriginalCategories([]);
+      setHasUnsavedChanges(false);
       notifications.show({
         title: 'Error',
         message: 'Failed to load categories',
@@ -96,6 +310,21 @@ const MenuCategoriesPage: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchButtonStyles = async () => {
+    if (!selectedBrandId) return;
+
+    setLoadingButtonStyles(true);
+    try {
+      const data = await buttonStyleService.getButtonStyles(selectedBrandId);
+      setButtonStyles(data || []);
+    } catch (error) {
+      console.error('Failed to fetch button styles:', error);
+      setButtonStyles([]);
+    } finally {
+      setLoadingButtonStyles(false);
     }
   };
 
@@ -107,7 +336,7 @@ const MenuCategoriesPage: React.FC = () => {
       displayIndex: categories.length,
       isTerminal: true,
       isPublicDisplay: true,
-      enabled: true,
+      isModifier: false,
       isSelfOrderingDisplay: true,
       isOnlineStoreDisplay: true
     });
@@ -163,6 +392,17 @@ const MenuCategoriesPage: React.FC = () => {
           )
         );
 
+        // Also update original categories to keep them in sync (deep clone)
+        setOriginalCategories(prevCategories =>
+          JSON.parse(JSON.stringify(
+            prevCategories.map(cat =>
+              cat.categoryId === selectedCategory.categoryId
+                ? { ...cat, ...formData }
+                : cat
+            )
+          ))
+        );
+
         notifications.show({
           title: 'Success',
           message: 'Category updated successfully',
@@ -170,10 +410,18 @@ const MenuCategoriesPage: React.FC = () => {
         });
       } else {
         // Create new category
-        const createdCategory = await itemCategoryService.createItemCategory(selectedBrandId, formData);
+        // Always set enabled to true for new categories (soft delete field)
+        const createdCategory = await itemCategoryService.createItemCategory(selectedBrandId, {
+          ...formData,
+          enabled: true
+        });
 
         // Add the new item to the local state
         setCategories(prevCategories => [...prevCategories, createdCategory]);
+        // Deep clone when updating original categories
+        setOriginalCategories(prevCategories =>
+          JSON.parse(JSON.stringify([...prevCategories, createdCategory]))
+        );
 
         notifications.show({
           title: 'Success',
@@ -204,6 +452,12 @@ const MenuCategoriesPage: React.FC = () => {
       // Remove the item from the local state
       setCategories(prevCategories =>
         prevCategories.filter(cat => cat.categoryId !== selectedCategory.categoryId)
+      );
+      // Deep clone when updating original categories
+      setOriginalCategories(prevCategories =>
+        JSON.parse(JSON.stringify(
+          prevCategories.filter(cat => cat.categoryId !== selectedCategory.categoryId)
+        ))
       );
 
       notifications.show({
@@ -368,6 +622,162 @@ const MenuCategoriesPage: React.FC = () => {
     });
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as number);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const activeCategory = categories.find(c => c.categoryId === active.id);
+    const overCategory = categories.find(c => c.categoryId === over.id);
+
+    if (!activeCategory || !overCategory) {
+      return;
+    }
+
+    // Only allow reordering within same parent
+    if ((activeCategory.parentCategoryId ?? null) !== (overCategory.parentCategoryId ?? null)) {
+      notifications.show({
+        title: 'Invalid Move',
+        message: 'Categories can only be reordered within the same parent level',
+        color: 'orange'
+      });
+      return;
+    }
+
+    // Get siblings at the same level
+    const siblings = categories
+      .filter(c => (c.parentCategoryId ?? null) === (activeCategory.parentCategoryId ?? null))
+      .sort((a, b) => a.displayIndex - b.displayIndex);
+
+    const oldIndex = siblings.findIndex(c => c.categoryId === activeCategory.categoryId);
+    const newIndex = siblings.findIndex(c => c.categoryId === overCategory.categoryId);
+
+    if (oldIndex === newIndex) {
+      return;
+    }
+
+    // Reorder siblings
+    const reorderedSiblings = [...siblings];
+    const [movedItem] = reorderedSiblings.splice(oldIndex, 1);
+    reorderedSiblings.splice(newIndex, 0, movedItem);
+
+    // Assign new display indices (using intervals of 10)
+    const updatedSiblings = reorderedSiblings.map((sibling, index) => ({
+      ...sibling,
+      displayIndex: index * 10
+    }));
+
+    // Update local state only - don't save to backend yet
+    setCategories(prevCategories => {
+      const categoriesMap = new Map(prevCategories.map(c => [c.categoryId, c]));
+      updatedSiblings.forEach(sibling => {
+        categoriesMap.set(sibling.categoryId, sibling);
+      });
+      return Array.from(categoriesMap.values());
+    });
+
+    // Mark as having unsaved changes
+    setHasUnsavedChanges(true);
+  };
+
+  // Save ordering changes to backend
+  const handleSaveOrdering = async () => {
+    if (!selectedBrandId) return;
+
+    setSavingOrder(true);
+    try {
+      // Get all categories that have changed displayIndex
+      const changedCategories = categories.filter(cat => {
+        const original = originalCategories.find(o => o.categoryId === cat.categoryId);
+        return original && original.displayIndex !== cat.displayIndex;
+      });
+
+      await Promise.all(
+        changedCategories.map(category =>
+          itemCategoryService.updateItemCategory(
+            selectedBrandId,
+            category.categoryId,
+            {
+              categoryName: category.categoryName,
+              categoryNameAlt: category.categoryNameAlt,
+              displayIndex: category.displayIndex,
+              parentCategoryId: category.parentCategoryId,
+              isTerminal: category.isTerminal,
+              isPublicDisplay: category.isPublicDisplay,
+              buttonStyleId: category.buttonStyleId,
+              printerName: category.printerName,
+              isModifier: category.isModifier,
+              enabled: category.enabled,
+              categoryTypeId: category.categoryTypeId,
+              imageFileName: category.imageFileName,
+              isSelfOrderingDisplay: category.isSelfOrderingDisplay,
+              isOnlineStoreDisplay: category.isOnlineStoreDisplay,
+              categoryCode: category.categoryCode
+            }
+          )
+        )
+      );
+
+      // Deep clone and update original categories to match current state
+      setOriginalCategories(JSON.parse(JSON.stringify(categories)));
+      setHasUnsavedChanges(false);
+
+      notifications.show({
+        title: 'Success',
+        message: 'Category order saved successfully',
+        color: 'green'
+      });
+    } catch (error) {
+      console.error('Failed to save category order:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to save category order',
+        color: 'red'
+      });
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
+  // Revert to original ordering
+  const handleRevertOrdering = () => {
+    // Deep clone the original categories to ensure proper restoration
+    setCategories(JSON.parse(JSON.stringify(originalCategories)));
+    setHasUnsavedChanges(false);
+    notifications.show({
+      title: 'Reverted',
+      message: 'Category order has been reverted to the original',
+      color: 'blue'
+    });
+  };
+
+  // Helper function to get button style color for display
+  const getButtonStyleColor = (style: ButtonStyle) => {
+    // Use backgroundColorTop as primary color, fallback to middle or bottom
+    let color = style.backgroundColorTop || style.backgroundColorMiddle || style.backgroundColorBottom || '#E0E0E0';
+
+    // Remove alpha channel if present (convert #AARRGGBB to #RRGGBB)
+    if (color.length === 9 && color.startsWith('#')) {
+      color = '#' + color.substring(3);
+    }
+
+    return color;
+  };
+
+  // Helper function to get button style by ID
+  const getButtonStyleById = (buttonStyleId?: number): ButtonStyle | undefined => {
+    if (!buttonStyleId) return undefined;
+    return buttonStyles.find(style => style.buttonStyleId === buttonStyleId);
+  };
+
   // Get available parent categories (excluding self and descendants)
   const getAvailableParents = (excludeCategoryId?: number): ItemCategory[] => {
     if (!excludeCategoryId) {
@@ -403,6 +813,20 @@ const MenuCategoriesPage: React.FC = () => {
 
   return (
     <Box>
+      {/* Add CSS animation */}
+      <style>{`
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+
       {/* Sticky Breadcrumbs */}
       <Box
         style={{
@@ -420,6 +844,52 @@ const MenuCategoriesPage: React.FC = () => {
           <AutoBreadcrumb />
         </Container>
       </Box>
+
+      {/* Floating Save Bar - Shows when there are unsaved changes */}
+      {hasUnsavedChanges && (
+        <Box
+          style={{
+            position: 'sticky',
+            top: 48,
+            zIndex: 99,
+            backgroundColor: '#FFF8E1',
+            borderBottom: '1px solid #FFD54F',
+            padding: '12px 24px',
+            animation: 'slideDown 0.3s ease-out',
+          }}
+        >
+          <Container size="xl" style={{ marginInline: 0 }}>
+            <Group justify="space-between">
+              <Group gap="sm">
+                <IconAlertCircle size={20} color="#F9A825" />
+                <Text size="sm" fw={500} c="dark">
+                  You have unsaved changes to the category order
+                </Text>
+              </Group>
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  size="sm"
+                  leftSection={<IconRotateClockwise2 size={16} />}
+                  onClick={handleRevertOrdering}
+                  disabled={savingOrder}
+                >
+                  Revert
+                </Button>
+                <Button
+                  size="sm"
+                  leftSection={<IconDeviceFloppy size={16} />}
+                  onClick={handleSaveOrdering}
+                  loading={savingOrder}
+                  color="blue"
+                >
+                  Save Changes
+                </Button>
+              </Group>
+            </Group>
+          </Container>
+        </Box>
+      )}
 
       {/* Page Header - Non-sticky */}
       <Box
@@ -536,6 +1006,7 @@ const MenuCategoriesPage: React.FC = () => {
                         )}
                       </Group>
                     </Table.Th>
+                    <Table.Th style={{ width: '80px' }}>Style</Table.Th>
                     <Table.Th style={{ width: '100px' }}>Visibility</Table.Th>
                     <Table.Th
                       style={{
@@ -554,7 +1025,7 @@ const MenuCategoriesPage: React.FC = () => {
                 <Table.Tbody>
                   {loading ? (
                     <Table.Tr>
-                      <Table.Td colSpan={5}>
+                      <Table.Td colSpan={6}>
                         <Center py="xl">
                           <Stack align="center" gap="md">
                             <Loader size="lg" />
@@ -565,7 +1036,7 @@ const MenuCategoriesPage: React.FC = () => {
                     </Table.Tr>
                   ) : !filteredAndSortedCategories || filteredAndSortedCategories.length === 0 ? (
                     <Table.Tr>
-                      <Table.Td colSpan={5}>
+                      <Table.Td colSpan={6}>
                         <Text ta="center" c="dimmed" py="lg">
                           {filterText ? 'No categories match your search.' : 'No categories found. Create your first category!'}
                         </Text>
@@ -591,6 +1062,38 @@ const MenuCategoriesPage: React.FC = () => {
                           <Badge variant="light" color="blue">
                             {category.displayIndex}
                           </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          {(() => {
+                            const style = getButtonStyleById(category.buttonStyleId);
+                            if (!style) {
+                              return (
+                                <Box
+                                  style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '4px',
+                                    backgroundColor: '#E0E0E0',
+                                    border: '1px dashed #999'
+                                  }}
+                                  title="No style"
+                                />
+                              );
+                            }
+                            return (
+                              <Box
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '4px',
+                                  backgroundColor: getButtonStyleColor(style),
+                                  border: '1px solid rgba(0,0,0,0.1)',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                }}
+                                title={style.styleName}
+                              />
+                            );
+                          })()}
                         </Table.Td>
                         <Table.Td>
                           <Badge
@@ -635,126 +1138,84 @@ const MenuCategoriesPage: React.FC = () => {
 
           {/* Tree View Table */}
           <Tabs.Panel value="tree">
-            <Box style={{ overflow: 'auto' }}>
-              <Table striped highlightOnHover style={{ minWidth: '800px' }}>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th style={{ width: '50px' }}></Table.Th>
-                    <Table.Th style={{ width: '80px' }}>ID</Table.Th>
-                    <Table.Th>Category Name</Table.Th>
-                    <Table.Th style={{ width: '120px' }}>Display Order</Table.Th>
-                    <Table.Th style={{ width: '100px' }}>Visibility</Table.Th>
-                    <Table.Th
-                      style={{
-                        width: '100px',
-                        textAlign: 'center',
-                        position: 'sticky',
-                        right: 0,
-                        backgroundColor: 'white',
-                        boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
-                      }}
-                    >
-                      Actions
-                    </Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {loading ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <Box style={{ overflow: 'auto' }}>
+                <Table striped highlightOnHover style={{ minWidth: '800px' }}>
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Td colSpan={6}>
-                        <Center py="xl">
-                          <Stack align="center" gap="md">
-                            <Loader size="lg" />
-                            <Text c="dimmed">Loading categories...</Text>
-                          </Stack>
-                        </Center>
-                      </Table.Td>
+                      <Table.Th style={{ width: '40px' }}></Table.Th>
+                      <Table.Th style={{ width: '50px' }}></Table.Th>
+                      <Table.Th style={{ width: '80px' }}>ID</Table.Th>
+                      <Table.Th>Category Name</Table.Th>
+                      <Table.Th style={{ width: '120px' }}>Display Order</Table.Th>
+                      <Table.Th style={{ width: '80px' }}>Style</Table.Th>
+                      <Table.Th style={{ width: '100px' }}>Visibility</Table.Th>
+                      <Table.Th
+                        style={{
+                          width: '100px',
+                          textAlign: 'center',
+                          position: 'sticky',
+                          right: 0,
+                          backgroundColor: 'white',
+                          boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+                        }}
+                      >
+                        Actions
+                      </Table.Th>
                     </Table.Tr>
-                  ) : !flattenedTree || flattenedTree.length === 0 ? (
-                    <Table.Tr>
-                      <Table.Td colSpan={6}>
-                        <Text ta="center" c="dimmed" py="lg">
-                          {filterText ? 'No categories match your search.' : 'No categories found. Create your first category!'}
-                        </Text>
-                      </Table.Td>
-                    </Table.Tr>
-                  ) : (
-                    flattenedTree.map((category) => (
-                      <Table.Tr key={category.categoryId}>
-                        <Table.Td>
-                          {category.children.length > 0 && (
-                            <ActionIcon
-                              variant="subtle"
-                              size="sm"
-                              onClick={() => toggleExpand(category.categoryId)}
-                            >
-                              {expandedCategories.has(category.categoryId) ? (
-                                <IconChevronDown size={16} />
-                              ) : (
-                                <IconChevronRight size={16} />
-                              )}
-                            </ActionIcon>
-                          )}
-                        </Table.Td>
-                        <Table.Td>{category.categoryId}</Table.Td>
-                        <Table.Td>
-                          <Box style={{ paddingLeft: `${category.level * 24}px` }}>
-                            <Text fw={500} size="sm">
-                              {category.categoryName}
+                  </Table.Thead>
+                  <SortableContext
+                    items={flattenedTree.map(c => c.categoryId)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <Table.Tbody>
+                      {loading ? (
+                        <Table.Tr>
+                          <Table.Td colSpan={8}>
+                            <Center py="xl">
+                              <Stack align="center" gap="md">
+                                <Loader size="lg" />
+                                <Text c="dimmed">Loading categories...</Text>
+                              </Stack>
+                            </Center>
+                          </Table.Td>
+                        </Table.Tr>
+                      ) : !flattenedTree || flattenedTree.length === 0 ? (
+                        <Table.Tr>
+                          <Table.Td colSpan={8}>
+                            <Text ta="center" c="dimmed" py="lg">
+                              {filterText ? 'No categories match your search.' : 'No categories found. Create your first category!'}
                             </Text>
-                            {category.categoryNameAlt && (
-                              <Text size="xs" c="dimmed">
-                                {category.categoryNameAlt}
-                              </Text>
-                            )}
-                          </Box>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge variant="light" color="blue">
-                            {category.displayIndex}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge
-                            variant="light"
-                            color={category.isPublicDisplay ? 'green' : 'gray'}
-                          >
-                            {category.isPublicDisplay ? 'Visible' : 'Hidden'}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td
-                          style={{
-                            position: 'sticky',
-                            right: 0,
-                            backgroundColor: 'white',
-                            boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
-                          }}
-                        >
-                          <Group gap="xs" justify="center">
-                            <ActionIcon
-                              variant="subtle"
-                              color="blue"
-                              onClick={() => handleEdit(category)}
-                            >
-                              <IconEdit size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="subtle"
-                              color="red"
-                              onClick={() => handleDelete(category)}
-                            >
-                              <IconTrash size={16} />
-                            </ActionIcon>
-                          </Group>
-                        </Table.Td>
-                      </Table.Tr>
-                    ))
-                  )}
-                </Table.Tbody>
+                          </Table.Td>
+                        </Table.Tr>
+                      ) : (
+                        flattenedTree.map((category) => (
+                          <SortableRow
+                            key={category.categoryId}
+                            category={category}
+                            expandedCategories={expandedCategories}
+                            toggleExpand={toggleExpand}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            buttonStyles={buttonStyles}
+                            getButtonStyleById={getButtonStyleById}
+                            getButtonStyleColor={getButtonStyleColor}
+                            isDragging={activeId === category.categoryId}
+                          />
+                        ))
+                      )}
+                    </Table.Tbody>
+                  </SortableContext>
               </Table>
             </Box>
-          </Tabs.Panel>
-        </Tabs>
+          </DndContext>
+        </Tabs.Panel>
+      </Tabs>
           </Paper>
         </Container>
       </Box>
@@ -803,18 +1264,102 @@ const MenuCategoriesPage: React.FC = () => {
             onChange={(e) => setFormData({ ...formData, displayIndex: parseInt(e.currentTarget.value) || 0 })}
           />
 
+          {/* Button Style Selection */}
+          <Box>
+            <Text size="sm" fw={500} mb={8}>
+              Button Style
+            </Text>
+            <Text size="xs" c="dimmed" mb={12}>
+              Select a style for the category button appearance
+            </Text>
+            {loadingButtonStyles ? (
+              <Center py="lg">
+                <Loader size="sm" />
+              </Center>
+            ) : (
+              <Box
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  padding: '12px',
+                  border: '1px solid #E3E8EE',
+                  borderRadius: '8px',
+                  backgroundColor: '#F8F9FA'
+                }}
+              >
+                {/* None/Default Option */}
+                <Box
+                  onClick={() => setFormData({ ...formData, buttonStyleId: undefined })}
+                  style={{
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    border: formData.buttonStyleId === undefined ? '2px solid #5469D4' : '2px solid transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Box
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      backgroundColor: '#E0E0E0',
+                      border: '2px dashed #999',
+                      marginBottom: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Text size="xs" c="dimmed">None</Text>
+                  </Box>
+                  <Text size="xs" mt={4}>Default</Text>
+                </Box>
+
+                {/* Button Style Options */}
+                {buttonStyles.map((style) => (
+                  <Box
+                    key={style.buttonStyleId}
+                    onClick={() => setFormData({ ...formData, buttonStyleId: style.buttonStyleId })}
+                    style={{
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      padding: '8px',
+                      borderRadius: '8px',
+                      border: formData.buttonStyleId === style.buttonStyleId ? '2px solid #5469D4' : '2px solid transparent',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        backgroundColor: '#F1F3F5'
+                      }
+                    }}
+                  >
+                    <Box
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '50%',
+                        backgroundColor: getButtonStyleColor(style),
+                        border: '1px solid rgba(0,0,0,0.1)',
+                        marginBottom: '4px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Text size="xs" mt={4} lineClamp={2} style={{ maxWidth: '64px' }}>
+                      {style.styleName}
+                    </Text>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Box>
+
           <Switch
             label="Visible in Menu"
             description="Show this category in POS and online ordering"
             checked={formData.isPublicDisplay}
             onChange={(e) => setFormData({ ...formData, isPublicDisplay: e.currentTarget.checked })}
-          />
-
-          <Switch
-            label="Enabled"
-            description="Enable or disable this category"
-            checked={formData.enabled}
-            onChange={(e) => setFormData({ ...formData, enabled: e.currentTarget.checked })}
           />
 
           <Group justify="flex-end" mt="md">
