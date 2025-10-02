@@ -1,155 +1,357 @@
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
-  Container,
-  Title,
-  Text,
   Paper,
+  Title,
   Group,
-  Stack,
   Button,
   TextInput,
+  Modal,
+  Stack,
+  Table,
+  Text,
+  Alert,
+  Container,
   ActionIcon,
   Badge,
-  Menu,
+  Loader,
+  Center,
   Switch,
-  Anchor,
-  UnstyledButton,
-  Checkbox,
-  Tooltip,
-  Drawer,
-  Textarea,
-  ColorSwatch,
-  Grid,
-  FileButton,
-} from '@mantine/core'
+  Tabs,
+  Select,
+  Collapse
+} from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
-  IconSearch,
   IconPlus,
-  IconFilter,
-  IconDownload,
-  IconDots,
   IconEdit,
   IconTrash,
-  IconCopy,
-  IconEye,
-  IconEyeOff,
-  IconGripVertical,
-  IconPhoto,
-  IconCheck,
   IconAlertCircle,
-} from '@tabler/icons-react'
-import { useState, useRef } from 'react'
-import { AutoBreadcrumb } from '../components/AutoBreadcrumb'
+  IconDownload,
+  IconChevronUp,
+  IconChevronDown,
+  IconChevronRight,
+  IconSearch,
+  IconList,
+  IconHierarchy
+} from '@tabler/icons-react';
+import { AutoBreadcrumb } from '../components/AutoBreadcrumb';
+import { useBrands } from '../contexts/BrandContext';
+import itemCategoryService from '../services/itemCategoryService';
+import type { ItemCategory, CreateItemCategory, UpdateItemCategory } from '../types/itemCategory';
 
-// Category type
-interface Category {
-  id: number
-  name: string
-  description: string
-  items: number
-  visible: boolean
-  order: number
-  color: string
-  image: string | null
+interface CategoryTreeNode extends ItemCategory {
+  children: CategoryTreeNode[];
+  level: number;
 }
 
-// Sample data for categories
-const categoriesData: Category[] = [
-  {
-    id: 1,
-    name: 'Appetizers',
-    description: 'Start your meal with our delicious appetizers',
-    items: 12,
-    visible: true,
-    order: 1,
-    color: '#5469D4',
-    image: null,
-  },
-  {
-    id: 2,
-    name: 'Main Courses',
-    description: 'Hearty and satisfying main dishes',
-    items: 28,
-    visible: true,
-    order: 2,
-    color: '#0E6027',
-    image: null,
-  },
-  {
-    id: 3,
-    name: 'Beverages',
-    description: 'Refreshing drinks and beverages',
-    items: 15,
-    visible: true,
-    order: 3,
-    color: '#1C92D2',
-    image: null,
-  },
-  {
-    id: 4,
-    name: 'Desserts',
-    description: 'Sweet endings to your meal',
-    items: 8,
-    visible: false,
-    order: 4,
-    color: '#F2994A',
-    image: null,
-  },
-]
+const MenuCategoriesPage: React.FC = () => {
+  const [categories, setCategories] = useState<ItemCategory[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<ItemCategory | null>(null);
+  const [sortBy, setSortBy] = useState<'id' | 'name' | 'displayIndex'>('displayIndex');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [filterText, setFilterText] = useState('');
+  const [viewMode, setViewMode] = useState<'flat' | 'tree'>('flat');
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
+  const [formData, setFormData] = useState<CreateItemCategory>({
+    categoryName: '',
+    categoryNameAlt: '',
+    displayIndex: 0,
+    isTerminal: true,
+    isPublicDisplay: true,
+    enabled: true,
+    isSelfOrderingDisplay: true,
+    isOnlineStoreDisplay: true
+  });
 
-export function MenuCategoriesPage() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategories, setSelectedCategories] = useState<number[]>([])
-  const [drawerOpened, setDrawerOpened] = useState(false)
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
-  const resetRef = useRef<() => void>(null)
-  const [file, setFile] = useState<File | null>(null)
+  const { selectedBrand } = useBrands();
+  const selectedBrandId = selectedBrand ? parseInt(selectedBrand) : null;
 
-  // Form state for drawer
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    color: '#5469D4',
-    visible: true,
-  })
+  useEffect(() => {
+    if (selectedBrandId) {
+      fetchCategories();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBrandId]);
 
-  const handleEdit = (category: Category) => {
-    setEditingCategory(category)
+  const fetchCategories = async () => {
+    if (!selectedBrandId) return;
+
+    setLoading(true);
+    try {
+      const data = await itemCategoryService.getItemCategories(selectedBrandId);
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+      setCategories([]);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to load categories',
+        color: 'red'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdd = () => {
+    setSelectedCategory(null);
     setFormData({
-      name: category.name,
-      description: category.description,
-      color: category.color,
-      visible: category.visible,
-    })
-    setDrawerOpened(true)
-  }
+      categoryName: '',
+      categoryNameAlt: '',
+      displayIndex: categories.length,
+      isTerminal: true,
+      isPublicDisplay: true,
+      enabled: true,
+      isSelfOrderingDisplay: true,
+      isOnlineStoreDisplay: true
+    });
+    setDialogOpen(true);
+  };
 
-  const handleCreate = () => {
-    setEditingCategory(null)
+  const handleEdit = (category: ItemCategory) => {
+    setSelectedCategory(category);
     setFormData({
-      name: '',
-      description: '',
-      color: '#5469D4',
-      visible: true,
-    })
-    setDrawerOpened(true)
-  }
+      categoryName: category.categoryName,
+      categoryNameAlt: category.categoryNameAlt,
+      displayIndex: category.displayIndex,
+      parentCategoryId: category.parentCategoryId,
+      isTerminal: category.isTerminal,
+      isPublicDisplay: category.isPublicDisplay,
+      buttonStyleId: category.buttonStyleId,
+      printerName: category.printerName,
+      isModifier: category.isModifier,
+      enabled: category.enabled,
+      categoryTypeId: category.categoryTypeId,
+      imageFileName: category.imageFileName,
+      isSelfOrderingDisplay: category.isSelfOrderingDisplay,
+      isOnlineStoreDisplay: category.isOnlineStoreDisplay,
+      categoryCode: category.categoryCode
+    });
+    setDialogOpen(true);
+  };
 
-  const filteredCategories = categoriesData.filter(category =>
-    category.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const handleDelete = (category: ItemCategory) => {
+    setSelectedCategory(category);
+    setDeleteDialogOpen(true);
+  };
 
-  const selectAll = () => {
-    setSelectedCategories(categoriesData.map(c => c.id))
-  }
+  const handleSave = async () => {
+    if (!selectedBrandId) return;
 
-  const clearSelection = () => {
-    setSelectedCategories([])
+    setSaving(true);
+    try {
+      if (selectedCategory) {
+        // Update existing category
+        await itemCategoryService.updateItemCategory(
+          selectedBrandId,
+          selectedCategory.categoryId,
+          formData as UpdateItemCategory
+        );
+
+        // Update the item in the local state
+        setCategories(prevCategories =>
+          prevCategories.map(cat =>
+            cat.categoryId === selectedCategory.categoryId
+              ? { ...cat, ...formData }
+              : cat
+          )
+        );
+
+        notifications.show({
+          title: 'Success',
+          message: 'Category updated successfully',
+          color: 'green'
+        });
+      } else {
+        // Create new category
+        const createdCategory = await itemCategoryService.createItemCategory(selectedBrandId, formData);
+
+        // Add the new item to the local state
+        setCategories(prevCategories => [...prevCategories, createdCategory]);
+
+        notifications.show({
+          title: 'Success',
+          message: 'Category created successfully',
+          color: 'green'
+        });
+      }
+      setDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to save category:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to save category',
+        color: 'red'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedBrandId || !selectedCategory) return;
+
+    setDeleting(true);
+    try {
+      await itemCategoryService.deleteItemCategory(selectedBrandId, selectedCategory.categoryId);
+
+      // Remove the item from the local state
+      setCategories(prevCategories =>
+        prevCategories.filter(cat => cat.categoryId !== selectedCategory.categoryId)
+      );
+
+      notifications.show({
+        title: 'Success',
+        message: 'Category deleted successfully',
+        color: 'green'
+      });
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to delete category',
+        color: 'red'
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleSort = (column: 'id' | 'name' | 'displayIndex') => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const filteredAndSortedCategories = React.useMemo(() => {
+    let filtered = categories;
+
+    // Apply filter
+    if (filterText) {
+      filtered = filtered.filter(cat =>
+        cat.categoryName.toLowerCase().includes(filterText.toLowerCase()) ||
+        cat.categoryId.toString().includes(filterText)
+      );
+    }
+
+    // Apply sort
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case 'id':
+          comparison = a.categoryId - b.categoryId;
+          break;
+        case 'name':
+          comparison = a.categoryName.localeCompare(b.categoryName);
+          break;
+        case 'displayIndex':
+          comparison = a.displayIndex - b.displayIndex;
+          break;
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [categories, filterText, sortBy, sortOrder]);
+
+  // Build tree structure from flat list
+  const categoryTree = useMemo(() => {
+    const buildTree = (parentId: number | null | undefined, level: number = 0): CategoryTreeNode[] => {
+      return categories
+        .filter(cat => (cat.parentCategoryId ?? null) === (parentId ?? null))
+        .sort((a, b) => a.displayIndex - b.displayIndex)
+        .map(cat => ({
+          ...cat,
+          level,
+          children: buildTree(cat.categoryId, level + 1)
+        }));
+    };
+
+    return buildTree(null);
+  }, [categories]);
+
+  // Flatten tree for rendering with filter
+  const flattenedTree = useMemo(() => {
+    const flatten = (nodes: CategoryTreeNode[], result: CategoryTreeNode[] = []): CategoryTreeNode[] => {
+      for (const node of nodes) {
+        // Apply filter
+        if (!filterText ||
+            node.categoryName.toLowerCase().includes(filterText.toLowerCase()) ||
+            node.categoryId.toString().includes(filterText)) {
+          result.push(node);
+
+          // Only show children if parent is expanded
+          if (expandedCategories.has(node.categoryId) && node.children.length > 0) {
+            flatten(node.children, result);
+          }
+        }
+      }
+      return result;
+    };
+
+    return flatten(categoryTree);
+  }, [categoryTree, expandedCategories, filterText]);
+
+  const toggleExpand = (categoryId: number) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
+
+  // Get available parent categories (excluding self and descendants)
+  const getAvailableParents = (excludeCategoryId?: number): ItemCategory[] => {
+    if (!excludeCategoryId) {
+      return categories.filter(c => c.categoryId !== excludeCategoryId);
+    }
+
+    // Build descendants set to prevent circular references
+    const descendants = new Set<number>();
+    const findDescendants = (categoryId: number) => {
+      descendants.add(categoryId);
+      categories
+        .filter(c => c.parentCategoryId === categoryId)
+        .forEach(child => findDescendants(child.categoryId));
+    };
+    findDescendants(excludeCategoryId);
+
+    return categories.filter(c => !descendants.has(c.categoryId));
+  };
+
+  if (!selectedBrand) {
+    return (
+      <Box p="md">
+        <Alert
+          icon={<IconAlertCircle size={16} />}
+          title="Brand Selection Required"
+          color="blue"
+        >
+          Please select a brand to manage menu categories.
+        </Alert>
+      </Box>
+    );
   }
 
   return (
     <Box>
-      {/* Sticky Breadcrumbs Only */}
+      {/* Sticky Breadcrumbs */}
       <Box
         style={{
           position: 'sticky',
@@ -201,7 +403,7 @@ export function MenuCategoriesPage() {
                   backgroundColor: '#5469D4',
                   color: 'white',
                 }}
-                onClick={handleCreate}
+                onClick={handleAdd}
               >
                 Add Category
               </Button>
@@ -210,477 +412,397 @@ export function MenuCategoriesPage() {
         </Container>
       </Box>
 
-      {/* Main Content Area with two-column layout */}
+      {/* Main Content Area */}
       <Box style={{ backgroundColor: '#F6F9FC', minHeight: 'calc(100vh - 200px)' }}>
         <Container size="xl" py="xl">
-          <Grid gutter="xl">
-            {/* Left Column - Main Content (70%) */}
-            <Grid.Col span={{ base: 12, lg: 8 }}>
-              {/* Search and Filter Bar */}
-              <Paper
-                p="md"
-                radius="md"
-                mb="md"
-                style={{
-                  border: '1px solid #E3E8EE',
-                  backgroundColor: 'white',
+          <Paper withBorder shadow="sm" style={{ backgroundColor: 'white' }}>
+            {/* Filter Bar */}
+            <Box p="md" style={{ borderBottom: '1px solid #E3E8EE' }}>
+              <TextInput
+                placeholder="Search by name or ID..."
+                leftSection={<IconSearch size={16} />}
+                value={filterText}
+                onChange={(e) => setFilterText(e.currentTarget.value)}
+                styles={{
+                  input: {
+                    border: '1px solid #E3E8EE',
+                    '&:focus': {
+                      borderColor: '#5469D4',
+                    },
+                  },
                 }}
-              >
-                <Group justify="space-between">
-                  <Group style={{ flex: 1 }}>
-                    <TextInput
-                      placeholder="Search categories..."
-                      leftSection={<IconSearch size={16} />}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.currentTarget.value)}
-                      style={{ width: 300 }}
-                      styles={{
-                        input: {
-                          border: '1px solid #E3E8EE',
-                          '&:focus': {
-                            borderColor: '#5469D4',
-                          },
-                        },
-                      }}
-                    />
-                    <Button
-                      variant="default"
-                      leftSection={<IconFilter size={16} />}
-                      style={{ border: '1px solid #E3E8EE' }}
+              />
+            </Box>
+
+            {/* View Mode Tabs */}
+            <Tabs value={viewMode} onChange={(value) => setViewMode(value as 'flat' | 'tree')}>
+              <Tabs.List style={{ borderBottom: '1px solid #E3E8EE', paddingLeft: '1rem' }}>
+                <Tabs.Tab value="flat" leftSection={<IconList size={16} />}>
+                  Flat View
+                </Tabs.Tab>
+                <Tabs.Tab value="tree" leftSection={<IconHierarchy size={16} />}>
+                  Tree View
+                </Tabs.Tab>
+              </Tabs.List>
+
+              {/* Flat View Table */}
+              <Tabs.Panel value="flat">
+                <Box style={{ overflow: 'auto' }}>
+                  <Table striped highlightOnHover style={{ minWidth: '800px' }}>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th
+                      style={{ width: '80px', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('id')}
                     >
-                      Filters
-                    </Button>
-                  </Group>
-
-                  {/* Bulk Actions */}
-                  {selectedCategories.length > 0 && (
-                    <Group gap="xs">
-                      <Badge variant="filled" color="indigo">
-                        {selectedCategories.length} selected
-                      </Badge>
-                      <Button size="xs" variant="subtle" onClick={clearSelection}>
-                        Clear
-                      </Button>
-                      <Menu shadow="md" width={200}>
-                        <Menu.Target>
-                          <Button size="xs" variant="default">
-                            Actions
-                          </Button>
-                        </Menu.Target>
-                        <Menu.Dropdown>
-                          <Menu.Item leftSection={<IconEye size={14} />}>
-                            Make Visible
-                          </Menu.Item>
-                          <Menu.Item leftSection={<IconEyeOff size={14} />}>
-                            Make Hidden
-                          </Menu.Item>
-                          <Menu.Item leftSection={<IconCopy size={14} />}>
-                            Duplicate
-                          </Menu.Item>
-                          <Menu.Divider />
-                          <Menu.Item color="red" leftSection={<IconTrash size={14} />}>
-                            Delete Selected
-                          </Menu.Item>
-                        </Menu.Dropdown>
-                      </Menu>
-                    </Group>
-                  )}
-                </Group>
-              </Paper>
-
-              {/* Categories Table/List */}
-              <Paper
-                radius="md"
-                style={{
-                  border: '1px solid #E3E8EE',
-                  backgroundColor: 'white',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Table Header */}
-                <Box
-                  px="md"
-                  py="sm"
-                  style={{
-                    borderBottom: '1px solid #E3E8EE',
-                    backgroundColor: '#F6F9FC',
-                  }}
-                >
-                  <Group justify="space-between">
-                    <Group gap="xs">
-                      <Checkbox
-                        checked={selectedCategories.length === categoriesData.length}
-                        indeterminate={
-                          selectedCategories.length > 0 &&
-                          selectedCategories.length < categoriesData.length
-                        }
-                        onChange={() => {
-                          if (selectedCategories.length === categoriesData.length) {
-                            clearSelection()
-                          } else {
-                            selectAll()
-                          }
-                        }}
-                      />
-                      <Text size="sm" fw={500} c="dimmed">
-                        {filteredCategories.length} Categories
-                      </Text>
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      Drag to reorder
-                    </Text>
-                  </Group>
-                </Box>
-
-                {/* Table Body */}
-                <Stack gap={0}>
-                  {filteredCategories.map((category, index) => (
-                    <Box
-                      key={category.id}
-                      px="md"
-                      py="md"
-                      style={{
-                        borderBottom:
-                          index < filteredCategories.length - 1
-                            ? '1px solid #F0F0F0'
-                            : 'none',
-                        backgroundColor: selectedCategories.includes(category.id)
-                          ? '#F6F9FC'
-                          : 'white',
-                        transition: 'all 0.2s',
-                        '&:hover': {
-                          backgroundColor: '#F6F9FC',
-                        },
-                      }}
-                    >
-                      <Group justify="space-between">
-                        <Group>
-                          {/* Drag Handle */}
-                          <ActionIcon
-                            variant="subtle"
-                            color="gray"
-                            style={{ cursor: 'grab' }}
-                          >
-                            <IconGripVertical size={16} />
-                          </ActionIcon>
-
-                          {/* Checkbox */}
-                          <Checkbox
-                            checked={selectedCategories.includes(category.id)}
-                            onChange={() => {
-                              if (selectedCategories.includes(category.id)) {
-                                setSelectedCategories(prev =>
-                                  prev.filter(id => id !== category.id)
-                                )
-                              } else {
-                                setSelectedCategories(prev => [...prev, category.id])
-                              }
-                            }}
-                          />
-
-                          {/* Category Info */}
-                          <Group>
-                            <ColorSwatch color={category.color} size={24} />
-                            <Box>
-                              <Group gap="xs">
-                                <Text fw={500} size="sm">
-                                  {category.name}
-                                </Text>
-                                {!category.visible && (
-                                  <Badge size="xs" variant="light" color="gray">
-                                    Hidden
-                                  </Badge>
-                                )}
-                              </Group>
-                              <Text size="xs" c="dimmed">
-                                {category.description}
-                              </Text>
-                            </Box>
-                          </Group>
-                        </Group>
-
-                        <Group>
-                          {/* Item Count */}
-                          <Badge variant="light" color="blue">
-                            {category.items} items
-                          </Badge>
-
-                          {/* Visibility Toggle */}
-                          <Tooltip label={category.visible ? 'Visible' : 'Hidden'}>
-                            <Switch
-                              size="sm"
-                              checked={category.visible}
-                              onChange={() => {}}
-                              styles={{
-                                track: {
-                                  backgroundColor: category.visible ? '#5469D4' : '#ADB5BD',
-                                },
-                              }}
-                            />
-                          </Tooltip>
-
-                          {/* Actions Menu */}
-                          <Menu shadow="md" width={200} position="bottom-end">
-                            <Menu.Target>
-                              <ActionIcon variant="subtle" color="gray">
-                                <IconDots size={16} />
-                              </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item
-                                leftSection={<IconEdit size={14} />}
-                                onClick={() => handleEdit(category)}
-                              >
-                                Edit Category
-                              </Menu.Item>
-                              <Menu.Item leftSection={<IconCopy size={14} />}>
-                                Duplicate
-                              </Menu.Item>
-                              <Menu.Item leftSection={<IconEye size={14} />}>
-                                View Items
-                              </Menu.Item>
-                              <Menu.Divider />
-                              <Menu.Item color="red" leftSection={<IconTrash size={14} />}>
-                                Delete
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </Group>
+                      <Group gap="xs">
+                        ID
+                        {sortBy === 'id' && (
+                          sortOrder === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />
+                        )}
                       </Group>
-                    </Box>
-                  ))}
-                </Stack>
-              </Paper>
-            </Grid.Col>
+                    </Table.Th>
+                    <Table.Th
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('name')}
+                    >
+                      <Group gap="xs">
+                        Category Name
+                        {sortBy === 'name' && (
+                          sortOrder === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />
+                        )}
+                      </Group>
+                    </Table.Th>
+                    <Table.Th
+                      style={{ width: '120px', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('displayIndex')}
+                    >
+                      <Group gap="xs">
+                        Display Order
+                        {sortBy === 'displayIndex' && (
+                          sortOrder === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />
+                        )}
+                      </Group>
+                    </Table.Th>
+                    <Table.Th style={{ width: '100px' }}>Visibility</Table.Th>
+                    <Table.Th
+                      style={{
+                        width: '100px',
+                        textAlign: 'center',
+                        position: 'sticky',
+                        right: 0,
+                        backgroundColor: 'white',
+                        boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+                      }}
+                    >
+                      Actions
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {loading ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={5}>
+                        <Center py="xl">
+                          <Stack align="center" gap="md">
+                            <Loader size="lg" />
+                            <Text c="dimmed">Loading categories...</Text>
+                          </Stack>
+                        </Center>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : !filteredAndSortedCategories || filteredAndSortedCategories.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={5}>
+                        <Text ta="center" c="dimmed" py="lg">
+                          {filterText ? 'No categories match your search.' : 'No categories found. Create your first category!'}
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : (
+                    filteredAndSortedCategories.map((category) => (
+                      <Table.Tr key={category.categoryId}>
+                        <Table.Td>{category.categoryId}</Table.Td>
+                        <Table.Td>
+                          <Box>
+                            <Text fw={500} size="sm">
+                              {category.categoryName}
+                            </Text>
+                            {category.categoryNameAlt && (
+                              <Text size="xs" c="dimmed">
+                                {category.categoryNameAlt}
+                              </Text>
+                            )}
+                          </Box>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="blue">
+                            {category.displayIndex}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            variant="light"
+                            color={category.isPublicDisplay ? 'green' : 'gray'}
+                          >
+                            {category.isPublicDisplay ? 'Visible' : 'Hidden'}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td
+                          style={{
+                            position: 'sticky',
+                            right: 0,
+                            backgroundColor: 'white',
+                            boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+                          }}
+                        >
+                          <Group gap="xs" justify="center">
+                            <ActionIcon
+                              variant="subtle"
+                              color="blue"
+                              onClick={() => handleEdit(category)}
+                            >
+                              <IconEdit size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              onClick={() => handleDelete(category)}
+                            >
+                              <IconTrash size={16} />
+                            </ActionIcon>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          </Tabs.Panel>
 
-            {/* Right Column - Sidebar Info (30%) */}
-            <Grid.Col span={{ base: 12, lg: 4 }}>
-              <Stack gap="md">
-                {/* Quick Stats */}
-                <Paper
-                  p="lg"
-                  radius="md"
-                  style={{
-                    border: '1px solid #E3E8EE',
-                    backgroundColor: 'white',
-                  }}
-                >
-                  <Title order={3} size={16} fw={600} mb="md">
-                    Quick Stats
-                  </Title>
-                  <Stack gap="sm">
-                    <Group justify="space-between">
-                      <Text size="sm" c="dimmed">Total Categories</Text>
-                      <Text size="sm" fw={500}>{categoriesData.length}</Text>
-                    </Group>
-                    <Group justify="space-between">
-                      <Text size="sm" c="dimmed">Visible</Text>
-                      <Text size="sm" fw={500}>
-                        {categoriesData.filter(c => c.visible).length}
-                      </Text>
-                    </Group>
-                    <Group justify="space-between">
-                      <Text size="sm" c="dimmed">Hidden</Text>
-                      <Text size="sm" fw={500}>
-                        {categoriesData.filter(c => !c.visible).length}
-                      </Text>
-                    </Group>
-                    <Group justify="space-between">
-                      <Text size="sm" c="dimmed">Total Items</Text>
-                      <Text size="sm" fw={500}>
-                        {categoriesData.reduce((acc, c) => acc + c.items, 0)}
-                      </Text>
-                    </Group>
-                  </Stack>
-                </Paper>
-
-                {/* Tips */}
-                <Paper
-                  p="lg"
-                  radius="md"
-                  style={{
-                    border: '1px solid #FFA94D',
-                    backgroundColor: '#FFF4E6',
-                  }}
-                >
-                  <Group gap="xs" mb="sm">
-                    <IconAlertCircle size={20} style={{ color: '#FD7E14' }} />
-                    <Title order={3} size={16} fw={600}>
-                      Pro Tips
-                    </Title>
-                  </Group>
-                  <Stack gap="xs">
-                    <Text size="xs">
-                      • Drag categories to reorder them in the menu
-                    </Text>
-                    <Text size="xs">
-                      • Hidden categories won't appear in POS or online ordering
-                    </Text>
-                    <Text size="xs">
-                      • Use colors to make categories easily identifiable
-                    </Text>
-                    <Text size="xs">
-                      • Group similar items together for better organization
-                    </Text>
-                  </Stack>
-                </Paper>
-
-                {/* Recent Changes */}
-                <Paper
-                  p="lg"
-                  radius="md"
-                  style={{
-                    border: '1px solid #E3E8EE',
-                    backgroundColor: 'white',
-                  }}
-                >
-                  <Group justify="space-between" mb="md">
-                    <Title order={3} size={16} fw={600}>
-                      Recent Changes
-                    </Title>
-                    <Anchor size="xs" c="indigo">
-                      View all
-                    </Anchor>
-                  </Group>
-                  <Stack gap="sm">
-                    <Box>
-                      <Text size="sm" fw={500}>Appetizers</Text>
-                      <Text size="xs" c="dimmed">
-                        2 items added • 10 mins ago
-                      </Text>
-                    </Box>
-                    <Box>
-                      <Text size="sm" fw={500}>Beverages</Text>
-                      <Text size="xs" c="dimmed">
-                        Price updated • 2 hours ago
-                      </Text>
-                    </Box>
-                    <Box>
-                      <Text size="sm" fw={500}>Desserts</Text>
-                      <Text size="xs" c="dimmed">
-                        Made hidden • Yesterday
-                      </Text>
-                    </Box>
-                  </Stack>
-                </Paper>
-              </Stack>
-            </Grid.Col>
-          </Grid>
+          {/* Tree View Table */}
+          <Tabs.Panel value="tree">
+            <Box style={{ overflow: 'auto' }}>
+              <Table striped highlightOnHover style={{ minWidth: '800px' }}>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th style={{ width: '50px' }}></Table.Th>
+                    <Table.Th style={{ width: '80px' }}>ID</Table.Th>
+                    <Table.Th>Category Name</Table.Th>
+                    <Table.Th style={{ width: '120px' }}>Display Order</Table.Th>
+                    <Table.Th style={{ width: '100px' }}>Visibility</Table.Th>
+                    <Table.Th
+                      style={{
+                        width: '100px',
+                        textAlign: 'center',
+                        position: 'sticky',
+                        right: 0,
+                        backgroundColor: 'white',
+                        boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+                      }}
+                    >
+                      Actions
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {loading ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={6}>
+                        <Center py="xl">
+                          <Stack align="center" gap="md">
+                            <Loader size="lg" />
+                            <Text c="dimmed">Loading categories...</Text>
+                          </Stack>
+                        </Center>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : !flattenedTree || flattenedTree.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={6}>
+                        <Text ta="center" c="dimmed" py="lg">
+                          {filterText ? 'No categories match your search.' : 'No categories found. Create your first category!'}
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : (
+                    flattenedTree.map((category) => (
+                      <Table.Tr key={category.categoryId}>
+                        <Table.Td>
+                          {category.children.length > 0 && (
+                            <ActionIcon
+                              variant="subtle"
+                              size="sm"
+                              onClick={() => toggleExpand(category.categoryId)}
+                            >
+                              {expandedCategories.has(category.categoryId) ? (
+                                <IconChevronDown size={16} />
+                              ) : (
+                                <IconChevronRight size={16} />
+                              )}
+                            </ActionIcon>
+                          )}
+                        </Table.Td>
+                        <Table.Td>{category.categoryId}</Table.Td>
+                        <Table.Td>
+                          <Box style={{ paddingLeft: `${category.level * 24}px` }}>
+                            <Text fw={500} size="sm">
+                              {category.categoryName}
+                            </Text>
+                            {category.categoryNameAlt && (
+                              <Text size="xs" c="dimmed">
+                                {category.categoryNameAlt}
+                              </Text>
+                            )}
+                          </Box>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="blue">
+                            {category.displayIndex}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            variant="light"
+                            color={category.isPublicDisplay ? 'green' : 'gray'}
+                          >
+                            {category.isPublicDisplay ? 'Visible' : 'Hidden'}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td
+                          style={{
+                            position: 'sticky',
+                            right: 0,
+                            backgroundColor: 'white',
+                            boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+                          }}
+                        >
+                          <Group gap="xs" justify="center">
+                            <ActionIcon
+                              variant="subtle"
+                              color="blue"
+                              onClick={() => handleEdit(category)}
+                            >
+                              <IconEdit size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              onClick={() => handleDelete(category)}
+                            >
+                              <IconTrash size={16} />
+                            </ActionIcon>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          </Tabs.Panel>
+        </Tabs>
+          </Paper>
         </Container>
       </Box>
 
-      {/* Edit/Create Drawer */}
-      <Drawer
-        opened={drawerOpened}
-        onClose={() => setDrawerOpened(false)}
-        title={
-          <Title order={2} size={20} fw={600}>
-            {editingCategory ? 'Edit Category' : 'New Category'}
-          </Title>
-        }
-        position="right"
-        size="md"
-        padding="xl"
+      {/* Add/Edit Modal */}
+      <Modal
+        opened={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        title={selectedCategory ? 'Edit Category' : 'Create New Category'}
+        size="lg"
       >
         <Stack gap="md">
           <TextInput
             label="Category Name"
             placeholder="e.g., Appetizers"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.currentTarget.value })}
+            value={formData.categoryName}
+            onChange={(e) => setFormData({ ...formData, categoryName: e.currentTarget.value })}
             required
           />
 
-          <Textarea
-            label="Description"
-            placeholder="Brief description of this category"
-            value={formData.description}
-            onChange={(e) =>
-              setFormData({ ...formData, description: e.currentTarget.value })
-            }
-            rows={3}
+          <TextInput
+            label="Alternative Name (Optional)"
+            placeholder="e.g., 前菜"
+            value={formData.categoryNameAlt || ''}
+            onChange={(e) => setFormData({ ...formData, categoryNameAlt: e.currentTarget.value })}
           />
 
-          <Box>
-            <Text size="sm" fw={500} mb="xs">
-              Category Color
-            </Text>
-            <Group>
-              {['#5469D4', '#0E6027', '#1C92D2', '#F2994A', '#E25950', '#8B5CF6'].map(
-                color => (
-                  <UnstyledButton
-                    key={color}
-                    onClick={() => setFormData({ ...formData, color })}
-                  >
-                    <ColorSwatch
-                      color={color}
-                      size={32}
-                      style={{
-                        border: formData.color === color ? '2px solid #5469D4' : 'none',
-                        cursor: 'pointer',
-                      }}
-                    />
-                  </UnstyledButton>
-                )
-              )}
-            </Group>
-          </Box>
+          <Select
+            label="Parent Category (Optional)"
+            description={selectedCategory ? "Cannot select this category or its children to prevent circular references" : "Leave empty to create a root-level category"}
+            placeholder="Select parent category or leave empty for root"
+            value={formData.parentCategoryId?.toString() || null}
+            onChange={(value) => setFormData({ ...formData, parentCategoryId: value ? parseInt(value) : undefined })}
+            data={getAvailableParents(selectedCategory?.categoryId).map(cat => ({
+              value: cat.categoryId.toString(),
+              label: cat.categoryName
+            }))}
+            clearable
+            searchable
+          />
 
-          <Box>
-            <Text size="sm" fw={500} mb="xs">
-              Category Image (Optional)
-            </Text>
-            <Paper
-              p="lg"
-              radius="md"
-              style={{
-                border: '2px dashed #E3E8EE',
-                backgroundColor: '#F6F9FC',
-                textAlign: 'center',
-              }}
-            >
-              <IconPhoto size={40} style={{ color: '#ADB5BD', marginBottom: 8 }} />
-              <FileButton
-                resetRef={resetRef}
-                onChange={setFile}
-                accept="image/png,image/jpeg"
-              >
-                {(props) => (
-                  <Button {...props} variant="subtle" size="sm">
-                    Upload Image
-                  </Button>
-                )}
-              </FileButton>
-              {file && (
-                <Text size="xs" c="dimmed" mt="xs">
-                  Selected: {file.name}
-                </Text>
-              )}
-            </Paper>
-          </Box>
+          <TextInput
+            label="Display Order"
+            type="number"
+            value={formData.displayIndex}
+            onChange={(e) => setFormData({ ...formData, displayIndex: parseInt(e.currentTarget.value) || 0 })}
+          />
 
           <Switch
             label="Visible in Menu"
             description="Show this category in POS and online ordering"
-            checked={formData.visible}
-            onChange={(e) =>
-              setFormData({ ...formData, visible: e.currentTarget.checked })
-            }
+            checked={formData.isPublicDisplay}
+            onChange={(e) => setFormData({ ...formData, isPublicDisplay: e.currentTarget.checked })}
           />
 
-          <Group justify="flex-end" mt="xl">
-            <Button variant="default" onClick={() => setDrawerOpened(false)}>
+          <Switch
+            label="Enabled"
+            description="Enable or disable this category"
+            checked={formData.enabled}
+            onChange={(e) => setFormData({ ...formData, enabled: e.currentTarget.checked })}
+          />
+
+          <Group justify="flex-end" mt="md">
+            <Button variant="default" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
             <Button
-              style={{ backgroundColor: '#5469D4' }}
-              leftSection={editingCategory ? <IconCheck size={16} /> : <IconPlus size={16} />}
+              onClick={handleSave}
+              disabled={!formData.categoryName.trim() || saving}
+              loading={saving}
+              color="green"
             >
-              {editingCategory ? 'Save Changes' : 'Create Category'}
+              {selectedCategory ? 'Update' : 'Create'}
             </Button>
           </Group>
         </Stack>
-      </Drawer>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        opened={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        title="Confirm Delete"
+        size="sm"
+      >
+        <Text mb="lg">
+          Are you sure you want to delete the category "{selectedCategory?.categoryName}"?
+          This action cannot be undone.
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button color="red" onClick={confirmDelete} loading={deleting} disabled={deleting}>
+            Delete
+          </Button>
+        </Group>
+      </Modal>
     </Box>
-  )
-}
+  );
+};
+
+export { MenuCategoriesPage };

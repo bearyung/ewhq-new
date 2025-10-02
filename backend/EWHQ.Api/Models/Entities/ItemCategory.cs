@@ -19,7 +19,7 @@ public class ItemCategory
     public string CategoryName { get; set; } = string.Empty;
 
     [MaxLength(100)]
-    public string CategoryNameAlt { get; set; }
+    public string? CategoryNameAlt { get; set; }
 
     public int DisplayIndex { get; set; }
 
@@ -32,7 +32,7 @@ public class ItemCategory
     public int? ButtonStyleId { get; set; }
 
     [MaxLength(50)]
-    public string PrinterName { get; set; }
+    public string? PrinterName { get; set; }
 
     public bool IsModifier { get; set; }
 
@@ -51,33 +51,33 @@ public class ItemCategory
     public string ModifiedBy { get; set; } = string.Empty;
 
     [MaxLength(50)]
-    public string PrinterName2 { get; set; }
+    public string? PrinterName2 { get; set; }
 
     [MaxLength(50)]
-    public string PrinterName3 { get; set; }
+    public string? PrinterName3 { get; set; }
 
     [MaxLength(50)]
-    public string PrinterName4 { get; set; }
+    public string? PrinterName4 { get; set; }
 
     [MaxLength(50)]
-    public string PrinterName5 { get; set; }
+    public string? PrinterName5 { get; set; }
 
     public int? CategoryTypeId { get; set; }
 
     [MaxLength(200)]
-    public string ImageFileName { get; set; }
+    public string? ImageFileName { get; set; }
 
     [MaxLength(200)]
-    public string ImageFileName2 { get; set; }
+    public string? ImageFileName2 { get; set; }
 
     [MaxLength(200)]
-    public string ImageFileName3 { get; set; }
+    public string? ImageFileName3 { get; set; }
 
     public bool? IsSelfOrderingDisplay { get; set; }
 
     public bool? IsOnlineStoreDisplay { get; set; }
 
     [MaxLength(50)]
-    public string CategoryCode { get; set; }
+    public string? CategoryCode { get; set; }
 
 }
