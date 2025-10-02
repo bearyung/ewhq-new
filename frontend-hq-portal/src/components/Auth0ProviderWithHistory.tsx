@@ -8,7 +8,7 @@ interface Auth0ProviderWithHistoryProps {
 
 export const Auth0ProviderWithHistory: React.FC<Auth0ProviderWithHistoryProps> = ({ children }) => {
 
-  const onRedirectCallback = (appState?: any) => {
+  const onRedirectCallback = (appState?: { returnTo?: string }) => {
     // Use the returnTo from appState, otherwise stay on current path
     const returnTo = appState?.returnTo || window.location.pathname;
 

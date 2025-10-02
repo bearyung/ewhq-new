@@ -9,10 +9,8 @@ import {
   Modal,
   Stack,
   Table,
-  Checkbox,
   Text,
   Alert,
-  NumberInput,
   Grid,
   Center,
   ActionIcon,
@@ -81,6 +79,7 @@ const ButtonStylesPage: React.FC = () => {
     if (selectedBrandId) {
       fetchButtonStyles();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBrandId]);
 
   const fetchButtonStyles = async () => {

@@ -40,4 +40,4 @@ export interface CreateButtonStyle {
   imageModeResourceStyleName?: string;
 }
 
-export interface UpdateButtonStyle extends CreateButtonStyle {}
+export type UpdateButtonStyle = CreateButtonStyle;

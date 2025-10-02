@@ -1,7 +1,6 @@
 import { Box, UnstyledButton, Group, Text, Menu, Divider, ScrollArea } from '@mantine/core';
 import {
   IconChevronDown,
-  IconSettings,
   IconBuilding,
   IconPlus,
   IconCheck,
@@ -46,7 +45,7 @@ export function TenantSelector() {
     }
 
     // Find the selected brand in grouped brands
-    for (const [companyName, brands] of Object.entries(groupedBrands)) {
+    for (const brands of Object.values(groupedBrands)) {
       const brand = brands.find(b => b.id.toString() === selectedBrand);
       if (brand) {
         return brand.name;

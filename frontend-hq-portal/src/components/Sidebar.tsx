@@ -5,9 +5,6 @@ import {
   IconReceipt,
   IconUsers,
   IconPackage,
-  IconFileText,
-  IconTerminal,
-  IconCreditCard,
   IconLink,
   IconChevronRight,
   IconSettings,
@@ -20,7 +17,6 @@ import {
   IconTable,
   IconUserCheck,
   IconClock,
-  IconCash,
   IconFileInvoice,
   IconReceiptTax,
   IconPigMoney,
@@ -41,7 +37,7 @@ import {
   IconStarOff,
 } from '@tabler/icons-react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../contexts/Auth0Context'
 import { useBookmarks } from '../contexts/BookmarkContext'
 import { TenantSelector } from './TenantSelector'
@@ -89,7 +85,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   ]
 
   // Section 3: Full menu items (expandable)
-  const fullMenuSections = [
+  const fullMenuSections = useMemo(() => [
     {
       key: 'operations',
       label: 'Operations',
@@ -151,7 +147,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         { icon: IconAdjustments, label: 'Settings', path: '/settings' },
       ]
     },
-  ]
+  ], [])
 
   const toggleSection = (key: string) => {
     setExpandedSections(prev =>
@@ -169,15 +165,18 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         (item.path !== '/' && location.pathname.startsWith(item.path + '/'))
       )
 
-      if (hasActiveItem && !expandedSections.includes(section.key)) {
+      if (hasActiveItem) {
         sectionsToExpand.push(section.key)
       }
     })
 
     if (sectionsToExpand.length > 0) {
-      setExpandedSections(prev => [...new Set([...prev, ...sectionsToExpand])])
+      setExpandedSections(prev => {
+        const newSections = [...new Set([...prev, ...sectionsToExpand])]
+        return newSections.length === prev.length ? prev : newSections
+      })
     }
-  }, [location.pathname])
+  }, [location.pathname, fullMenuSections])
 
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

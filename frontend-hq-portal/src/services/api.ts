@@ -25,7 +25,7 @@ class ApiService {
     return { data };
   }
 
-  async post(endpoint: string, data: any) {
+  async post(endpoint: string, data: unknown) {
     const headers = await this.getAuthHeader();
     const response = await fetch(`${API_URL}/api${endpoint}`, {
       method: 'POST',
@@ -44,7 +44,7 @@ class ApiService {
     return { data: responseData };
   }
 
-  async put(endpoint: string, data: any) {
+  async put(endpoint: string, data: unknown) {
     const headers = await this.getAuthHeader();
     const response = await fetch(`${API_URL}/api${endpoint}`, {
       method: 'PUT',

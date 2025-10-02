@@ -48,7 +48,7 @@ export default function OnboardingWizard() {
   const [tenantSetup, setTenantSetup] = useState<TenantSetup>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [invitationDetails, setInvitationDetails] = useState<any>(null);
+  const [invitationDetails, setInvitationDetails] = useState<{ organizationName: string; role?: string } | null>(null);
 
   // Check for invitation code in URL
   useEffect(() => {
@@ -172,9 +172,10 @@ export default function OnboardingWizard() {
         console.log('Joined tenant:', result);
         navigate('/');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error in onboarding:', error);
-      setError(error.message || 'An error occurred during setup');
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred during setup';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
