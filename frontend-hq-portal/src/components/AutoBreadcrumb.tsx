@@ -52,9 +52,10 @@ export function AutoBreadcrumb() {
         const siblings = getRouteChildren(parent.path)
 
         if (siblings.length > 1) {
-          // Show dropdown with all siblings
+          // Show dropdown with all siblings for the last item only
           return {
             label: route.label,
+            path: route.path,
             isDropdown: true,
             dropdownItems: siblings.map(sibling => ({
               label: sibling.label,
@@ -64,7 +65,7 @@ export function AutoBreadcrumb() {
         }
       }
 
-      // Regular breadcrumb item
+      // Regular breadcrumb item with path (clickable)
       return {
         label: route.label,
         path: route.path,
