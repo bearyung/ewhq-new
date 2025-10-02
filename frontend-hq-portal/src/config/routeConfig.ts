@@ -94,41 +94,50 @@ export function getRouteChildren(parentPath: string): RouteItem[] {
 
 /**
  * Helper function to build breadcrumb trail from current path
+ * Returns array of RouteItems from root to current page
+ *
+ * Strategy: For any path, we need to check ALL top-level routes to see if
+ * the path falls under them, not just direct children. This ensures Dashboard (/)
+ * is included when visiting /menus/categories.
  */
 export function buildBreadcrumbTrail(currentPath: string): RouteItem[] {
   const trail: RouteItem[] = []
 
-  const findPath = (routes: RouteItem[], path: string): boolean => {
+  function searchRoutes(routes: RouteItem[], path: string): boolean {
     for (const route of routes) {
-      if (route.path === path || path.startsWith(route.path + '/')) {
+      // Exact match - found the target
+      if (route.path === path) {
+        trail.push(route)
+        return true
+      }
+
+      // Check if current path could be under this route
+      const couldBeUnder =
+        route.path === '/'
+          ? path.startsWith('/') && path !== '/' // Everything under root except root itself
+          : path.startsWith(route.path + '/') // Path starts with this route + /
+
+      if (couldBeUnder) {
         trail.push(route)
 
-        if (route.path === path) {
-          return true
-        }
-
-        if (route.children && findPath(route.children, path)) {
-          return true
-        }
-
-        // If we have children but path doesn't match any child exactly,
-        // check if current path starts with any child path
-        if (route.children) {
-          const matchingChild = route.children.find(child =>
-            path === child.path || path.startsWith(child.path + '/')
-          )
-          if (matchingChild && matchingChild.path !== route.path) {
-            trail.push(matchingChild)
-            return true
+        // Search in children recursively (or continue if no children)
+        if (route.children && route.children.length > 0) {
+          if (searchRoutes(route.children, path)) {
+            return true // Found in children, keep this route in trail
           }
+          // Not found in children, backtrack
+          trail.pop()
+        } else {
+          // No children - check if any sibling has the path
+          // If not found later, this will be popped by parent
+          continue
         }
-
-        trail.pop()
       }
     }
     return false
   }
 
-  findPath(ROUTE_CONFIG, currentPath)
+  // Always start with full config to check all top-level routes
+  searchRoutes(ROUTE_CONFIG, currentPath)
   return trail
 }
