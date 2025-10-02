@@ -11,6 +11,7 @@ import { OrganizationManagementPage } from './pages/OrganizationManagementPage'
 import OnboardingWizard from './pages/OnboardingWizard'
 import { MenuPage } from './pages/MenuPage'
 import { MenuCategoriesPage } from './pages/MenuCategoriesPage'
+import ButtonStylesPage from './pages/operations/menu/ButtonStyles'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { useAuth0 } from '@auth0/auth0-react'
 import { useEffect, useState } from 'react'
@@ -95,6 +96,7 @@ function AppContent() {
         <Route path="organization-management" element={<OrganizationManagementPage />} />
         <Route path="menus" element={<MenuPage />} />
         <Route path="menus/categories" element={<MenuCategoriesPage />} />
+        <Route path="menus/button-styles" element={<ButtonStylesPage />} />
       </Route>
       <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
     </Routes>

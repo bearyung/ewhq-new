@@ -159,6 +159,26 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     )
   }
 
+  // Auto-expand sections when a subitem is active
+  useEffect(() => {
+    const sectionsToExpand: string[] = []
+
+    fullMenuSections.forEach((section) => {
+      const hasActiveItem = section.items.some((item) =>
+        location.pathname === item.path ||
+        (item.path !== '/' && location.pathname.startsWith(item.path + '/'))
+      )
+
+      if (hasActiveItem && !expandedSections.includes(section.key)) {
+        sectionsToExpand.push(section.key)
+      }
+    })
+
+    if (sectionsToExpand.length > 0) {
+      setExpandedSections(prev => [...new Set([...prev, ...sectionsToExpand])])
+    }
+  }, [location.pathname])
+
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Close button - Mobile only */}
@@ -322,11 +342,14 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                     <Box pl={32} py={2}>
                       <Stack gap={0}>
                         {section.items.map((item) => {
-                          const isActive = location.pathname === item.path;
+                          // Check if current path matches item path or starts with it (for sub-pages)
+                          const isActive = location.pathname === item.path ||
+                            (item.path !== '/' && location.pathname.startsWith(item.path + '/'));
                           return (
                             <NavLink
                               key={item.path}
                               label={item.label}
+                              leftSection={<item.icon size={16} stroke={1.5} />}
                               active={isActive}
                               onClick={() => navigate(item.path)}
                               styles={{

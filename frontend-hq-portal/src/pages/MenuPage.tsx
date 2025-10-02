@@ -33,6 +33,7 @@ import {
   IconFilter,
   IconDownload,
   IconUpload,
+  IconPalette,
 } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -92,6 +93,15 @@ const menuSections = [
     description: 'Discount rules and coupon management',
     stats: '8 rules',
     path: '/menus/discounts',
+  },
+  {
+    id: 'button-styles',
+    label: 'Button Styles',
+    icon: IconPalette,
+    color: 'violet',
+    description: 'Customize menu button appearance and layout',
+    stats: '4 styles',
+    path: '/menus/button-styles',
   },
 ]
 

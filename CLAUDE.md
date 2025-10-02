@@ -160,3 +160,4 @@ VITE_AUTH0_REDIRECT_URI=http://localhost:5173/callback (or 5174 for internal adm
   - Port 5174: Internal Admin Portal (staff-facing)
 - Auth0 tokens are cached in localStorage and included in API requests as Bearer tokens
 - The system supports both SQL Server and PostgreSQL - check `DatabaseProvider` setting
+- **Frontend Testing**: Unless specifically requested otherwise, always use Playwright MCP (NOT Chrome DevTools MCP) to test frontend functionality when needed

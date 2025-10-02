@@ -8,6 +8,7 @@ public class ButtonStyleMaster
 {
     [Key]
     [Column(Order = 0)]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int ButtonStyleId { get; set; }
 
     [Key]
