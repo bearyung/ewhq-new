@@ -6,21 +6,15 @@ import {
   Paper,
   Group,
   Stack,
-  Button,
-  Tabs,
-  Badge,
-  TextInput,
-  ActionIcon,
   Card,
   SimpleGrid,
   UnstyledButton,
   ThemeIcon,
   Anchor,
   Breadcrumbs,
+  Badge,
 } from '@mantine/core'
 import {
-  IconSearch,
-  IconPlus,
   IconCategory,
   IconTags,
   IconPackage,
@@ -28,14 +22,9 @@ import {
   IconPercentage,
   IconDiscount2,
   IconChevronRight,
-  IconLayoutGrid,
-  IconList,
-  IconFilter,
-  IconDownload,
-  IconUpload,
   IconPalette,
+  IconPlus,
 } from '@tabler/icons-react'
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 // Sub-navigation items with descriptions
@@ -107,8 +96,6 @@ const menuSections = [
 
 export function MenuPage() {
   const navigate = useNavigate()
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<string | null>('overview')
 
   return (
     <Box>
@@ -151,166 +138,24 @@ export function MenuPage() {
         }}
       >
         <Container size="xl">
-          {/* Page Title and Actions */}
-          <Group justify="space-between" mb="xl">
-            <Box>
-              <Title order={1} size={28} fw={600}>
-                Menu Management
-              </Title>
-              <Text size="sm" c="dimmed" mt={4}>
-                Configure your menu structure, items, and pricing
-              </Text>
-            </Box>
-
-            <Group gap="sm">
-              <Button
-                variant="default"
-                leftSection={<IconDownload size={16} />}
-                style={{ border: '1px solid #E3E8EE' }}
-              >
-                Export
-              </Button>
-              <Button
-                variant="default"
-                leftSection={<IconUpload size={16} />}
-                style={{ border: '1px solid #E3E8EE' }}
-              >
-                Import
-              </Button>
-              <Button
-                leftSection={<IconPlus size={16} />}
-                style={{
-                  backgroundColor: '#5469D4',
-                  color: 'white',
-                }}
-              >
-                Add Item
-              </Button>
-            </Group>
-          </Group>
-
-          {/* Tab Navigation for Different Views */}
-          <Tabs value={activeTab} onChange={setActiveTab}>
-            <Tabs.List style={{ borderBottom: 'none' }}>
-              <Tabs.Tab value="overview" style={{ fontSize: 14 }}>
-                Overview
-              </Tabs.Tab>
-              <Tabs.Tab value="analytics" style={{ fontSize: 14 }}>
-                Analytics
-                <Badge size="sm" variant="filled" color="red" ml={8}>
-                  3
-                </Badge>
-              </Tabs.Tab>
-              <Tabs.Tab value="settings" style={{ fontSize: 14 }}>
-                Settings
-              </Tabs.Tab>
-            </Tabs.List>
-          </Tabs>
+          {/* Page Title */}
+          <Box mb="xl">
+            <Title order={1} size={28} fw={600}>
+              Menu Management
+            </Title>
+            <Text size="sm" c="dimmed" mt={4}>
+              Configure your menu structure, items, and pricing
+            </Text>
+          </Box>
         </Container>
       </Box>
 
       {/* Main Content Area */}
       <Box p="xl" style={{ backgroundColor: '#F6F9FC', minHeight: 'calc(100vh - 200px)' }}>
         <Container size="xl">
-          {activeTab === 'overview' && (
-            <Stack gap="xl">
-              {/* Quick Stats */}
-              <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-                <Paper p="md" radius="md" style={{ border: '1px solid #E3E8EE', backgroundColor: 'white' }}>
-                  <Group justify="space-between">
-                    <Box>
-                      <Text size="xs" c="dimmed" fw={500} tt="uppercase">Total Items</Text>
-                      <Title order={3} size={24} fw={600} mt={4}>156</Title>
-                    </Box>
-                    <ThemeIcon size="lg" radius="md" variant="light" color="blue">
-                      <IconPackage size={20} />
-                    </ThemeIcon>
-                  </Group>
-                </Paper>
-
-                <Paper p="md" radius="md" style={{ border: '1px solid #E3E8EE', backgroundColor: 'white' }}>
-                  <Group justify="space-between">
-                    <Box>
-                      <Text size="xs" c="dimmed" fw={500} tt="uppercase">Categories</Text>
-                      <Title order={3} size={24} fw={600} mt={4}>12</Title>
-                    </Box>
-                    <ThemeIcon size="lg" radius="md" variant="light" color="indigo">
-                      <IconCategory size={20} />
-                    </ThemeIcon>
-                  </Group>
-                </Paper>
-
-                <Paper p="md" radius="md" style={{ border: '1px solid #E3E8EE', backgroundColor: 'white' }}>
-                  <Group justify="space-between">
-                    <Box>
-                      <Text size="xs" c="dimmed" fw={500} tt="uppercase">Active Promos</Text>
-                      <Title order={3} size={24} fw={600} mt={4}>3</Title>
-                    </Box>
-                    <ThemeIcon size="lg" radius="md" variant="light" color="orange">
-                      <IconPercentage size={20} />
-                    </ThemeIcon>
-                  </Group>
-                </Paper>
-
-                <Paper p="md" radius="md" style={{ border: '1px solid #E3E8EE', backgroundColor: 'white' }}>
-                  <Group justify="space-between">
-                    <Box>
-                      <Text size="xs" c="dimmed" fw={500} tt="uppercase">Out of Stock</Text>
-                      <Title order={3} size={24} fw={600} mt={4}>5</Title>
-                    </Box>
-                    <ThemeIcon size="lg" radius="md" variant="light" color="red">
-                      <IconPackage size={20} />
-                    </ThemeIcon>
-                  </Group>
-                </Paper>
-              </SimpleGrid>
-
-              {/* Search Bar */}
-              <Paper p="md" radius="md" style={{ border: '1px solid #E3E8EE', backgroundColor: 'white' }}>
-                <Group>
-                  <TextInput
-                    placeholder="Search menu sections..."
-                    leftSection={<IconSearch size={16} />}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.currentTarget.value)}
-                    style={{ flex: 1 }}
-                    styles={{
-                      input: {
-                        border: '1px solid #E3E8EE',
-                        '&:focus': {
-                          borderColor: '#5469D4',
-                        },
-                      },
-                    }}
-                  />
-                  <Button
-                    variant="default"
-                    leftSection={<IconFilter size={16} />}
-                    style={{ border: '1px solid #E3E8EE' }}
-                  >
-                    Filters
-                  </Button>
-                  <Group gap={4}>
-                    <ActionIcon
-                      variant="default"
-                      size="lg"
-                      style={{ border: '1px solid #E3E8EE' }}
-                    >
-                      <IconLayoutGrid size={18} />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="default"
-                      size="lg"
-                      style={{ border: '1px solid #E3E8EE' }}
-                    >
-                      <IconList size={18} />
-                    </ActionIcon>
-                  </Group>
-                </Group>
-              </Paper>
-
-              {/* Section Cards Grid */}
-              <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
+          <Stack gap="xl">
+            {/* Section Cards Grid */}
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
                 {menuSections.map((section) => {
                   const Icon = section.icon
                   return (
@@ -427,26 +272,7 @@ export function MenuPage() {
                 </Stack>
               </Paper>
             </Stack>
-          )}
-
-          {activeTab === 'analytics' && (
-            <Paper p="xl" radius="md" style={{ border: '1px solid #E3E8EE', backgroundColor: 'white' }}>
-              <Title order={2} size={20} fw={600} mb="md">
-                Menu Analytics
-              </Title>
-              <Text c="dimmed">Analytics content coming soon...</Text>
-            </Paper>
-          )}
-
-          {activeTab === 'settings' && (
-            <Paper p="xl" radius="md" style={{ border: '1px solid #E3E8EE', backgroundColor: 'white' }}>
-              <Title order={2} size={20} fw={600} mb="md">
-                Menu Settings
-              </Title>
-              <Text c="dimmed">Settings content coming soon...</Text>
-            </Paper>
-          )}
-        </Container>
+          </Container>
       </Box>
     </Box>
   )
