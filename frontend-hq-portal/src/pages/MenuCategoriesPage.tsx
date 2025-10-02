@@ -284,12 +284,26 @@ const MenuCategoriesPage: React.FC = () => {
 
   // Flatten tree for rendering with filter
   const flattenedTree = useMemo(() => {
+    // Helper function to check if a node or any of its descendants match the filter
+    const nodeMatchesFilter = (node: CategoryTreeNode, searchText: string): boolean => {
+      if (!searchText) return true;
+
+      const lowerSearchText = searchText.toLowerCase();
+
+      // Check if current node matches
+      if (node.categoryName.toLowerCase().includes(lowerSearchText) ||
+          node.categoryId.toString().includes(searchText)) {
+        return true;
+      }
+
+      // Check if any children match
+      return node.children.some(child => nodeMatchesFilter(child, searchText));
+    };
+
     const flatten = (nodes: CategoryTreeNode[], result: CategoryTreeNode[] = []): CategoryTreeNode[] => {
       for (const node of nodes) {
-        // Apply filter
-        if (!filterText ||
-            node.categoryName.toLowerCase().includes(filterText.toLowerCase()) ||
-            node.categoryId.toString().includes(filterText)) {
+        // Check if node or any descendants match filter
+        if (nodeMatchesFilter(node, filterText)) {
           result.push(node);
 
           // Only show children if parent is expanded
@@ -303,6 +317,44 @@ const MenuCategoriesPage: React.FC = () => {
 
     return flatten(categoryTree);
   }, [categoryTree, expandedCategories, filterText]);
+
+  // Auto-expand categories when filtering to show matching nested results
+  useEffect(() => {
+    if (filterText) {
+      const categoriesToExpand = new Set<number>();
+
+      const hasMatchingDescendant = (node: CategoryTreeNode): boolean => {
+        const lowerSearchText = filterText.toLowerCase();
+
+        // Check if any direct children match
+        const childMatches = node.children.some(child =>
+          child.categoryName.toLowerCase().includes(lowerSearchText) ||
+          child.categoryId.toString().includes(filterText)
+        );
+
+        if (childMatches) {
+          categoriesToExpand.add(node.categoryId);
+          return true;
+        }
+
+        // Recursively check descendants
+        const descendantMatches = node.children.some(child => {
+          if (hasMatchingDescendant(child)) {
+            categoriesToExpand.add(node.categoryId);
+            return true;
+          }
+          return false;
+        });
+
+        return descendantMatches;
+      };
+
+      // Check all root nodes
+      categoryTree.forEach(node => hasMatchingDescendant(node));
+
+      setExpandedCategories(categoriesToExpand);
+    }
+  }, [filterText, categoryTree]);
 
   const toggleExpand = (categoryId: number) => {
     setExpandedCategories(prev => {
