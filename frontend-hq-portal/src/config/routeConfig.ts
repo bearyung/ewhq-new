@@ -44,6 +44,10 @@ export const ROUTE_CONFIG: RouteItem[] = [
         label: 'Modifiers',
       },
       {
+        path: '/menus/meal-set',
+        label: 'Meal Set',
+      },
+      {
         path: '/menus/promotions',
         label: 'Promotions',
       },

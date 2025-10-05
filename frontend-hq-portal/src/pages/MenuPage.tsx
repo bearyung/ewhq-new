@@ -24,6 +24,7 @@ import {
   IconChevronRight,
   IconPalette,
   IconPlus,
+  IconChefHat,
 } from '@tabler/icons-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -66,6 +67,15 @@ const menuSections = [
     path: '/menus/modifiers',
   },
   {
+    id: 'meal-set',
+    label: 'Meal Set',
+    icon: IconChefHat,
+    color: 'lime',
+    description: 'Bundle menu items into curated meal sets',
+    stats: '2 sets',
+    path: '/menus/meal-set',
+  },
+  {
     id: 'promotions',
     label: 'Promotions',
     icon: IconPercentage,
@@ -88,7 +98,7 @@ const menuSections = [
     label: 'Button Styles',
     icon: IconPalette,
     color: 'violet',
-    description: 'Customize menu button appearance and layout',
+    description: 'Adjust button colors to match your brand',
     stats: '4 styles',
     path: '/menus/button-styles',
   },

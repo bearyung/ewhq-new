@@ -17,7 +17,8 @@ import {
   Badge,
   ColorInput,
   Container,
-  Loader
+  Loader,
+  Tooltip
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -512,22 +513,34 @@ const ButtonStylesPage: FC = () => {
                     }}
                   >
                     <Group gap="xs" justify="center">
-                      <ActionIcon
-                        variant="subtle"
-                        color="blue"
-                        onClick={() => handleEdit(style)}
-                        disabled={style.isSystemUse}
+                      <Tooltip
+                        label={style.isSystemUse ? 'System styles cannot be edited' : 'Edit button style'}
+                        withArrow
+                        position="top"
                       >
-                        <IconEdit size={16} />
-                      </ActionIcon>
+                        <span>
+                          <ActionIcon
+                            variant="subtle"
+                            color="blue"
+                            onClick={() => handleEdit(style)}
+                            disabled={style.isSystemUse}
+                            aria-label="Edit button style"
+                          >
+                            <IconEdit size={16} />
+                          </ActionIcon>
+                        </span>
+                      </Tooltip>
                       {!style.isSystemUse && (
-                        <ActionIcon
-                          variant="subtle"
-                          color="red"
-                          onClick={() => handleDelete(style)}
-                        >
-                          <IconTrash size={16} />
-                        </ActionIcon>
+                        <Tooltip label="Delete button style" withArrow position="top">
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            onClick={() => handleDelete(style)}
+                            aria-label="Delete button style"
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Tooltip>
                       )}
                     </Group>
                   </Table.Td>
