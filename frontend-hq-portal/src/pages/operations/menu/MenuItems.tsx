@@ -1,0 +1,1159 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { FC } from 'react';
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  Container,
+  Divider,
+  Drawer,
+  Flex,
+  Grid,
+  Group,
+  Loader,
+  NumberInput,
+  Pagination,
+  Paper,
+  ScrollArea,
+  SegmentedControl,
+  Select,
+  Stack,
+  Switch,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+} from '@mantine/core';
+import { useDebouncedValue } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
+import {
+  IconAlertCircle,
+  IconArrowAutofitContent,
+  IconArrowsSort,
+  IconCheck,
+  IconChevronRight,
+  IconPencil,
+  IconPlus,
+  IconSearch,
+  IconSparkles,
+  IconX,
+} from '@tabler/icons-react';
+import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
+import { ScrollingHeader } from '../../../components/ScrollingHeader';
+import { useBrands } from '../../../contexts/BrandContext';
+import menuItemService from '../../../services/menuItemService';
+import type {
+  MenuItemListResponse,
+  MenuItemSummary,
+  MenuItemLookups,
+  MenuItemUpsertPayload,
+  MenuItemDetail,
+  CategoryItemCount,
+} from '../../../types/menuItem';
+import type { ItemCategory } from '../../../types/itemCategory';
+
+interface CategoryNode extends ItemCategory {
+  children: CategoryNode[];
+}
+
+const PAGE_SIZE = 25;
+
+const buildCategoryTree = (categories: ItemCategory[]): CategoryNode[] => {
+  const map = new Map<number, CategoryNode>();
+  const roots: CategoryNode[] = [];
+
+  categories.forEach((cat) => {
+    map.set(cat.categoryId, { ...cat, children: [] });
+  });
+
+  categories.forEach((cat) => {
+    const node = map.get(cat.categoryId);
+    if (!node) return;
+
+    if (cat.parentCategoryId && map.has(cat.parentCategoryId)) {
+      map.get(cat.parentCategoryId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  const sortFn = (a: CategoryNode, b: CategoryNode) => {
+    if (a.displayIndex !== b.displayIndex) return a.displayIndex - b.displayIndex;
+    return a.categoryName.localeCompare(b.categoryName);
+  };
+
+  const sortTree = (nodes: CategoryNode[]) => {
+    nodes.sort(sortFn);
+    nodes.forEach((node) => sortTree(node.children));
+  };
+
+  sortTree(roots);
+  return roots;
+};
+
+const createBasePayload = (categoryId: number, departmentId: number): MenuItemUpsertPayload => ({
+  itemCode: '',
+  itemName: '',
+  itemNameAlt: '',
+  itemNameAlt2: '',
+  itemNameAlt3: '',
+  itemNameAlt4: '',
+  itemPosName: '',
+  itemPosNameAlt: '',
+  itemPublicDisplayName: '',
+  itemPublicDisplayNameAlt: '',
+  itemPublicPrintedName: '',
+  itemPublicPrintedNameAlt: '',
+  remark: '',
+  remarkAlt: '',
+  imageFileName: '',
+  imageFileName2: '',
+  tableOrderingImageFileName: '',
+  categoryId,
+  departmentId,
+  subDepartmentId: null,
+  displayIndex: 0,
+  enabled: true,
+  isItemShow: true,
+  isPriceShow: true,
+  hasModifier: false,
+  autoRedirectToModifier: false,
+  isModifier: false,
+  modifierGroupHeaderId: null,
+  buttonStyleId: null,
+  isManualPrice: false,
+  isManualName: false,
+  isPromoItem: false,
+  isModifierConcatToParent: false,
+  isFollowSet: false,
+  isFollowSetDynamic: false,
+  isFollowSetStandard: false,
+  isNonDiscountItem: false,
+  isNonServiceChargeItem: false,
+  isStandaloneAndSetItem: null,
+  isGroupRightItem: false,
+  isPrintLabel: false,
+  isPrintLabelTakeaway: false,
+  isPriceInPercentage: false,
+  isPointPaidItem: null,
+  isNoPointEarnItem: null,
+  isNonTaxableItem: null,
+  isItemShowInKitchenChecklist: null,
+  isSoldoutAutoLock: null,
+  isPrepaidRechargeItem: null,
+  isAutoLinkWithRawMaterial: null,
+  isDinein: true,
+  isTakeaway: true,
+  isDelivery: true,
+  isKitchenPrintInRedColor: null,
+  isManualPriceGroup: null,
+  isExcludeLabelCount: null,
+  servingSize: null,
+  systemRemark: '',
+  isNonSalesItem: null,
+  productionSeconds: null,
+  parentItemId: null,
+  isComboRequired: null,
+});
+
+const mapDetailToPayload = (detail: MenuItemDetail): MenuItemUpsertPayload => ({
+  itemCode: detail.itemCode,
+  itemName: detail.itemName ?? '',
+  itemNameAlt: detail.itemNameAlt ?? '',
+  itemNameAlt2: detail.itemNameAlt2 ?? '',
+  itemNameAlt3: detail.itemNameAlt3 ?? '',
+  itemNameAlt4: detail.itemNameAlt4 ?? '',
+  itemPosName: detail.itemPosName ?? '',
+  itemPosNameAlt: detail.itemPosNameAlt ?? '',
+  itemPublicDisplayName: detail.itemPublicDisplayName ?? '',
+  itemPublicDisplayNameAlt: detail.itemPublicDisplayNameAlt ?? '',
+  itemPublicPrintedName: detail.itemPublicPrintedName ?? '',
+  itemPublicPrintedNameAlt: detail.itemPublicPrintedNameAlt ?? '',
+  remark: detail.remark ?? '',
+  remarkAlt: detail.remarkAlt ?? '',
+  imageFileName: detail.imageFileName ?? '',
+  imageFileName2: detail.imageFileName2 ?? '',
+  tableOrderingImageFileName: detail.tableOrderingImageFileName ?? '',
+  categoryId: detail.categoryId,
+  departmentId: detail.departmentId,
+  subDepartmentId: detail.subDepartmentId ?? null,
+  displayIndex: detail.displayIndex,
+  enabled: detail.enabled,
+  isItemShow: detail.isItemShow,
+  isPriceShow: detail.isPriceShow,
+  hasModifier: detail.hasModifier,
+  autoRedirectToModifier: detail.autoRedirectToModifier,
+  isModifier: detail.isModifier,
+  modifierGroupHeaderId: detail.modifierGroupHeaderId ?? null,
+  buttonStyleId: detail.buttonStyleId ?? null,
+  isManualPrice: detail.isManualPrice,
+  isManualName: detail.isManualName,
+  isPromoItem: detail.isPromoItem,
+  isModifierConcatToParent: detail.isModifierConcatToParent,
+  isFollowSet: detail.isFollowSet,
+  isFollowSetDynamic: detail.isFollowSetDynamic,
+  isFollowSetStandard: detail.isFollowSetStandard,
+  isNonDiscountItem: detail.isNonDiscountItem,
+  isNonServiceChargeItem: detail.isNonServiceChargeItem,
+  isStandaloneAndSetItem: detail.isStandaloneAndSetItem ?? null,
+  isGroupRightItem: detail.isGroupRightItem,
+  isPrintLabel: detail.isPrintLabel,
+  isPrintLabelTakeaway: detail.isPrintLabelTakeaway,
+  isPriceInPercentage: detail.isPriceInPercentage,
+  isPointPaidItem: detail.isPointPaidItem ?? null,
+  isNoPointEarnItem: detail.isNoPointEarnItem ?? null,
+  isNonTaxableItem: detail.isNonTaxableItem ?? null,
+  isItemShowInKitchenChecklist: detail.isItemShowInKitchenChecklist ?? null,
+  isSoldoutAutoLock: detail.isSoldoutAutoLock ?? null,
+  isPrepaidRechargeItem: detail.isPrepaidRechargeItem ?? null,
+  isAutoLinkWithRawMaterial: detail.isAutoLinkWithRawMaterial ?? null,
+  isDinein: detail.isDinein,
+  isTakeaway: detail.isTakeaway,
+  isDelivery: detail.isDelivery,
+  isKitchenPrintInRedColor: detail.isKitchenPrintInRedColor ?? null,
+  isManualPriceGroup: detail.isManualPriceGroup ?? null,
+  isExcludeLabelCount: detail.isExcludeLabelCount ?? null,
+  servingSize: detail.servingSize ?? null,
+  systemRemark: detail.systemRemark ?? '',
+  isNonSalesItem: detail.isNonSalesItem ?? null,
+  productionSeconds: detail.productionSeconds ?? null,
+  parentItemId: detail.parentItemId ?? null,
+  isComboRequired: detail.isComboRequired ?? null,
+});
+
+const coerceString = (value?: string | null): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+};
+
+const normalizePayload = (payload: MenuItemUpsertPayload): MenuItemUpsertPayload => ({
+  ...payload,
+  itemName: coerceString(payload.itemName) ?? null,
+  itemNameAlt: coerceString(payload.itemNameAlt) ?? null,
+  itemNameAlt2: coerceString(payload.itemNameAlt2) ?? null,
+  itemNameAlt3: coerceString(payload.itemNameAlt3) ?? null,
+  itemNameAlt4: coerceString(payload.itemNameAlt4) ?? null,
+  itemPosName: coerceString(payload.itemPosName) ?? null,
+  itemPosNameAlt: coerceString(payload.itemPosNameAlt) ?? null,
+  itemPublicDisplayName: coerceString(payload.itemPublicDisplayName) ?? null,
+  itemPublicDisplayNameAlt: coerceString(payload.itemPublicDisplayNameAlt) ?? null,
+  itemPublicPrintedName: coerceString(payload.itemPublicPrintedName) ?? null,
+  itemPublicPrintedNameAlt: coerceString(payload.itemPublicPrintedNameAlt) ?? null,
+  remark: coerceString(payload.remark) ?? null,
+  remarkAlt: coerceString(payload.remarkAlt) ?? null,
+  imageFileName: coerceString(payload.imageFileName) ?? null,
+  imageFileName2: coerceString(payload.imageFileName2) ?? null,
+  tableOrderingImageFileName: coerceString(payload.tableOrderingImageFileName) ?? null,
+  systemRemark: coerceString(payload.systemRemark) ?? null,
+});
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString();
+};
+
+const MenuItemsPage: FC = () => {
+  const { selectedBrand } = useBrands();
+  const brandId = selectedBrand ? parseInt(selectedBrand, 10) : null;
+
+  const [lookups, setLookups] = useState<MenuItemLookups | null>(null);
+  const [lookupsLoading, setLookupsLoading] = useState(false);
+  const [itemsResponse, setItemsResponse] = useState<MenuItemListResponse | null>(null);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const [categorySearch, setCategorySearch] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch] = useDebouncedValue(search, 300);
+  const [includeDisabled, setIncludeDisabled] = useState(false);
+  const [modifierFilter, setModifierFilter] = useState<'all' | 'with' | 'without'>('all');
+  const [promoFilter, setPromoFilter] = useState<'all' | 'promo' | 'nonpromo'>('all');
+  const [sortBy, setSortBy] = useState<'displayIndex' | 'name' | 'modified'>('displayIndex');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [page, setPage] = useState(1);
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<MenuItemUpsertPayload | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('basics');
+  const [saving, setSaving] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  useEffect(() => {
+    if (!brandId) return;
+
+    const loadLookups = async () => {
+      setLookupsLoading(true);
+      try {
+        const data = await menuItemService.getLookups(brandId);
+        setLookups(data);
+        setSelectedCategoryId((current) => {
+          if (current && data.categories.some((cat) => cat.categoryId === current)) {
+            return current;
+          }
+          return data.categories[0]?.categoryId ?? null;
+        });
+        setPage(1);
+      } catch (error) {
+        console.error('Failed to load menu item lookups', error);
+        notifications.show({
+          title: 'Error',
+          message: 'Unable to load supporting data for menu items',
+          color: 'red',
+          icon: <IconAlertCircle size={16} />,
+        });
+      } finally {
+        setLookupsLoading(false);
+      }
+    };
+
+    loadLookups();
+  }, [brandId]);
+
+  useEffect(() => {
+    if (!brandId) return;
+
+    const loadItems = async () => {
+      setItemsLoading(true);
+      setFetchError(null);
+      try {
+        const response = await menuItemService.getMenuItems(brandId, {
+          categoryId: selectedCategoryId ?? undefined,
+          search: debouncedSearch || undefined,
+          includeDisabled,
+          hasModifier:
+            modifierFilter === 'with' ? true : modifierFilter === 'without' ? false : undefined,
+          isPromoItem:
+            promoFilter === 'promo' ? true : promoFilter === 'nonpromo' ? false : undefined,
+          sortBy,
+          sortDirection,
+          page,
+          pageSize: PAGE_SIZE,
+        });
+        setItemsResponse(response);
+      } catch (error) {
+        console.error('Failed to load menu items', error);
+        setFetchError('Unable to fetch menu items. Please try again.');
+      } finally {
+        setItemsLoading(false);
+      }
+    };
+
+    loadItems();
+  }, [brandId, selectedCategoryId, debouncedSearch, includeDisabled, modifierFilter, promoFilter, sortBy, sortDirection, page]);
+
+  const categoryTree = useMemo(() => buildCategoryTree(lookups?.categories ?? []), [lookups?.categories]);
+
+  const filteredCategories = useMemo(() => {
+    if (!categorySearch.trim()) return categoryTree;
+
+    const term = categorySearch.trim().toLowerCase();
+
+    const filterRecursive = (nodes: CategoryNode[]): CategoryNode[] =>
+      nodes
+        .map((node) => ({
+          ...node,
+          children: filterRecursive(node.children),
+        }))
+        .filter((node) =>
+          node.categoryName.toLowerCase().includes(term) || node.children.length > 0,
+        );
+
+    return filterRecursive(categoryTree);
+  }, [categoryTree, categorySearch]);
+
+  const categoryCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    itemsResponse?.categoryCounts.forEach((entry: CategoryItemCount) => {
+      map.set(entry.categoryId, entry.itemCount);
+    });
+    return map;
+  }, [itemsResponse?.categoryCounts]);
+
+  const totalItems = itemsResponse?.totalItems ?? 0;
+  const totalPages = itemsResponse?.totalPages ?? 1;
+
+  const getCategoryLabel = (categoryId?: number | null) => {
+    if (!categoryId || !lookups) return '—';
+    const match = lookups.categories.find((cat) => cat.categoryId === categoryId);
+    return match ? match.categoryName : '—';
+  };
+
+  const getDepartmentName = (departmentId?: number) => {
+    if (!departmentId || !lookups) return '—';
+    return lookups.departments.find((dep) => dep.departmentId === departmentId)?.departmentName ?? '—';
+  };
+
+  const handleCreate = () => {
+    if (!lookups || lookups.categories.length === 0 || lookups.departments.length === 0) {
+      notifications.show({
+        title: 'Missing data',
+        message: 'Please configure categories and departments before creating items.',
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />,
+      });
+      return;
+    }
+
+    const defaultCategoryId = selectedCategoryId ?? lookups.categories[0].categoryId;
+    const defaultDepartmentId = lookups.departments[0].departmentId;
+
+    setFormData(createBasePayload(defaultCategoryId, defaultDepartmentId));
+    setDrawerMode('create');
+    setEditingItemId(null);
+    setActiveTab('basics');
+    setDrawerOpen(true);
+  };
+
+  const handleEdit = async (item: MenuItemSummary) => {
+    if (!brandId) return;
+    setDrawerMode('edit');
+    setDrawerOpen(true);
+    setActiveTab('basics');
+    setFormData(null);
+    setEditingItemId(item.itemId);
+    setDetailLoading(true);
+    try {
+      const detail = await menuItemService.getMenuItem(brandId, item.itemId);
+      setFormData(mapDetailToPayload(detail));
+    } catch (error) {
+      console.error('Failed to load item detail', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Unable to load item details',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+      setDrawerOpen(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const updateForm = <K extends keyof MenuItemUpsertPayload>(key: K, value: MenuItemUpsertPayload[K]) => {
+    setFormData((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const handleSubmit = async () => {
+    if (!formData || !brandId) return;
+
+    if (!formData.itemCode.trim()) {
+      notifications.show({
+        title: 'Validation error',
+        message: 'Item code is required.',
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />,
+      });
+      setActiveTab('basics');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = normalizePayload(formData);
+      if (drawerMode === 'create') {
+        await menuItemService.createMenuItem(brandId, payload);
+        notifications.show({
+          title: 'Item created',
+          message: 'The menu item has been created successfully.',
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+        setPage(1);
+      } else if (drawerMode === 'edit' && editingItemId) {
+        await menuItemService.updateMenuItem(brandId, editingItemId, payload);
+        notifications.show({
+          title: 'Item updated',
+          message: 'Changes have been saved.',
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+      }
+
+      setDrawerOpen(false);
+      setFormData(null);
+      setEditingItemId(null);
+      // Refresh list
+      const response = await menuItemService.getMenuItems(brandId, {
+        categoryId: selectedCategoryId ?? undefined,
+        search: debouncedSearch || undefined,
+        includeDisabled,
+        hasModifier:
+          modifierFilter === 'with' ? true : modifierFilter === 'without' ? false : undefined,
+        isPromoItem:
+          promoFilter === 'promo' ? true : promoFilter === 'nonpromo' ? false : undefined,
+        sortBy,
+        sortDirection,
+        page,
+        pageSize: PAGE_SIZE,
+      });
+      setItemsResponse(response);
+    } catch (error) {
+      console.error('Failed to save menu item', error);
+      notifications.show({
+        title: 'Save failed',
+        message: 'Unable to save changes. Please check the form and try again.',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderCategoryNodes = (nodes: CategoryNode[], depth = 0) => (
+    <Stack gap="xs" key={`depth-${depth}`}>
+      {nodes.map((node) => {
+        const isSelected = node.categoryId === selectedCategoryId;
+        const count = categoryCounts.get(node.categoryId) ?? 0;
+        return (
+          <Box key={node.categoryId}>
+            <Button
+              variant={isSelected ? 'filled' : 'subtle'}
+              color={isSelected ? 'indigo' : 'gray'}
+              fullWidth
+              onClick={() => {
+                setSelectedCategoryId(node.categoryId);
+                setPage(1);
+              }}
+              leftSection={
+                node.children.length > 0 ? (
+                  <IconChevronRight size={16} style={{ opacity: 0.6 }} />
+                ) : (
+                  <IconArrowAutofitContent size={16} style={{ opacity: 0.6 }} />
+                )
+              }
+              styles={{
+                label: {
+                  justifyContent: 'space-between',
+                },
+              }}
+            >
+              <Flex justify="space-between" align="center" w="100%">
+                <Text size="sm" fw={500} truncate>
+                  {node.categoryName}
+                </Text>
+                <Badge size="sm" variant={isSelected ? 'light' : 'outline'} color={isSelected ? 'white' : 'gray'}>
+                  {count}
+                </Badge>
+              </Flex>
+            </Button>
+            {node.children.length > 0 && (
+              <Box pl="md" mt="xs">
+                {renderCategoryNodes(node.children, depth + 1)}
+              </Box>
+            )}
+          </Box>
+        );
+      })}
+    </Stack>
+  );
+
+  const renderTags = (item: MenuItemSummary) => (
+    <Group gap="xs">
+      <Badge variant="light" color={item.enabled ? 'green' : 'gray'}>
+        {item.enabled ? 'Enabled' : 'Disabled'}
+      </Badge>
+      <Badge variant="light" color={item.isItemShow ? 'blue' : 'gray'}>
+        {item.isItemShow ? 'Visible' : 'Hidden'}
+      </Badge>
+      {item.hasModifier && (
+        <Badge variant="light" color="violet">
+          Modifiers
+        </Badge>
+      )}
+      {item.isPromoItem && (
+        <Badge variant="light" color="orange">
+          Promo
+        </Badge>
+      )}
+      {item.isManualPrice && (
+        <Badge variant="light" color="red">
+          Manual price
+        </Badge>
+      )}
+    </Group>
+  );
+
+  const itemRows = (itemsResponse?.items ?? []).map((item) => (
+    <Table.Tr key={item.itemId}>
+      <Table.Td>
+        <Stack gap={2}>
+          <Text fw={600}>{item.itemName || item.itemCode}</Text>
+          <Text size="xs" c="dimmed">
+            Code: {item.itemCode}
+          </Text>
+          {item.itemPublicDisplayName && (
+            <Text size="xs" c="dimmed">
+              Public: {item.itemPublicDisplayName}
+            </Text>
+          )}
+        </Stack>
+      </Table.Td>
+      <Table.Td>{getCategoryLabel(item.categoryId)}</Table.Td>
+      <Table.Td>{getDepartmentName(item.departmentId)}</Table.Td>
+      <Table.Td>{renderTags(item)}</Table.Td>
+      <Table.Td>{formatDateTime(item.modifiedDate)}</Table.Td>
+      <Table.Td>
+        <Group gap="xs" justify="flex-end">
+          <ActionIcon variant="subtle" color="indigo" onClick={() => handleEdit(item)}>
+            <IconPencil size={16} />
+          </ActionIcon>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
+  ));
+
+  return (
+    <Box>
+      <AutoBreadcrumb />
+      <ScrollingHeader
+        title="Menu Items"
+        subtitle="Browse, filter, and edit items across your menu"
+        actions={
+          <Group>
+            <Button leftSection={<IconPlus size={16} />} onClick={handleCreate} disabled={!brandId}>
+              New item
+            </Button>
+          </Group>
+        }
+      />
+
+      <Container size="xl" py="xl">
+        {!brandId && (
+          <Paper withBorder p="lg" mb="xl">
+            <Group gap="sm">
+              <IconAlertCircle size={20} color="var(--mantine-color-red-6)" />
+              <Stack gap={4}>
+                <Text fw={600}>Select a brand to manage menu items</Text>
+                <Text size="sm" c="dimmed">
+                  Choose a brand from the header selector to load menu data.
+                </Text>
+              </Stack>
+            </Group>
+          </Paper>
+        )}
+
+        <Grid gutter="xl" align="stretch">
+          <Grid.Col span={{ base: 12, md: 4, lg: 3 }}>
+            <Paper withBorder shadow="xs" p="md" h="100%">
+              <Stack gap="sm">
+                <Group justify="space-between">
+                  <Text fw={600}>Categories</Text>
+                  <Badge variant="light" color="gray">
+                    {(itemsResponse?.categoryCounts ?? []).reduce((acc, entry) => acc + entry.itemCount, 0)} items
+                  </Badge>
+                </Group>
+                <TextInput
+                  placeholder="Search categories"
+                  value={categorySearch}
+                  onChange={(event) => setCategorySearch(event.currentTarget.value)}
+                  leftSection={<IconSearch size={16} />}
+                />
+                <Button
+                  variant={selectedCategoryId === null ? 'filled' : 'subtle'}
+                  color={selectedCategoryId === null ? 'indigo' : 'gray'}
+                  leftSection={<IconSparkles size={16} />}
+                  onClick={() => {
+                    setSelectedCategoryId(null);
+                    setPage(1);
+                  }}
+                >
+                  All items
+                </Button>
+                <Divider label="Browse" labelPosition="center" />
+                <ScrollArea h={420} type="auto" offsetScrollbars>
+                  {lookupsLoading ? (
+                    <CenterLoader message="Loading categories" />
+                  ) : filteredCategories.length > 0 ? (
+                    <Stack gap="sm">{renderCategoryNodes(filteredCategories)}</Stack>
+                  ) : (
+                    <Stack gap="xs" align="center" py="md">
+                      <IconSparkles size={20} color="var(--mantine-color-gray-6)" />
+                      <Text size="sm" c="dimmed" ta="center">
+                        No categories match your search.
+                      </Text>
+                    </Stack>
+                  )}
+                </ScrollArea>
+              </Stack>
+            </Paper>
+          </Grid.Col>
+
+          <Grid.Col span={{ base: 12, md: 8, lg: 9 }}>
+            <Stack>
+              <Paper withBorder shadow="xs" p="md">
+                <Stack gap="md">
+                  <Group align="flex-end" justify="space-between">
+                    <TextInput
+                      label="Search"
+                    placeholder="Search by name or code"
+                    value={search}
+                    onChange={(event) => {
+                      setSearch(event.currentTarget.value);
+                      setPage(1);
+                    }}
+                    leftSection={<IconSearch size={16} />}
+                    w="60%"
+                  />
+                  <Switch
+                    label="Include disabled"
+                    checked={includeDisabled}
+                    onChange={(event) => {
+                      setIncludeDisabled(event.currentTarget.checked);
+                      setPage(1);
+                    }}
+                  />
+                </Group>
+
+                <Group grow>
+                  <SegmentedControl
+                    value={modifierFilter}
+                    onChange={(value) => {
+                      const next = value as 'all' | 'with' | 'without';
+                      setModifierFilter(next);
+                      setPage(1);
+                    }}
+                    data={[
+                      { label: 'All modifiers', value: 'all' },
+                      { label: 'With modifiers', value: 'with' },
+                      { label: 'Without modifiers', value: 'without' },
+                    ]}
+                  />
+                  <SegmentedControl
+                    value={promoFilter}
+                    onChange={(value) => {
+                      const next = value as 'all' | 'promo' | 'nonpromo';
+                      setPromoFilter(next);
+                      setPage(1);
+                    }}
+                    data={[
+                      { label: 'All items', value: 'all' },
+                      { label: 'Promo only', value: 'promo' },
+                      { label: 'Non promo', value: 'nonpromo' },
+                    ]}
+                  />
+                </Group>
+
+                <Group>
+                  <Select
+                    label="Sort by"
+                    value={sortBy}
+                    onChange={(value) => {
+                      if (!value) return;
+                      setSortBy(value as typeof sortBy);
+                      setPage(1);
+                    }}
+                    data={[
+                      { label: 'Display order', value: 'displayIndex' },
+                      { label: 'Name', value: 'name' },
+                      { label: 'Last updated', value: 'modified' },
+                    ]}
+                    w={220}
+                  />
+                  <Button
+                    variant="light"
+                    leftSection={<IconArrowsSort size={16} />}
+                    onClick={() => {
+                      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                      setPage(1);
+                    }}
+                  >
+                    {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+
+            <Paper withBorder shadow="xs">
+              {itemsLoading ? (
+                <CenterLoader message="Loading menu items" />
+              ) : fetchError ? (
+                <Stack align="center" justify="center" p="xl" gap="sm">
+                  <IconAlertCircle size={24} color="var(--mantine-color-red-6)" />
+                  <Text fw={600}>{fetchError}</Text>
+                  <Button variant="light" onClick={() => setPage((prev) => prev)}>
+                    Retry
+                  </Button>
+                </Stack>
+              ) : (
+                <ScrollArea type="auto">
+                  <Table highlightOnHover withColumnBorders>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Item</Table.Th>
+                        <Table.Th>Category</Table.Th>
+                        <Table.Th>Department</Table.Th>
+                        <Table.Th>Flags</Table.Th>
+                        <Table.Th>Last updated</Table.Th>
+                        <Table.Th style={{ width: 80 }}></Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {itemRows.length > 0 ? (
+                        itemRows
+                      ) : (
+                        <Table.Tr>
+                          <Table.Td colSpan={6}>
+                            <Stack align="center" gap="xs" py="lg">
+                              <IconSparkles size={24} color="var(--mantine-color-gray-6)" />
+                              <Text fw={600}>No items found</Text>
+                              <Text size="sm" c="dimmed" ta="center">
+                                Adjust filters or add a new item to this category.
+                              </Text>
+                            </Stack>
+                          </Table.Td>
+                        </Table.Tr>
+                      )}
+                    </Table.Tbody>
+                  </Table>
+                </ScrollArea>
+              )}
+            </Paper>
+
+            <Group justify="space-between" align="center">
+              <Text size="sm" c="dimmed">
+                Showing page {page} of {totalPages} • {totalItems} items
+              </Text>
+              <Pagination
+                value={page}
+                onChange={setPage}
+                total={totalPages}
+                disabled={itemsLoading || totalPages <= 1}
+              />
+            </Group>
+            </Stack>
+          </Grid.Col>
+        </Grid>
+      </Container>
+
+      <Drawer
+        opened={drawerOpen}
+        onClose={() => {
+          if (!saving) {
+            setDrawerOpen(false);
+            setFormData(null);
+            setEditingItemId(null);
+            setDetailLoading(false);
+          }
+        }}
+        position="right"
+        size="lg"
+        title={drawerMode === 'create' ? 'Create menu item' : 'Edit menu item'}
+        overlayProps={{ opacity: 0.15 }}
+      >
+        {detailLoading ? (
+          <CenterLoader message="Loading item" />
+        ) : formData ? (
+          <Stack gap="lg">
+            <Tabs value={activeTab} onChange={(value) => value && setActiveTab(value)}>
+              <Tabs.List>
+                <Tabs.Tab value="basics" leftSection={<IconChevronRight size={14} />}>Basics</Tabs.Tab>
+                <Tabs.Tab value="display" leftSection={<IconChevronRight size={14} />}>Display</Tabs.Tab>
+                <Tabs.Tab value="availability" leftSection={<IconChevronRight size={14} />}>Availability</Tabs.Tab>
+                <Tabs.Tab value="advanced" leftSection={<IconChevronRight size={14} />}>Advanced</Tabs.Tab>
+              </Tabs.List>
+
+              <Tabs.Panel value="basics" mt="md">
+                <Stack gap="md">
+                  <Group grow align="flex-start">
+                    <TextInput
+                      label="Item code"
+                      required
+                      value={formData.itemCode}
+                      onChange={(event) => updateForm('itemCode', event.currentTarget.value)}
+                    />
+                    <NumberInput
+                      label="Display order"
+                      value={formData.displayIndex}
+                      onChange={(value) => updateForm('displayIndex', Number(value) || 0)}
+                      min={0}
+                    />
+                  </Group>
+                  <TextInput
+                    label="Item name"
+                    value={formData.itemName ?? ''}
+                    onChange={(event) => updateForm('itemName', event.currentTarget.value)}
+                  />
+                  <Group grow>
+                    <Select
+                      label="Category"
+                      data={(lookups?.categories ?? []).map((cat) => ({
+                        value: String(cat.categoryId),
+                        label: cat.categoryName,
+                      }))}
+                      value={String(formData.categoryId)}
+                      onChange={(value) => {
+                        if (value) updateForm('categoryId', parseInt(value, 10));
+                      }}
+                    />
+                    <Select
+                      label="Department"
+                      data={(lookups?.departments ?? []).map((dep) => ({
+                        value: String(dep.departmentId),
+                        label: dep.departmentName,
+                      }))}
+                      value={String(formData.departmentId)}
+                      onChange={(value) => {
+                        if (value) updateForm('departmentId', parseInt(value, 10));
+                      }}
+                    />
+                  </Group>
+                  <Group>
+                    <Checkbox
+                      label="Enabled"
+                      checked={formData.enabled}
+                      onChange={(event) => updateForm('enabled', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="Show item"
+                      checked={formData.isItemShow}
+                      onChange={(event) => updateForm('isItemShow', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="Show price"
+                      checked={formData.isPriceShow}
+                      onChange={(event) => updateForm('isPriceShow', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="Promo item"
+                      checked={formData.isPromoItem}
+                      onChange={(event) => updateForm('isPromoItem', event.currentTarget.checked)}
+                    />
+                  </Group>
+                  <Divider label="Modifiers" labelPosition="center" />
+                  <Group align="flex-end" grow>
+                    <Switch
+                      label="Has modifiers"
+                      checked={formData.hasModifier}
+                      onChange={(event) => {
+                        const value = event.currentTarget.checked;
+                        updateForm('hasModifier', value);
+                        if (!value) {
+                          updateForm('modifierGroupHeaderId', null);
+                          updateForm('autoRedirectToModifier', false);
+                        }
+                      }}
+                    />
+                    <Switch
+                      label="Auto open modifier screen"
+                      checked={formData.autoRedirectToModifier}
+                      onChange={(event) => updateForm('autoRedirectToModifier', event.currentTarget.checked)}
+                      disabled={!formData.hasModifier}
+                    />
+                  </Group>
+                  <Select
+                    label="Modifier group"
+                    placeholder="No group linked"
+                    data={(lookups?.modifierGroups ?? []).map((group) => ({
+                      value: String(group.groupHeaderId),
+                      label: group.groupBatchName,
+                    }))}
+                    value={formData.modifierGroupHeaderId ? String(formData.modifierGroupHeaderId) : null}
+                    onChange={(value) =>
+                      updateForm('modifierGroupHeaderId', value ? parseInt(value, 10) : null)
+                    }
+                    disabled={!formData.hasModifier}
+                  />
+                  <Select
+                    label="Button style"
+                    placeholder="Default"
+                    data={(lookups?.buttonStyles ?? []).map((style) => ({
+                      value: String(style.buttonStyleId),
+                      label: style.styleName,
+                    }))}
+                    value={formData.buttonStyleId ? String(formData.buttonStyleId) : null}
+                    onChange={(value) => updateForm('buttonStyleId', value ? parseInt(value, 10) : null)}
+                  />
+                </Stack>
+              </Tabs.Panel>
+
+              <Tabs.Panel value="display" mt="md">
+                <Stack gap="md">
+                  <TextInput
+                    label="POS display name"
+                    value={formData.itemPosName ?? ''}
+                    onChange={(event) => updateForm('itemPosName', event.currentTarget.value)}
+                  />
+                  <TextInput
+                    label="Public display name"
+                    value={formData.itemPublicDisplayName ?? ''}
+                    onChange={(event) => updateForm('itemPublicDisplayName', event.currentTarget.value)}
+                  />
+                  <TextInput
+                    label="POS display name (alt)"
+                    value={formData.itemPosNameAlt ?? ''}
+                    onChange={(event) => updateForm('itemPosNameAlt', event.currentTarget.value)}
+                  />
+                  <TextInput
+                    label="Public display name (alt)"
+                    value={formData.itemPublicDisplayNameAlt ?? ''}
+                    onChange={(event) => updateForm('itemPublicDisplayNameAlt', event.currentTarget.value)}
+                  />
+                  <TextInput
+                    label="POS printed name"
+                    value={formData.itemPublicPrintedName ?? ''}
+                    onChange={(event) => updateForm('itemPublicPrintedName', event.currentTarget.value)}
+                  />
+                  <TextInput
+                    label="Staff note"
+                    value={formData.remark ?? ''}
+                    onChange={(event) => updateForm('remark', event.currentTarget.value)}
+                  />
+                  <TextInput
+                    label="Image file"
+                    value={formData.imageFileName ?? ''}
+                    onChange={(event) => updateForm('imageFileName', event.currentTarget.value)}
+                  />
+                </Stack>
+              </Tabs.Panel>
+
+              <Tabs.Panel value="availability" mt="md">
+                <Stack gap="md">
+                  <Group>
+                    <Checkbox
+                      label="Dine-in"
+                      checked={formData.isDinein}
+                      onChange={(event) => updateForm('isDinein', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="Takeaway"
+                      checked={formData.isTakeaway}
+                      onChange={(event) => updateForm('isTakeaway', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="Delivery"
+                      checked={formData.isDelivery}
+                      onChange={(event) => updateForm('isDelivery', event.currentTarget.checked)}
+                    />
+                  </Group>
+                  <Group grow>
+                    <NumberInput
+                      label="Serving size"
+                      value={formData.servingSize ?? undefined}
+                      onChange={(value) => updateForm('servingSize', value === '' ? null : Number(value))}
+                      min={0}
+                      step={0.1}
+                    />
+                    <NumberInput
+                      label="Production seconds"
+                      value={formData.productionSeconds ?? undefined}
+                      onChange={(value) => updateForm('productionSeconds', value === '' ? null : Number(value))}
+                      min={0}
+                    />
+                  </Group>
+                  <Switch
+                    label="Show in kitchen checklist"
+                    checked={Boolean(formData.isItemShowInKitchenChecklist)}
+                    onChange={(event) => updateForm('isItemShowInKitchenChecklist', event.currentTarget.checked)}
+                  />
+                </Stack>
+              </Tabs.Panel>
+
+              <Tabs.Panel value="advanced" mt="md">
+                <Stack gap="md">
+                  <Group>
+                    <Checkbox
+                      label="Manual price"
+                      checked={formData.isManualPrice}
+                      onChange={(event) => updateForm('isManualPrice', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="Manual name"
+                      checked={formData.isManualName}
+                      onChange={(event) => updateForm('isManualName', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="Non discountable"
+                      checked={formData.isNonDiscountItem}
+                      onChange={(event) => updateForm('isNonDiscountItem', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="Non service charge"
+                      checked={formData.isNonServiceChargeItem}
+                      onChange={(event) => updateForm('isNonServiceChargeItem', event.currentTarget.checked)}
+                    />
+                  </Group>
+                  <Group>
+                    <Checkbox
+                      label="Allow points payment"
+                      checked={Boolean(formData.isPointPaidItem)}
+                      onChange={(event) => updateForm('isPointPaidItem', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="No point earning"
+                      checked={Boolean(formData.isNoPointEarnItem)}
+                      onChange={(event) => updateForm('isNoPointEarnItem', event.currentTarget.checked)}
+                    />
+                    <Checkbox
+                      label="Non taxable"
+                      checked={Boolean(formData.isNonTaxableItem)}
+                      onChange={(event) => updateForm('isNonTaxableItem', event.currentTarget.checked)}
+                    />
+                  </Group>
+                  <Checkbox
+                    label="Combo required"
+                    checked={Boolean(formData.isComboRequired)}
+                    onChange={(event) => updateForm('isComboRequired', event.currentTarget.checked)}
+                  />
+                  <TextInput
+                    label="System remark"
+                    value={formData.systemRemark ?? ''}
+                    onChange={(event) => updateForm('systemRemark', event.currentTarget.value)}
+                  />
+                </Stack>
+              </Tabs.Panel>
+            </Tabs>
+
+            <Divider />
+            <Group justify="space-between">
+              <Button
+                variant="subtle"
+                color="gray"
+                leftSection={<IconX size={16} />}
+                onClick={() => {
+                  setDrawerOpen(false);
+                  setFormData(null);
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button
+                leftSection={saving ? <Loader size="xs" /> : <IconCheck size={16} />}
+                onClick={handleSubmit}
+                disabled={saving}
+              >
+                Save changes
+              </Button>
+            </Group>
+          </Stack>
+        ) : (
+          <CenterLoader message="Loading item" />
+        )}
+      </Drawer>
+    </Box>
+  );
+};
+
+function CenterLoader({ message }: { message?: string }) {
+  return (
+    <Stack align="center" justify="center" py="lg" gap="xs">
+      <Loader color="indigo" />
+      {message && (
+        <Text size="sm" c="dimmed">
+          {message}
+        </Text>
+      )}
+    </Stack>
+  );
+}
+
+export default MenuItemsPage;
