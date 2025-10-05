@@ -40,11 +40,11 @@ const menuSections = [
   },
   {
     id: 'virtual-categories',
-    label: 'Virtual Categories',
+    label: 'Smart Categories',
     icon: IconTags,
     color: 'teal',
     description: 'Create dynamic categories based on rules',
-    stats: '5 virtual',
+    stats: '5 smart categories',
     path: '/menus/virtual-categories',
   },
   {

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 const menuTabs = [
   { value: 'categories', label: 'Categories', path: '/menus/categories' },
-  { value: 'virtual-categories', label: 'Virtual Categories', path: '/menus/virtual-categories' },
+  { value: 'virtual-categories', label: 'Smart Categories', path: '/menus/virtual-categories' },
   { value: 'items', label: 'Menu Items', path: '/menus/items' },
   { value: 'modifiers', label: 'Modifiers', path: '/menus/modifiers' },
   { value: 'promotions', label: 'Promotions', path: '/menus/promotions' },

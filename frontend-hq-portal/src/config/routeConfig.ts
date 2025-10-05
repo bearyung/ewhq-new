@@ -33,7 +33,7 @@ export const ROUTE_CONFIG: RouteItem[] = [
       },
       {
         path: '/menus/virtual-categories',
-        label: 'Virtual Categories',
+        label: 'Smart Categories',
       },
       {
         path: '/menus/items',
