@@ -18,7 +18,8 @@ import {
   Center,
   Switch,
   Tabs,
-  Select
+  Select,
+  Tooltip
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -73,6 +74,7 @@ interface SortableRowProps {
   toggleExpand: (id: number) => void;
   onEdit: (category: ItemCategory) => void;
   onDelete: (category: ItemCategory) => void;
+  onAddChild: (category: ItemCategory) => void;
   getButtonStyleById: (buttonStyleId?: number) => ButtonStyle | undefined;
   getButtonStyleColor: (style: ButtonStyle) => string;
 }
@@ -83,6 +85,7 @@ const SortableRow: FC<SortableRowProps> = ({
   toggleExpand,
   onEdit,
   onDelete,
+  onAddChild,
   getButtonStyleById,
   getButtonStyleColor
 }) => {
@@ -199,24 +202,42 @@ const SortableRow: FC<SortableRowProps> = ({
           position: 'sticky',
           right: 0,
           backgroundColor: 'white',
-          boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+          boxShadow: '-2px 0 4px rgba(0,0,0,0.05)',
+          width: '140px',
+          minWidth: '140px'
         }}
       >
         <Group gap="xs" justify="center">
-          <ActionIcon
-            variant="subtle"
-            color="blue"
-            onClick={() => onEdit(category)}
-          >
-            <IconEdit size={16} />
-          </ActionIcon>
-          <ActionIcon
-            variant="subtle"
-            color="red"
-            onClick={() => onDelete(category)}
-          >
-            <IconTrash size={16} />
-          </ActionIcon>
+          <Tooltip label="Add child category" withArrow position="top">
+            <ActionIcon
+              variant="subtle"
+              color="green"
+              onClick={() => onAddChild(category)}
+              aria-label="Add child category"
+            >
+              <IconPlus size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Edit category" withArrow position="top">
+            <ActionIcon
+              variant="subtle"
+              color="blue"
+              onClick={() => onEdit(category)}
+              aria-label="Edit category"
+            >
+              <IconEdit size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Delete category" withArrow position="top">
+            <ActionIcon
+              variant="subtle"
+              color="red"
+              onClick={() => onDelete(category)}
+              aria-label="Delete category"
+            >
+              <IconTrash size={16} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </Table.Td>
     </Table.Tr>
@@ -322,7 +343,7 @@ const MenuCategoriesPage: FC = () => {
     }
   };
 
-  const handleAdd = () => {
+  const openCreateCategoryModal = (overrides: Partial<CreateItemCategory> = {}) => {
     setSelectedCategory(null);
     setFormData({
       categoryName: '',
@@ -332,9 +353,22 @@ const MenuCategoriesPage: FC = () => {
       isPublicDisplay: true,
       isModifier: false,
       isSelfOrderingDisplay: true,
-      isOnlineStoreDisplay: true
+      isOnlineStoreDisplay: true,
+      ...overrides
     });
     setDialogOpen(true);
+  };
+
+  const handleAdd = () => {
+    openCreateCategoryModal();
+  };
+
+  const handleAddChild = (parentCategory: ItemCategory) => {
+    const siblingCount = categories.filter(cat => cat.parentCategoryId === parentCategory.categoryId).length;
+    openCreateCategoryModal({
+      parentCategoryId: parentCategory.categoryId,
+      displayIndex: siblingCount
+    });
   };
 
   const handleEdit = (category: ItemCategory) => {
@@ -987,7 +1021,8 @@ const MenuCategoriesPage: FC = () => {
                     <Table.Th style={{ width: '100px' }}>Visibility</Table.Th>
                     <Table.Th
                       style={{
-                        width: '100px',
+                        width: '140px',
+                        minWidth: '140px',
                         textAlign: 'center',
                         position: 'sticky',
                         right: 0,
@@ -1085,24 +1120,42 @@ const MenuCategoriesPage: FC = () => {
                             position: 'sticky',
                             right: 0,
                             backgroundColor: 'white',
-                            boxShadow: '-2px 0 4px rgba(0,0,0,0.05)'
+                            boxShadow: '-2px 0 4px rgba(0,0,0,0.05)',
+                            width: '140px',
+                            minWidth: '140px'
                           }}
                         >
                           <Group gap="xs" justify="center">
-                            <ActionIcon
-                              variant="subtle"
-                              color="blue"
-                              onClick={() => handleEdit(category)}
-                            >
-                              <IconEdit size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="subtle"
-                              color="red"
-                              onClick={() => handleDelete(category)}
-                            >
-                              <IconTrash size={16} />
-                            </ActionIcon>
+                            <Tooltip label="Add child category" withArrow position="top">
+                              <ActionIcon
+                                variant="subtle"
+                                color="green"
+                                onClick={() => handleAddChild(category)}
+                                aria-label="Add child category"
+                              >
+                                <IconPlus size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Edit category" withArrow position="top">
+                              <ActionIcon
+                                variant="subtle"
+                                color="blue"
+                                onClick={() => handleEdit(category)}
+                                aria-label="Edit category"
+                              >
+                                <IconEdit size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Delete category" withArrow position="top">
+                              <ActionIcon
+                                variant="subtle"
+                                color="red"
+                                onClick={() => handleDelete(category)}
+                                aria-label="Delete category"
+                              >
+                                <IconTrash size={16} />
+                              </ActionIcon>
+                            </Tooltip>
                           </Group>
                         </Table.Td>
                       </Table.Tr>
@@ -1134,7 +1187,8 @@ const MenuCategoriesPage: FC = () => {
                       <Table.Th style={{ width: '100px' }}>Visibility</Table.Th>
                       <Table.Th
                         style={{
-                          width: '100px',
+                          width: '140px',
+                          minWidth: '140px',
                           textAlign: 'center',
                           position: 'sticky',
                           right: 0,
@@ -1179,6 +1233,7 @@ const MenuCategoriesPage: FC = () => {
                             toggleExpand={toggleExpand}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
+                            onAddChild={handleAddChild}
                             getButtonStyleById={getButtonStyleById}
                             getButtonStyleColor={getButtonStyleColor}
                           />
