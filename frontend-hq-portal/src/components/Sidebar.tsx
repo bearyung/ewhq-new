@@ -77,7 +77,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
 
   // Section 1: Common items (always visible)
   const commonItems = [
-    { icon: IconHome, label: 'Dashboard', path: '/' },
+    { icon: IconHome, label: 'Home', path: '/' },
     { icon: IconCashRegister, label: 'POS System', path: '/pos' },
     { icon: IconReceipt, label: 'Orders', path: '/orders' },
     { icon: IconPackage, label: 'Products', path: '/products' },

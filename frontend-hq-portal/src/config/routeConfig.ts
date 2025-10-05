@@ -21,7 +21,7 @@ export interface RouteItem {
 export const ROUTE_CONFIG: RouteItem[] = [
   {
     path: '/',
-    label: 'Dashboard',
+    label: 'Home',
   },
   {
     path: '/menus',
@@ -97,7 +97,7 @@ export function getRouteChildren(parentPath: string): RouteItem[] {
  * Returns array of RouteItems from root to current page
  *
  * Strategy: For any path, we need to check ALL top-level routes to see if
- * the path falls under them, not just direct children. This ensures Dashboard (/)
+ * the path falls under them, not just direct children. This ensures Home (/)
  * is included when visiting /menus/categories.
  */
 export function buildBreadcrumbTrail(currentPath: string): RouteItem[] {

@@ -121,7 +121,7 @@ export function MenuPage() {
             }}
           >
             <Anchor onClick={() => navigate('/')} c="dimmed">
-              Dashboard
+              Home
             </Anchor>
             <Text c="dark" fw={500}>Menu Management</Text>
           </Breadcrumbs>
