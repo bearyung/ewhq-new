@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import type { FC } from 'react';
 import {
   Box,
   Paper,
-  Title,
   Group,
   Button,
   TextInput,
@@ -18,8 +18,7 @@ import {
   Center,
   Switch,
   Tabs,
-  Select,
-  Collapse
+  Select
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -44,10 +43,9 @@ import {
   KeyboardSensor,
   PointerSensor,
   useSensor,
-  useSensors,
-  DragOverlay
+  useSensors
 } from '@dnd-kit/core';
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
 import {
   SortableContext,
   sortableKeyboardCoordinates,
@@ -56,6 +54,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AutoBreadcrumb } from '../components/AutoBreadcrumb';
+import { ScrollingHeader } from '../components/ScrollingHeader';
 import { useBrands } from '../contexts/BrandContext';
 import itemCategoryService from '../services/itemCategoryService';
 import buttonStyleService from '../services/buttonStyleService';
@@ -74,22 +73,18 @@ interface SortableRowProps {
   toggleExpand: (id: number) => void;
   onEdit: (category: ItemCategory) => void;
   onDelete: (category: ItemCategory) => void;
-  buttonStyles: ButtonStyle[];
   getButtonStyleById: (buttonStyleId?: number) => ButtonStyle | undefined;
   getButtonStyleColor: (style: ButtonStyle) => string;
-  isDragging?: boolean;
 }
 
-const SortableRow: React.FC<SortableRowProps> = ({
+const SortableRow: FC<SortableRowProps> = ({
   category,
   expandedCategories,
   toggleExpand,
   onEdit,
   onDelete,
-  buttonStyles,
   getButtonStyleById,
-  getButtonStyleColor,
-  isDragging = false
+  getButtonStyleColor
 }) => {
   const {
     attributes,
@@ -228,7 +223,7 @@ const SortableRow: React.FC<SortableRowProps> = ({
   );
 };
 
-const MenuCategoriesPage: React.FC = () => {
+const MenuCategoriesPage: FC = () => {
   const [categories, setCategories] = useState<ItemCategory[]>([]);
   const [originalCategories, setOriginalCategories] = useState<ItemCategory[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -244,7 +239,6 @@ const MenuCategoriesPage: React.FC = () => {
   const [filterText, setFilterText] = useState('');
   const [viewMode, setViewMode] = useState<'flat' | 'tree'>('flat');
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
-  const [activeId, setActiveId] = useState<number | null>(null);
   const [formData, setFormData] = useState<CreateItemCategory>({
     categoryName: '',
     categoryNameAlt: '',
@@ -487,7 +481,7 @@ const MenuCategoriesPage: React.FC = () => {
     }
   };
 
-  const filteredAndSortedCategories = React.useMemo(() => {
+  const filteredAndSortedCategories = useMemo(() => {
     let filtered = categories;
 
     // Apply filter
@@ -623,13 +617,12 @@ const MenuCategoriesPage: React.FC = () => {
   };
 
   // Drag and drop handlers
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as number);
+  const handleDragStart = () => {
+    // Placeholder for future visual feedback
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveId(null);
 
     if (!over || active.id === over.id) {
       return;
@@ -845,94 +838,78 @@ const MenuCategoriesPage: React.FC = () => {
         </Container>
       </Box>
 
-      {/* Floating Save Bar - Shows when there are unsaved changes */}
-      {hasUnsavedChanges && (
-        <Box
-          style={{
-            position: 'sticky',
-            top: 48,
-            zIndex: 99,
-            backgroundColor: '#FFF8E1',
-            borderBottom: '1px solid #FFD54F',
-            padding: '12px 24px',
-            animation: 'slideDown 0.3s ease-out',
-          }}
-        >
-          <Container size="xl" style={{ marginInline: 0 }}>
-            <Group justify="space-between">
-              <Group gap="sm">
-                <IconAlertCircle size={20} color="#F9A825" />
-                <Text size="sm" fw={500} c="dark">
-                  You have unsaved changes to the category order
-                </Text>
-              </Group>
-              <Group gap="xs">
-                <Button
-                  variant="default"
-                  size="sm"
-                  leftSection={<IconRotateClockwise2 size={16} />}
-                  onClick={handleRevertOrdering}
-                  disabled={savingOrder}
-                >
-                  Revert
-                </Button>
-                <Button
-                  size="sm"
-                  leftSection={<IconDeviceFloppy size={16} />}
-                  onClick={handleSaveOrdering}
-                  loading={savingOrder}
-                  color="blue"
-                >
-                  Save Changes
-                </Button>
-              </Group>
-            </Group>
-          </Container>
-        </Box>
-      )}
-
-      {/* Page Header - Non-sticky */}
-      <Box
-        pt="xl"
-        px="xl"
-        pb="xl"
-        style={{
-          backgroundColor: 'white',
-        }}
+      {/* Page Header with Scrolling Behavior */}
+      <ScrollingHeader
+        title="Menu Categories"
+        subtitle="Organize your menu items into logical groups"
+        actions={
+          <>
+            <Button
+              variant="default"
+              leftSection={<IconDownload size={16} />}
+              style={{ border: '1px solid #E3E8EE' }}
+            >
+              Export
+            </Button>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              style={{
+                backgroundColor: '#5469D4',
+                color: 'white',
+              }}
+              onClick={handleAdd}
+            >
+              Add Category
+            </Button>
+          </>
+        }
       >
-        <Container size="xl">
-          <Group justify="space-between">
-            <Box>
-              <Title order={1} size={28} fw={600}>
-                Menu Categories
-              </Title>
-              <Text size="sm" c="dimmed" mt={4}>
-                Organize your menu items into logical groups
-              </Text>
-            </Box>
-
-            <Group gap="sm">
-              <Button
-                variant="default"
-                leftSection={<IconDownload size={16} />}
-                style={{ border: '1px solid #E3E8EE' }}
-              >
-                Export
-              </Button>
-              <Button
-                leftSection={<IconPlus size={16} />}
-                style={{
-                  backgroundColor: '#5469D4',
-                  color: 'white',
-                }}
-                onClick={handleAdd}
-              >
-                Add Category
-              </Button>
-            </Group>
-          </Group>
-        </Container>
-      </Box>
+        {/* Floating Save Bar - Shows when there are unsaved changes */}
+        {hasUnsavedChanges && (
+          <Box
+            style={{
+              position: 'sticky',
+              top: 96, // Position below breadcrumb (48px) + compact header (48px)
+              zIndex: 97,
+              backgroundColor: '#FFF8E1',
+              borderBottom: '1px solid #FFD54F',
+              padding: '12px 24px',
+              animation: 'slideDown 0.3s ease-out',
+            }}
+          >
+            <Container size="xl" style={{ marginInline: 0 }}>
+              <Group justify="space-between">
+                <Group gap="sm">
+                  <IconAlertCircle size={20} color="#F9A825" />
+                  <Text size="sm" fw={500} c="dark">
+                    You have unsaved changes to the category order
+                  </Text>
+                </Group>
+                <Group gap="xs">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    leftSection={<IconRotateClockwise2 size={16} />}
+                    onClick={handleRevertOrdering}
+                    disabled={savingOrder}
+                  >
+                    Revert
+                  </Button>
+                  <Button
+                    size="sm"
+                    leftSection={<IconDeviceFloppy size={16} />}
+                    onClick={handleSaveOrdering}
+                    loading={savingOrder}
+                    color="blue"
+                  >
+                    Save Changes
+                  </Button>
+                </Group>
+              </Group>
+            </Container>
+          </Box>
+        )}
+      </ScrollingHeader>
 
       {/* Main Content Area */}
       <Box style={{ backgroundColor: '#F6F9FC', minHeight: 'calc(100vh - 200px)' }}>
@@ -1202,10 +1179,8 @@ const MenuCategoriesPage: React.FC = () => {
                             toggleExpand={toggleExpand}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
-                            buttonStyles={buttonStyles}
                             getButtonStyleById={getButtonStyleById}
                             getButtonStyleColor={getButtonStyleColor}
-                            isDragging={activeId === category.categoryId}
                           />
                         ))
                       )}

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, ReactNode } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Box, Container, Title, Group, Text } from '@mantine/core';
+import type { ReactNode, FC } from 'react';
 
 const BREADCRUMB_HEIGHT = 48;
 
@@ -32,7 +33,7 @@ interface ScrollingHeaderProps {
   children?: ReactNode; // For additional content like floating save bars
 }
 
-const ScrollingHeader: React.FC<ScrollingHeaderProps> = ({
+const ScrollingHeader: FC<ScrollingHeaderProps> = ({
   title,
   subtitle,
   actions,

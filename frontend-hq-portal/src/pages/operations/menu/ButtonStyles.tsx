@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import type { FC } from 'react';
 import {
   Box,
   Paper,
-  Title,
   Group,
   Button,
   TextInput,
@@ -31,11 +31,12 @@ import {
   IconSearch
 } from '@tabler/icons-react';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
+import { ScrollingHeader } from '../../../components/ScrollingHeader';
 import { useBrands } from '../../../contexts/BrandContext';
 import buttonStyleService from '../../../services/buttonStyleService';
 import type { ButtonStyle, CreateButtonStyle, UpdateButtonStyle } from '../../../types/buttonStyle';
 
-const ButtonStylesPage: React.FC = () => {
+const ButtonStylesPage: FC = () => {
   const [buttonStyles, setButtonStyles] = useState<ButtonStyle[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -266,7 +267,7 @@ const ButtonStylesPage: React.FC = () => {
     }
   };
 
-  const filteredAndSortedStyles = React.useMemo(() => {
+  const filteredAndSortedStyles = useMemo(() => {
     let filtered = buttonStyles;
 
     // Apply filter
@@ -333,48 +334,32 @@ const ButtonStylesPage: React.FC = () => {
         </Container>
       </Box>
 
-      {/* Page Header - Non-sticky */}
-      <Box
-        pt="xl"
-        px="xl"
-        pb="xl"
-        style={{
-          backgroundColor: 'white',
-        }}
-      >
-        <Container size="xl">
-          <Group justify="space-between">
-            <Box>
-              <Title order={1} size={28} fw={600}>
-                Button Styles
-              </Title>
-              <Text size="sm" c="dimmed" mt={4}>
-                Customize menu button appearance and layout
-              </Text>
-            </Box>
-
-            <Group gap="sm">
-              <Button
-                variant="default"
-                leftSection={<IconDownload size={16} />}
-                style={{ border: '1px solid #E3E8EE' }}
-              >
-                Export
-              </Button>
-              <Button
-                leftSection={<IconPlus size={16} />}
-                style={{
-                  backgroundColor: '#5469D4',
-                  color: 'white',
-                }}
-                onClick={handleAdd}
-              >
-                Add Button Style
-              </Button>
-            </Group>
-          </Group>
-        </Container>
-      </Box>
+      {/* Page Header with Scrolling Behavior */}
+      <ScrollingHeader
+        title="Button Styles"
+        subtitle="Customize menu button appearance and layout"
+        actions={
+          <>
+            <Button
+              variant="default"
+              leftSection={<IconDownload size={16} />}
+              style={{ border: '1px solid #E3E8EE' }}
+            >
+              Export
+            </Button>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              style={{
+                backgroundColor: '#5469D4',
+                color: 'white',
+              }}
+              onClick={handleAdd}
+            >
+              Add Button Style
+            </Button>
+          </>
+        }
+      />
 
       {/* Main Content Area */}
       <Box style={{ backgroundColor: '#F6F9FC', minHeight: 'calc(100vh - 200px)' }}>
