@@ -5,6 +5,10 @@ import type {
   MenuItemDetail,
   MenuItemUpsertPayload,
   MenuItemLookups,
+  MenuItemPrice,
+  MenuItemShopAvailability,
+  UpdateMenuItemPricePayload,
+  UpdateMenuItemAvailabilityPayload,
 } from '../types/menuItem';
 
 const buildQueryString = (query: MenuItemListQuery): string => {
@@ -47,6 +51,26 @@ class MenuItemService {
 
   async updateMenuItem(brandId: number, itemId: number, payload: MenuItemUpsertPayload): Promise<void> {
     await api.put(`/menu-items/brand/${brandId}/${itemId}`, payload);
+  }
+
+  async updateMenuItemPrice(
+    brandId: number,
+    itemId: number,
+    shopId: number,
+    payload: UpdateMenuItemPricePayload,
+  ): Promise<MenuItemPrice> {
+    const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/prices/${shopId}`, payload);
+    return response.data;
+  }
+
+  async updateMenuItemAvailability(
+    brandId: number,
+    itemId: number,
+    shopId: number,
+    payload: UpdateMenuItemAvailabilityPayload,
+  ): Promise<MenuItemShopAvailability> {
+    const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/availability/${shopId}`, payload);
+    return response.data;
   }
 }
 

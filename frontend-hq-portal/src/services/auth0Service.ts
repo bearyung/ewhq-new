@@ -5,7 +5,6 @@ class Auth0Service {
   private domain = auth0Config.domain;
   private clientId = auth0Config.clientId;
   private audience = auth0Config.audience;
-  private redirectUri = auth0Config.redirectUri;
 
   // Login with email and password using Resource Owner Password Grant
   async loginWithPassword(email: string, password: string) {

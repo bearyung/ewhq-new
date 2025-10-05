@@ -20,7 +20,7 @@ import { useEffect } from 'react'
 // Protected Route Component
 function ProtectedRoute({ children, requireTenant = true }: { children: React.ReactNode, requireTenant?: boolean }) {
   const { isAuthenticated, isLoading: authLoading } = useAuth0();
-  const { user, loading: userLoading, hasTenantAssociation } = useAuth();
+  const { user, isLoading: userLoading, hasTenantAssociation } = useAuth();
 
   // Show loading while Auth0 or user profile is loading
   if (authLoading || userLoading) {
@@ -50,7 +50,7 @@ function ProtectedRoute({ children, requireTenant = true }: { children: React.Re
 function CallbackPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading } = useAuth0();
-  const { user, loading: userLoading, hasTenantAssociation } = useAuth();
+  const { user, isLoading: userLoading, hasTenantAssociation } = useAuth();
 
   useEffect(() => {
     // Wait for both Auth0 authentication and user profile sync

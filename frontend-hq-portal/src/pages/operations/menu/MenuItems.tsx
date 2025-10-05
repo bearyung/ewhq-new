@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FC } from 'react';
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
@@ -25,6 +26,7 @@ import {
   Tabs,
   Text,
   TextInput,
+  Tooltip,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -32,6 +34,7 @@ import {
   IconAlertCircle,
   IconArrowAutofitContent,
   IconArrowsSort,
+  IconAdjustments,
   IconCheck,
   IconChevronRight,
   IconPencil,
@@ -40,6 +43,7 @@ import {
   IconSparkles,
   IconX,
 } from '@tabler/icons-react';
+import { useNavigate } from 'react-router-dom';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { ScrollingHeader } from '../../../components/ScrollingHeader';
 import { useBrands } from '../../../contexts/BrandContext';
@@ -260,6 +264,7 @@ const formatDateTime = (value?: string) => {
 const MenuItemsPage: FC = () => {
   const { selectedBrand } = useBrands();
   const brandId = selectedBrand ? parseInt(selectedBrand, 10) : null;
+  const navigate = useNavigate();
 
   const [lookups, setLookups] = useState<MenuItemLookups | null>(null);
   const [lookupsLoading, setLookupsLoading] = useState(false);
@@ -281,10 +286,15 @@ const MenuItemsPage: FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<MenuItemDetail | null>(null);
+  const [priceEdits, setPriceEdits] = useState<Record<number, { price: number | null; enabled: boolean }>>({});
+  const [availabilityEdits, setAvailabilityEdits] = useState<Record<number, { enabled: boolean | null; isOutOfStock: boolean | null; isLimitedItem: boolean | null }>>({});
   const [formData, setFormData] = useState<MenuItemUpsertPayload | null>(null);
   const [activeTab, setActiveTab] = useState<string>('basics');
   const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [priceSavingShopId, setPriceSavingShopId] = useState<number | null>(null);
+  const [availabilitySavingShopId, setAvailabilitySavingShopId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!brandId) return;
@@ -316,6 +326,38 @@ const MenuItemsPage: FC = () => {
 
     loadLookups();
   }, [brandId]);
+
+  useEffect(() => {
+    if (!selectedDetail) {
+      setPriceEdits({});
+      setAvailabilityEdits({});
+      return;
+    }
+
+    const initialPrices = Object.fromEntries(
+      (selectedDetail.prices ?? []).map((price) => [
+        price.shopId,
+        {
+          price: price.price ?? null,
+          enabled: price.enabled,
+        },
+      ]),
+    );
+
+    const initialAvailability = Object.fromEntries(
+      (selectedDetail.shopAvailability ?? []).map((record) => [
+        record.shopId,
+        {
+          enabled: record.enabled ?? false,
+          isOutOfStock: record.isOutOfStock ?? false,
+          isLimitedItem: record.isLimitedItem ?? false,
+        },
+      ]),
+    );
+
+    setPriceEdits(initialPrices);
+    setAvailabilityEdits(initialAvailability);
+  }, [selectedDetail]);
 
   useEffect(() => {
     if (!brandId) return;
@@ -408,6 +450,9 @@ const MenuItemsPage: FC = () => {
     setFormData(createBasePayload(defaultCategoryId, defaultDepartmentId));
     setDrawerMode('create');
     setEditingItemId(null);
+    setSelectedDetail(null);
+    setPriceEdits({});
+    setAvailabilityEdits({});
     setActiveTab('basics');
     setDrawerOpen(true);
   };
@@ -419,9 +464,13 @@ const MenuItemsPage: FC = () => {
     setActiveTab('basics');
     setFormData(null);
     setEditingItemId(item.itemId);
+    setSelectedDetail(null);
+    setPriceEdits({});
+    setAvailabilityEdits({});
     setDetailLoading(true);
     try {
       const detail = await menuItemService.getMenuItem(brandId, item.itemId);
+      setSelectedDetail(detail);
       setFormData(mapDetailToPayload(detail));
     } catch (error) {
       console.error('Failed to load item detail', error);
@@ -434,6 +483,131 @@ const MenuItemsPage: FC = () => {
       setDrawerOpen(false);
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const updatePriceEdit = (shopId: number, changes: Partial<{ price: number | null; enabled: boolean }>) => {
+    setPriceEdits((prev) => {
+      const previous = prev[shopId] ?? { price: null, enabled: false };
+      return {
+        ...prev,
+        [shopId]: {
+          price: Object.prototype.hasOwnProperty.call(changes, 'price') ? changes.price ?? null : previous.price,
+          enabled: changes.enabled ?? previous.enabled,
+        },
+      };
+    });
+  };
+
+  const updateAvailabilityEdit = (
+    shopId: number,
+    changes: Partial<{ enabled: boolean | null; isOutOfStock: boolean | null; isLimitedItem: boolean | null }>,
+  ) => {
+    setAvailabilityEdits((prev) => {
+      const previous = prev[shopId] ?? { enabled: false, isOutOfStock: false, isLimitedItem: false };
+      return {
+        ...prev,
+        [shopId]: {
+          enabled: Object.prototype.hasOwnProperty.call(changes, 'enabled') ? changes.enabled ?? false : previous.enabled,
+          isOutOfStock: Object.prototype.hasOwnProperty.call(changes, 'isOutOfStock')
+            ? changes.isOutOfStock ?? false
+            : previous.isOutOfStock,
+          isLimitedItem: Object.prototype.hasOwnProperty.call(changes, 'isLimitedItem')
+            ? changes.isLimitedItem ?? false
+            : previous.isLimitedItem,
+        },
+      };
+    });
+  };
+
+  const handleSavePrice = async (shopId: number) => {
+    if (!brandId || !selectedDetail) return;
+    const edit = priceEdits[shopId];
+    if (!edit || edit.price === null || Number.isNaN(edit.price)) {
+      notifications.show({
+        title: 'Validation error',
+        message: 'Please provide a valid price before saving.',
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />,
+      });
+      return;
+    }
+
+    setPriceSavingShopId(shopId);
+    try {
+      const updated = await menuItemService.updateMenuItemPrice(brandId, selectedDetail.itemId, shopId, {
+        price: edit.price,
+        enabled: edit.enabled,
+      });
+
+      setSelectedDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              prices: prev.prices.map((price) => (price.shopId === shopId ? updated : price)),
+            }
+          : prev,
+      );
+
+      notifications.show({
+        title: 'Pricing updated',
+        message: `Price saved for ${updated.shopName}.`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    } catch (error) {
+      console.error('Failed to update price', error);
+      notifications.show({
+        title: 'Save failed',
+        message: 'Unable to update price. Please try again.',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setPriceSavingShopId(null);
+    }
+  };
+
+  const handleSaveAvailability = async (shopId: number) => {
+    if (!brandId || !selectedDetail) return;
+    const edit = availabilityEdits[shopId];
+    if (!edit) return;
+
+    setAvailabilitySavingShopId(shopId);
+    try {
+      const updated = await menuItemService.updateMenuItemAvailability(brandId, selectedDetail.itemId, shopId, {
+        enabled: edit.enabled,
+        isOutOfStock: edit.isOutOfStock,
+        isLimitedItem: edit.isLimitedItem,
+      });
+
+      setSelectedDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              shopAvailability: prev.shopAvailability.map((record) =>
+                record.shopId === shopId ? updated : record,
+              ),
+            }
+          : prev,
+      );
+
+      notifications.show({
+        title: 'Availability updated',
+        message: `Availability saved for ${updated.shopName}.`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    } catch (error) {
+      console.error('Failed to update availability', error);
+      notifications.show({
+        title: 'Save failed',
+        message: 'Unable to update availability. Please try again.',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setAvailabilitySavingShopId(null);
     }
   };
 
@@ -480,6 +654,9 @@ const MenuItemsPage: FC = () => {
       setDrawerOpen(false);
       setFormData(null);
       setEditingItemId(null);
+      setSelectedDetail(null);
+      setPriceEdits({});
+      setAvailabilityEdits({});
       // Refresh list
       const response = await menuItemService.getMenuItems(brandId, {
         categoryId: selectedCategoryId ?? undefined,
@@ -603,6 +780,17 @@ const MenuItemsPage: FC = () => {
       <Table.Td>{formatDateTime(item.modifiedDate)}</Table.Td>
       <Table.Td>
         <Group gap="xs" justify="flex-end">
+          {item.hasModifier && (
+            <Tooltip label="Manage modifiers" withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="violet"
+                onClick={() => navigate(`/menus/modifiers?itemId=${item.itemId}`)}
+              >
+                <IconAdjustments size={16} />
+              </ActionIcon>
+            </Tooltip>
+          )}
           <ActionIcon variant="subtle" color="indigo" onClick={() => handleEdit(item)}>
             <IconPencil size={16} />
           </ActionIcon>
@@ -841,6 +1029,9 @@ const MenuItemsPage: FC = () => {
             setDrawerOpen(false);
             setFormData(null);
             setEditingItemId(null);
+            setSelectedDetail(null);
+            setPriceEdits({});
+            setAvailabilityEdits({});
             setDetailLoading(false);
           }
         }}
@@ -1054,6 +1245,223 @@ const MenuItemsPage: FC = () => {
                     checked={Boolean(formData.isItemShowInKitchenChecklist)}
                     onChange={(event) => updateForm('isItemShowInKitchenChecklist', event.currentTarget.checked)}
                   />
+                  <Divider label="Shop overrides" labelPosition="center" />
+                  {drawerMode === 'create' ? (
+                    <Alert variant="light" color="blue">
+                      Pricing and shop availability overrides will be available once the item has been created.
+                    </Alert>
+                  ) : detailLoading ? (
+                    <CenterLoader message="Loading shop data" />
+                  ) : selectedDetail ? (
+                    <Stack gap="lg">
+                      <Stack gap="sm">
+                        <Text fw={600}>Pricing by shop</Text>
+                        <ScrollArea type="auto" h={220} offsetScrollbars>
+                          <Table horizontalSpacing="md" verticalSpacing="sm">
+                            <Table.Thead>
+                              <Table.Tr>
+                                <Table.Th>Shop</Table.Th>
+                                <Table.Th>Price</Table.Th>
+                                <Table.Th>Enabled</Table.Th>
+                                <Table.Th>Last updated</Table.Th>
+                                <Table.Th align="right">Actions</Table.Th>
+                              </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                              {selectedDetail.prices.length === 0 ? (
+                                <Table.Tr>
+                                  <Table.Td colSpan={5}>
+                                    <Text size="sm" c="dimmed">
+                                      No shop pricing data is available.
+                                    </Text>
+                                  </Table.Td>
+                                </Table.Tr>
+                              ) : (
+                                selectedDetail.prices.map((price) => {
+                                  const state = priceEdits[price.shopId] ?? {
+                                    price: price.price ?? null,
+                                    enabled: price.enabled,
+                                  };
+
+                                  return (
+                                    <Table.Tr key={`price-${price.shopId}`}>
+                                      <Table.Td>
+                                        <Text fw={500}>{price.shopName}</Text>
+                                      </Table.Td>
+                                      <Table.Td style={{ width: 140 }}>
+                                        <NumberInput
+                                          value={state.price ?? undefined}
+                                          min={0}
+                                          step={0.1}
+                                          onChange={(value) => {
+                                            if (value === '' || value === null) {
+                                              updatePriceEdit(price.shopId, { price: null });
+                                              return;
+                                            }
+
+                                            const numeric = typeof value === 'number' ? value : Number(value);
+                                            if (!Number.isFinite(numeric)) {
+                                              updatePriceEdit(price.shopId, { price: null });
+                                              return;
+                                            }
+                                            const normalised = Math.round(Number(numeric) * 100) / 100;
+                                            updatePriceEdit(price.shopId, {
+                                              price: normalised,
+                                            });
+                                          }}
+                                        />
+                                      </Table.Td>
+                                      <Table.Td style={{ width: 120 }}>
+                                        <Switch
+                                          checked={state.enabled}
+                                          onChange={(event) =>
+                                            updatePriceEdit(price.shopId, {
+                                              enabled: event.currentTarget.checked,
+                                            })
+                                          }
+                                        />
+                                      </Table.Td>
+                                      <Table.Td style={{ width: 180 }}>
+                                        {price.modifiedDate ? (
+                                          <Tooltip
+                                            label={`Updated by ${price.modifiedBy ?? 'unknown user'}`}
+                                            withArrow
+                                          >
+                                            <Text size="xs">{formatDateTime(price.modifiedDate)}</Text>
+                                          </Tooltip>
+                                        ) : (
+                                          <Text size="xs" c="dimmed">
+                                            —
+                                          </Text>
+                                        )}
+                                      </Table.Td>
+                                      <Table.Td align="right" style={{ width: 120 }}>
+                                        <Button
+                                          size="xs"
+                                          variant="light"
+                                          loading={priceSavingShopId === price.shopId}
+                                          leftSection={priceSavingShopId === price.shopId ? undefined : <IconCheck size={14} />}
+                                          onClick={() => handleSavePrice(price.shopId)}
+                                        >
+                                          Save
+                                        </Button>
+                                      </Table.Td>
+                                    </Table.Tr>
+                                  );
+                                })
+                              )}
+                            </Table.Tbody>
+                          </Table>
+                        </ScrollArea>
+                      </Stack>
+
+                      <Stack gap="sm">
+                        <Text fw={600}>Availability by shop</Text>
+                        <ScrollArea type="auto" h={220} offsetScrollbars>
+                          <Table horizontalSpacing="md" verticalSpacing="sm">
+                            <Table.Thead>
+                              <Table.Tr>
+                                <Table.Th>Shop</Table.Th>
+                                <Table.Th>Enabled</Table.Th>
+                                <Table.Th>Out of stock</Table.Th>
+                                <Table.Th>Limited item</Table.Th>
+                                <Table.Th>Last updated</Table.Th>
+                                <Table.Th align="right">Actions</Table.Th>
+                              </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                              {selectedDetail.shopAvailability.length === 0 ? (
+                                <Table.Tr>
+                                  <Table.Td colSpan={6}>
+                                    <Text size="sm" c="dimmed">
+                                      No shop availability records found.
+                                    </Text>
+                                  </Table.Td>
+                                </Table.Tr>
+                              ) : (
+                                selectedDetail.shopAvailability.map((record) => {
+                                  const state = availabilityEdits[record.shopId] ?? {
+                                    enabled: record.enabled ?? false,
+                                    isOutOfStock: record.isOutOfStock ?? false,
+                                    isLimitedItem: record.isLimitedItem ?? false,
+                                  };
+
+                                  return (
+                                    <Table.Tr key={`availability-${record.shopId}`}>
+                                      <Table.Td>
+                                        <Text fw={500}>{record.shopName}</Text>
+                                      </Table.Td>
+                                      <Table.Td style={{ width: 140 }}>
+                                        <Switch
+                                          checked={Boolean(state.enabled)}
+                                          onChange={(event) =>
+                                            updateAvailabilityEdit(record.shopId, {
+                                              enabled: event.currentTarget.checked,
+                                            })
+                                          }
+                                        />
+                                      </Table.Td>
+                                      <Table.Td style={{ width: 160 }}>
+                                        <Switch
+                                          checked={Boolean(state.isOutOfStock)}
+                                          onChange={(event) =>
+                                            updateAvailabilityEdit(record.shopId, {
+                                              isOutOfStock: event.currentTarget.checked,
+                                            })
+                                          }
+                                          color="red"
+                                        />
+                                      </Table.Td>
+                                      <Table.Td style={{ width: 160 }}>
+                                        <Switch
+                                          checked={Boolean(state.isLimitedItem)}
+                                          onChange={(event) =>
+                                            updateAvailabilityEdit(record.shopId, {
+                                              isLimitedItem: event.currentTarget.checked,
+                                            })
+                                          }
+                                          color="orange"
+                                        />
+                                      </Table.Td>
+                                      <Table.Td style={{ width: 180 }}>
+                                        {record.lastUpdated ? (
+                                          <Tooltip
+                                            label={`Updated by ${record.updatedBy ?? 'unknown user'}`}
+                                            withArrow
+                                          >
+                                            <Text size="xs">{formatDateTime(record.lastUpdated)}</Text>
+                                          </Tooltip>
+                                        ) : (
+                                          <Text size="xs" c="dimmed">
+                                            —
+                                          </Text>
+                                        )}
+                                      </Table.Td>
+                                      <Table.Td align="right" style={{ width: 120 }}>
+                                        <Button
+                                          size="xs"
+                                          variant="light"
+                                          loading={availabilitySavingShopId === record.shopId}
+                                          leftSection={availabilitySavingShopId === record.shopId ? undefined : <IconCheck size={14} />}
+                                          onClick={() => handleSaveAvailability(record.shopId)}
+                                        >
+                                          Save
+                                        </Button>
+                                      </Table.Td>
+                                    </Table.Tr>
+                                  );
+                                })
+                              )}
+                            </Table.Tbody>
+                          </Table>
+                        </ScrollArea>
+                      </Stack>
+                    </Stack>
+                  ) : (
+                    <Alert variant="light" color="blue">
+                      Select a menu item to view shop-specific overrides.
+                    </Alert>
+                  )}
                 </Stack>
               </Tabs.Panel>
 

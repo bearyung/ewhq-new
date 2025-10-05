@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using EWHQ.Api.Authorization;
+using EWHQ.Api.Data;
 using EWHQ.Api.DTOs;
 using EWHQ.Api.Models.Entities;
 using EWHQ.Api.Services;
@@ -155,7 +158,9 @@ public class MenuItemsController : ControllerBase
                 return NotFound(new { message = "Menu item not found" });
             }
 
-            return Ok(MapToDetailDto(item));
+            var (prices, availability) = await BuildPricingAndAvailabilityAsync(context, accountId, item.ItemId);
+
+            return Ok(MapToDetailDto(item, prices, availability));
         }
         catch (InvalidOperationException ex)
         {
@@ -218,10 +223,12 @@ public class MenuItemsController : ControllerBase
             context.ItemMasters.Add(newItem);
             await context.SaveChangesAsync();
 
+            var (prices, availability) = await BuildPricingAndAvailabilityAsync(context, accountId, newItem.ItemId);
+
             return CreatedAtAction(
                 nameof(GetMenuItem),
                 new { brandId, itemId = newItem.ItemId },
-                MapToDetailDto(newItem));
+                MapToDetailDto(newItem, prices, availability));
         }
         catch (InvalidOperationException ex)
         {
@@ -423,6 +430,178 @@ public class MenuItemsController : ControllerBase
         }
     }
 
+    [HttpPut("brand/{brandId}/{itemId}/prices/{shopId}")]
+    [RequireBrandModify]
+    public async Task<ActionResult<MenuItemPriceDto>> UpsertMenuItemPrice(int brandId, int itemId, int shopId, UpdateMenuItemPriceDto updateDto)
+    {
+        try
+        {
+            var (context, accountId) = await _posContextService.GetContextAndAccountIdForBrandAsync(brandId);
+
+            var itemExists = await context.ItemMasters.AnyAsync(i => i.AccountId == accountId && i.ItemId == itemId);
+            if (!itemExists)
+            {
+                return NotFound(new { message = "Menu item not found" });
+            }
+
+            var shop = await context.Shops.AsNoTracking().FirstOrDefaultAsync(s => s.AccountId == accountId && s.ShopId == shopId);
+            if (shop == null)
+            {
+                return NotFound(new { message = "Shop not found for this brand" });
+            }
+
+            var price = await context.ItemPrices.FirstOrDefaultAsync(p => p.AccountId == accountId && p.ItemId == itemId && p.ShopId == shopId);
+            var now = DateTime.UtcNow;
+            var currentUser = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
+
+            if (price == null)
+            {
+                price = new ItemPrice
+                {
+                    AccountId = accountId,
+                    ItemId = itemId,
+                    ShopId = shopId,
+                    Price = updateDto.Price,
+                    Enabled = updateDto.Enabled,
+                    CreatedDate = now,
+                    CreatedBy = currentUser,
+                    ModifiedDate = now,
+                    ModifiedBy = currentUser
+                };
+
+                context.ItemPrices.Add(price);
+            }
+            else
+            {
+                price.Price = updateDto.Price;
+                price.Enabled = updateDto.Enabled;
+                price.ModifiedDate = now;
+                price.ModifiedBy = currentUser;
+            }
+
+            await context.SaveChangesAsync();
+
+            return Ok(new MenuItemPriceDto
+            {
+                ShopId = shop.ShopId,
+                ShopName = shop.Name,
+                Price = price.Price,
+                Enabled = price.Enabled,
+                ModifiedDate = price.ModifiedDate,
+                ModifiedBy = price.ModifiedBy
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Brand not found: {BrandId}", brandId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating menu item price for item {ItemId} in shop {ShopId}", itemId, shopId);
+            return StatusCode(500, new { message = "An error occurred while updating the price" });
+        }
+    }
+
+    [HttpPut("brand/{brandId}/{itemId}/availability/{shopId}")]
+    [RequireBrandModify]
+    public async Task<ActionResult<MenuItemShopAvailabilityDto>> UpdateMenuItemAvailability(int brandId, int itemId, int shopId, UpdateMenuItemAvailabilityDto updateDto)
+    {
+        try
+        {
+            var (context, accountId) = await _posContextService.GetContextAndAccountIdForBrandAsync(brandId);
+
+            var itemExists = await context.ItemMasters.AnyAsync(i => i.AccountId == accountId && i.ItemId == itemId);
+            if (!itemExists)
+            {
+                return NotFound(new { message = "Menu item not found" });
+            }
+
+            var shop = await context.Shops.AsNoTracking().FirstOrDefaultAsync(s => s.AccountId == accountId && s.ShopId == shopId);
+            if (shop == null)
+            {
+                return NotFound(new { message = "Shop not found for this brand" });
+            }
+
+            var detail = await context.ItemShopDetails.FirstOrDefaultAsync(d => d.AccountId == accountId && d.ItemId == itemId && d.ShopId == shopId);
+            var now = DateTime.UtcNow;
+            var currentUser = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
+
+            if (detail == null)
+            {
+                var referencePrice = await context.ItemPrices.AsNoTracking()
+                    .Where(p => p.AccountId == accountId && p.ItemId == itemId && p.ShopId == shopId)
+                    .Select(p => (decimal?)p.Price)
+                    .FirstOrDefaultAsync() ?? 0m;
+
+                detail = new ItemShopDetail
+                {
+                    AccountId = accountId,
+                    ItemId = itemId,
+                    ShopId = shopId,
+                    Price = referencePrice,
+                    IsLimitedItem = updateDto.IsLimitedItem ?? false,
+                    IsOutOfStock = updateDto.IsOutOfStock ?? false,
+                    ItemQty = null,
+                    ItemCount = null,
+                    CreatedDate = now,
+                    CreatedBy = currentUser,
+                    ModifiedDate = now,
+                    ModifiedBy = currentUser,
+                    Enabled = updateDto.Enabled,
+                    IsPublicDisplay = null,
+                    IsLimitedItemAutoReset = null,
+                    OriginalPrice = null
+                };
+
+                context.ItemShopDetails.Add(detail);
+            }
+            else
+            {
+                if (updateDto.Enabled.HasValue)
+                {
+                    detail.Enabled = updateDto.Enabled.Value;
+                }
+
+                if (updateDto.IsOutOfStock.HasValue)
+                {
+                    detail.IsOutOfStock = updateDto.IsOutOfStock.Value;
+                }
+
+                if (updateDto.IsLimitedItem.HasValue)
+                {
+                    detail.IsLimitedItem = updateDto.IsLimitedItem.Value;
+                }
+
+                detail.ModifiedDate = now;
+                detail.ModifiedBy = currentUser;
+            }
+
+            await context.SaveChangesAsync();
+
+            return Ok(new MenuItemShopAvailabilityDto
+            {
+                ShopId = shop.ShopId,
+                ShopName = shop.Name,
+                Enabled = detail.Enabled,
+                IsOutOfStock = detail.IsOutOfStock,
+                IsLimitedItem = detail.IsLimitedItem,
+                LastUpdated = detail.ModifiedDate,
+                UpdatedBy = detail.ModifiedBy
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Brand not found: {BrandId}", brandId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating availability for menu item {ItemId} in shop {ShopId}", itemId, shopId);
+            return StatusCode(500, new { message = "An error occurred while updating availability" });
+        }
+    }
+
     private static IQueryable<ItemMaster> ApplySorting(IQueryable<ItemMaster> query, MenuItemListQuery request)
     {
         var direction = string.Equals(request.SortDirection, "desc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc";
@@ -440,6 +619,71 @@ public class MenuItemsController : ControllerBase
                 ? query.OrderByDescending(i => i.DisplayIndex).ThenByDescending(i => i.ItemId)
                 : query.OrderBy(i => i.DisplayIndex).ThenBy(i => i.ItemId)
         };
+    }
+
+    private static async Task<(List<MenuItemPriceDto> prices, List<MenuItemShopAvailabilityDto> availability)> BuildPricingAndAvailabilityAsync(
+        EWHQDbContext context,
+        int accountId,
+        int itemId)
+    {
+        var shops = await context.Shops
+            .AsNoTracking()
+            .Where(s => s.AccountId == accountId)
+            .Select(s => new { s.ShopId, s.Name })
+            .ToListAsync();
+
+        var priceEntities = await context.ItemPrices
+            .AsNoTracking()
+            .Where(p => p.AccountId == accountId && p.ItemId == itemId)
+            .ToListAsync();
+
+        var availabilityEntities = await context.ItemShopDetails
+            .AsNoTracking()
+            .Where(a => a.AccountId == accountId && a.ItemId == itemId)
+            .ToListAsync();
+
+        var priceLookup = priceEntities
+            .GroupBy(p => p.ShopId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.ModifiedDate).First());
+
+        var availabilityLookup = availabilityEntities
+            .GroupBy(a => a.ShopId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.ModifiedDate).First());
+
+        var prices = shops
+            .Select(shop =>
+            {
+                priceLookup.TryGetValue(shop.ShopId, out var price);
+                return new MenuItemPriceDto
+                {
+                    ShopId = shop.ShopId,
+                    ShopName = shop.Name,
+                    Price = price?.Price,
+                    Enabled = price?.Enabled ?? false,
+                    ModifiedDate = price?.ModifiedDate,
+                    ModifiedBy = price?.ModifiedBy
+                };
+            })
+            .ToList();
+
+        var availability = shops
+            .Select(shop =>
+            {
+                availabilityLookup.TryGetValue(shop.ShopId, out var detail);
+                return new MenuItemShopAvailabilityDto
+                {
+                    ShopId = shop.ShopId,
+                    ShopName = shop.Name,
+                    Enabled = detail?.Enabled,
+                    IsOutOfStock = detail?.IsOutOfStock,
+                    IsLimitedItem = detail?.IsLimitedItem,
+                    LastUpdated = detail?.ModifiedDate,
+                    UpdatedBy = detail?.ModifiedBy
+                };
+            })
+            .ToList();
+
+        return (prices, availability);
     }
 
     private static void ApplyUpsertDtoToEntity(ItemMaster entity, MenuItemUpsertDto dto, string normalizedItemCode)
@@ -508,7 +752,10 @@ public class MenuItemsController : ControllerBase
         entity.IsComboRequired = dto.IsComboRequired;
     }
 
-    private static MenuItemDetailDto MapToDetailDto(ItemMaster item)
+    private static MenuItemDetailDto MapToDetailDto(
+        ItemMaster item,
+        IReadOnlyList<MenuItemPriceDto> prices,
+        IReadOnlyList<MenuItemShopAvailabilityDto> availability)
     {
         return new MenuItemDetailDto
         {
@@ -579,7 +826,9 @@ public class MenuItemsController : ControllerBase
             ModifiedDate = item.ModifiedDate,
             CreatedDate = item.CreatedDate,
             CreatedBy = item.CreatedBy,
-            ModifiedBy = item.ModifiedBy
+            ModifiedBy = item.ModifiedBy,
+            Prices = prices,
+            ShopAvailability = availability
         };
     }
 }

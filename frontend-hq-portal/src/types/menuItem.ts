@@ -75,6 +75,8 @@ export interface MenuItemDetail extends MenuItemSummary {
   createdDate?: string;
   createdBy?: string;
   modifiedBy?: string;
+  prices: MenuItemPrice[];
+  shopAvailability: MenuItemShopAvailability[];
 }
 
 export interface MenuItemUpsertPayload {
@@ -173,4 +175,35 @@ export interface MenuItemLookups {
   buttonStyles: ButtonStyle[];
   departments: Department[];
   modifierGroups: ModifierGroupHeader[];
+}
+
+export interface MenuItemPrice {
+  shopId: number;
+  shopName: string;
+  price: number | null;
+  enabled: boolean;
+  modifiedDate: string | null;
+  modifiedBy: string | null;
+  hasPrice: boolean;
+}
+
+export interface MenuItemShopAvailability {
+  shopId: number;
+  shopName: string;
+  enabled: boolean | null;
+  isOutOfStock: boolean | null;
+  isLimitedItem: boolean | null;
+  lastUpdated: string | null;
+  updatedBy: string | null;
+}
+
+export interface UpdateMenuItemPricePayload {
+  price: number;
+  enabled: boolean;
+}
+
+export interface UpdateMenuItemAvailabilityPayload {
+  enabled?: boolean | null;
+  isOutOfStock?: boolean | null;
+  isLimitedItem?: boolean | null;
 }

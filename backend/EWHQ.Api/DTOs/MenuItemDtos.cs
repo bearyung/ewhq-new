@@ -76,6 +76,8 @@ public class MenuItemDetailDto : MenuItemSummaryDto
     public DateTime? CreatedDate { get; set; }
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
+    public IReadOnlyList<MenuItemPriceDto> Prices { get; set; } = Array.Empty<MenuItemPriceDto>();
+    public IReadOnlyList<MenuItemShopAvailabilityDto> ShopAvailability { get; set; } = Array.Empty<MenuItemShopAvailabilityDto>();
 }
 
 public class MenuItemUpsertDto
@@ -186,4 +188,41 @@ public class MenuItemLookupsDto
     public IReadOnlyList<ButtonStyleDto> ButtonStyles { get; set; } = Array.Empty<ButtonStyleDto>();
     public IReadOnlyList<DepartmentDto> Departments { get; set; } = Array.Empty<DepartmentDto>();
     public IReadOnlyList<ModifierGroupHeaderDto> ModifierGroups { get; set; } = Array.Empty<ModifierGroupHeaderDto>();
+}
+
+public class MenuItemPriceDto
+{
+    public int ShopId { get; set; }
+    public string ShopName { get; set; } = string.Empty;
+    public decimal? Price { get; set; }
+    public bool Enabled { get; set; }
+    public DateTime? ModifiedDate { get; set; }
+    public string? ModifiedBy { get; set; }
+    public bool HasPrice => Price.HasValue;
+}
+
+public class MenuItemShopAvailabilityDto
+{
+    public int ShopId { get; set; }
+    public string ShopName { get; set; } = string.Empty;
+    public bool? Enabled { get; set; }
+    public bool? IsOutOfStock { get; set; }
+    public bool? IsLimitedItem { get; set; }
+    public DateTime? LastUpdated { get; set; }
+    public string? UpdatedBy { get; set; }
+}
+
+public class UpdateMenuItemPriceDto
+{
+    [Range(0, double.MaxValue)]
+    public decimal Price { get; set; }
+
+    public bool Enabled { get; set; }
+}
+
+public class UpdateMenuItemAvailabilityDto
+{
+    public bool? Enabled { get; set; }
+    public bool? IsOutOfStock { get; set; }
+    public bool? IsLimitedItem { get; set; }
 }

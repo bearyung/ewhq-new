@@ -47,3 +47,4 @@
 - Bulk edit mode (select multiple rows → update flags).
 - Inline image upload pipeline (ties into media service once ready).
 - Link to price editor once ItemPrice API exposed.
+- Surface per-shop pricing + availability toggles directly in drawer (in progress, powered by new POS endpoints).
