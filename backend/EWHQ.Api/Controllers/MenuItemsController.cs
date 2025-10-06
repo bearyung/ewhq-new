@@ -388,7 +388,7 @@ public class MenuItemsController : ControllerBase
                 {
                     DepartmentId = d.DepartmentId,
                     AccountId = d.AccountId,
-                    DepartmentName = d.DepartmentName,
+                    DepartmentName = d.DepartmentName ?? string.Empty,
                     DepartmentCode = d.DepartmentCode,
                     Enabled = d.Enabled
                 })
@@ -402,7 +402,7 @@ public class MenuItemsController : ControllerBase
                 {
                     GroupHeaderId = mg.GroupHeaderId,
                     AccountId = mg.AccountId,
-                    GroupBatchName = mg.GroupBatchName,
+                    GroupBatchName = mg.GroupBatchName ?? string.Empty,
                     GroupBatchNameAlt = mg.GroupBatchNameAlt,
                     Enabled = mg.Enabled
                 })
