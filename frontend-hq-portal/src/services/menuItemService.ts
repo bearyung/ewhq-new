@@ -39,9 +39,27 @@ class MenuItemService {
     return response.data;
   }
 
-  async getLookups(brandId: number): Promise<MenuItemLookups> {
-    const response = await api.get(`/menu-items/brand/${brandId}/lookups`);
-    return response.data;
+  private lookupsCache = new Map<number, Promise<MenuItemLookups>>();
+
+  async getLookups(brandId: number, options: { force?: boolean } = {}): Promise<MenuItemLookups> {
+    if (!options.force && this.lookupsCache.has(brandId)) {
+      return this.lookupsCache.get(brandId)!;
+    }
+
+    const promise = api
+      .get(`/menu-items/brand/${brandId}/lookups`)
+      .then((response) => response.data)
+      .finally(() => {
+        if (options.force) {
+          this.lookupsCache.delete(brandId);
+        }
+      });
+
+    if (!options.force) {
+      this.lookupsCache.set(brandId, promise);
+    }
+
+    return promise;
   }
 
   async createMenuItem(brandId: number, payload: MenuItemUpsertPayload): Promise<MenuItemDetail> {

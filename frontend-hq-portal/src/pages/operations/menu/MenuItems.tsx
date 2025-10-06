@@ -268,6 +268,7 @@ const MenuItemsPage: FC = () => {
 
   const [lookups, setLookups] = useState<MenuItemLookups | null>(null);
   const [lookupsLoading, setLookupsLoading] = useState(false);
+  const [filtersReady, setFiltersReady] = useState(false);
   const [itemsResponse, setItemsResponse] = useState<MenuItemListResponse | null>(null);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -298,12 +299,19 @@ const MenuItemsPage: FC = () => {
   const [availabilitySavingShopId, setAvailabilitySavingShopId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!brandId) return;
+    if (!brandId) {
+      setLookups(null);
+      setFiltersReady(false);
+      return;
+    }
+
+    let active = true;
 
     const loadLookups = async () => {
       setLookupsLoading(true);
       try {
         const data = await menuItemService.getLookups(brandId);
+        if (!active) return;
         setLookups(data);
         setSelectedCategoryId((current) => {
           if (current && data.categories.some((cat) => cat.categoryId === current)) {
@@ -312,7 +320,9 @@ const MenuItemsPage: FC = () => {
           return data.categories[0]?.categoryId ?? null;
         });
         setPage(1);
+        setFiltersReady(true);
       } catch (error) {
+        if (!active) return;
         console.error('Failed to load menu item lookups', error);
         notifications.show({
           title: 'Error',
@@ -320,12 +330,20 @@ const MenuItemsPage: FC = () => {
           color: 'red',
           icon: <IconAlertCircle size={16} />,
         });
+        setFiltersReady(true);
       } finally {
-        setLookupsLoading(false);
+        if (active) {
+          setLookupsLoading(false);
+        }
       }
     };
 
     loadLookups();
+
+    return () => {
+      active = false;
+      setFiltersReady(false);
+    };
   }, [brandId]);
 
   useEffect(() => {
@@ -361,7 +379,7 @@ const MenuItemsPage: FC = () => {
   }, [selectedDetail]);
 
   useEffect(() => {
-    if (!brandId) return;
+    if (!brandId || !filtersReady) return;
 
     const loadItems = async () => {
       setItemsLoading(true);
@@ -390,7 +408,7 @@ const MenuItemsPage: FC = () => {
     };
 
     loadItems();
-  }, [brandId, selectedCategoryId, debouncedSearch, includeDisabled, modifierFilter, promoFilter, sortBy, sortDirection, page]);
+  }, [brandId, filtersReady, selectedCategoryId, debouncedSearch, includeDisabled, modifierFilter, promoFilter, sortBy, sortDirection, page]);
 
   const categoryTree = useMemo(() => buildCategoryTree(lookups?.categories ?? []), [lookups?.categories]);
 
