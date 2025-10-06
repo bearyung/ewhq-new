@@ -23,16 +23,16 @@ public class ItemMaster
     public string ItemCode { get; set; } = string.Empty;
 
     [MaxLength(100)]
-    public string ItemName { get; set; }
+    public string? ItemName { get; set; }
 
     [MaxLength(100)]
-    public string ItemNameAlt { get; set; }
+    public string? ItemNameAlt { get; set; }
 
     [MaxLength(50)]
-    public string ItemPosName { get; set; }
+    public string? ItemPosName { get; set; }
 
     [MaxLength(100)]
-    public string ItemPosNameAlt { get; set; }
+    public string? ItemPosNameAlt { get; set; }
 
     public int DisplayIndex { get; set; }
 
@@ -51,25 +51,25 @@ public class ItemMaster
     public DateTime? CreatedDate { get; set; }
 
     [MaxLength(50)]
-    public string CreatedBy { get; set; }
+    public string? CreatedBy { get; set; }
 
     public DateTime? ModifiedDate { get; set; }
 
     [MaxLength(50)]
-    public string ModifiedBy { get; set; }
+    public string? ModifiedBy { get; set; }
 
     public bool IsItemShow { get; set; }
 
     public bool IsPriceShow { get; set; }
 
     [MaxLength(100)]
-    public string ItemNameAlt2 { get; set; }
+    public string? ItemNameAlt2 { get; set; }
 
     [MaxLength(100)]
-    public string ItemNameAlt3 { get; set; }
+    public string? ItemNameAlt3 { get; set; }
 
     [MaxLength(100)]
-    public string ItemNameAlt4 { get; set; }
+    public string? ItemNameAlt4 { get; set; }
 
     public bool IsManualPrice { get; set; }
 
@@ -100,7 +100,7 @@ public class ItemMaster
     public bool IsPriceInPercentage { get; set; }
 
     [MaxLength(200)]
-    public string ImageFileName { get; set; }
+    public string? ImageFileName { get; set; }
 
     public bool? IsPointPaidItem { get; set; }
 
@@ -117,43 +117,43 @@ public class ItemMaster
     public bool? IsAutoLinkWithRawMaterial { get; set; }
 
     [MaxLength(200)]
-    public string ImageFileName2 { get; set; }
+    public string? ImageFileName2 { get; set; }
 
     [MaxLength(4000)]
-    public string Remark { get; set; }
+    public string? Remark { get; set; }
 
     [MaxLength(4000)]
-    public string RemarkAlt { get; set; }
+    public string? RemarkAlt { get; set; }
 
     [MaxLength(200)]
-    public string OdoImageFileName { get; set; }
+    public string? OdoImageFileName { get; set; }
 
     [MaxLength(4000)]
-    public string OdoRemark { get; set; }
+    public string? OdoRemark { get; set; }
 
     [MaxLength(4000)]
-    public string OdoRemarkAlt { get; set; }
+    public string? OdoRemarkAlt { get; set; }
 
     [MaxLength(200)]
-    public string KioskImageFileName { get; set; }
+    public string? KioskImageFileName { get; set; }
 
     [MaxLength(4000)]
-    public string KioskRemark { get; set; }
+    public string? KioskRemark { get; set; }
 
     [MaxLength(4000)]
-    public string KioskRemarkAlt { get; set; }
+    public string? KioskRemarkAlt { get; set; }
 
     [MaxLength(100)]
-    public string ItemPublicDisplayName { get; set; }
+    public string? ItemPublicDisplayName { get; set; }
 
     [MaxLength(100)]
-    public string ItemPublicDisplayNameAlt { get; set; }
+    public string? ItemPublicDisplayNameAlt { get; set; }
 
     [MaxLength(100)]
-    public string ItemPublicPrintedName { get; set; }
+    public string? ItemPublicPrintedName { get; set; }
 
     [MaxLength(100)]
-    public string ItemPublicPrintedNameAlt { get; set; }
+    public string? ItemPublicPrintedNameAlt { get; set; }
 
     public bool IsDinein { get; set; }
 
@@ -162,7 +162,7 @@ public class ItemMaster
     public bool IsDelivery { get; set; }
 
     [MaxLength(200)]
-    public string TableOrderingImageFileName { get; set; }
+    public string? TableOrderingImageFileName { get; set; }
 
     public bool? IsKitchenPrintInRedColor { get; set; }
 
@@ -176,7 +176,7 @@ public class ItemMaster
     public decimal? ServingSize { get; set; }
 
     [MaxLength(200)]
-    public string SystemRemark { get; set; }
+    public string? SystemRemark { get; set; }
 
     public bool? IsNonSalesItem { get; set; }
 
