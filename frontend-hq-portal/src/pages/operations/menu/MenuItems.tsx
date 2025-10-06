@@ -801,7 +801,23 @@ const MenuItemsPage: FC = () => {
 
   return (
     <Box>
-      <AutoBreadcrumb />
+      <Box
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          backgroundColor: 'white',
+          borderBottom: '1px solid #E3E8EE',
+          minHeight: 48,
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <Container size="xl" px="xl" style={{ marginInline: 0 }}>
+          <AutoBreadcrumb />
+        </Container>
+      </Box>
+
       <ScrollingHeader
         title="Menu Items"
         subtitle="Browse, filter, and edit items across your menu"
