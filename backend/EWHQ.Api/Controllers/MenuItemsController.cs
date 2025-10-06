@@ -319,7 +319,7 @@ public class MenuItemsController : ControllerBase
         {
             var (context, accountId) = await _posContextService.GetContextAndAccountIdForBrandAsync(brandId);
 
-            var categoriesTask = context.ItemCategories
+            var categories = await context.ItemCategories
                 .AsNoTracking()
                 .Where(c => c.AccountId == accountId)
                 .OrderBy(c => c.DisplayIndex)
@@ -350,7 +350,7 @@ public class MenuItemsController : ControllerBase
                 })
                 .ToListAsync();
 
-            var buttonStylesTask = context.ButtonStyleMasters
+            var buttonStyles = await context.ButtonStyleMasters
                 .AsNoTracking()
                 .Where(bs => bs.AccountId == accountId && bs.IsSystemUse != true)
                 .OrderBy(bs => bs.StyleName)
@@ -380,7 +380,7 @@ public class MenuItemsController : ControllerBase
                 })
                 .ToListAsync();
 
-            var departmentsTask = context.Departments
+            var departments = await context.Departments
                 .AsNoTracking()
                 .Where(d => d.AccountId == accountId && d.Enabled)
                 .OrderBy(d => d.DepartmentName)
@@ -394,7 +394,7 @@ public class MenuItemsController : ControllerBase
                 })
                 .ToListAsync();
 
-            var modifierGroupsTask = context.ModifierGroupHeaders
+            var modifierGroups = await context.ModifierGroupHeaders
                 .AsNoTracking()
                 .Where(mg => mg.AccountId == accountId && mg.Enabled)
                 .OrderBy(mg => mg.GroupBatchName)
@@ -408,14 +408,12 @@ public class MenuItemsController : ControllerBase
                 })
                 .ToListAsync();
 
-            await Task.WhenAll(categoriesTask, buttonStylesTask, departmentsTask, modifierGroupsTask);
-
             return Ok(new MenuItemLookupsDto
             {
-                Categories = categoriesTask.Result,
-                ButtonStyles = buttonStylesTask.Result,
-                Departments = departmentsTask.Result,
-                ModifierGroups = modifierGroupsTask.Result
+                Categories = categories,
+                ButtonStyles = buttonStyles,
+                Departments = departments,
+                ModifierGroups = modifierGroups
             });
         }
         catch (InvalidOperationException ex)
