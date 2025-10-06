@@ -27,12 +27,12 @@ import {
   Text,
   TextInput,
   Tooltip,
+  UnstyledButton,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
   IconAlertCircle,
-  IconArrowAutofitContent,
   IconArrowsSort,
   IconAdjustments,
   IconCheck,
@@ -274,6 +274,7 @@ const MenuItemsPage: FC = () => {
 
   const [categorySearch, setCategorySearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebouncedValue(search, 300);
   const [includeDisabled, setIncludeDisabled] = useState(false);
@@ -393,6 +394,14 @@ const MenuItemsPage: FC = () => {
 
   const categoryTree = useMemo(() => buildCategoryTree(lookups?.categories ?? []), [lookups?.categories]);
 
+  const parentMap = useMemo(() => {
+    const map = new Map<number, number | null>();
+    (lookups?.categories ?? []).forEach((category) => {
+      map.set(category.categoryId, category.parentCategoryId ?? null);
+    });
+    return map;
+  }, [lookups?.categories]);
+
   const filteredCategories = useMemo(() => {
     if (!categorySearch.trim()) return categoryTree;
 
@@ -410,6 +419,44 @@ const MenuItemsPage: FC = () => {
 
     return filterRecursive(categoryTree);
   }, [categoryTree, categorySearch]);
+
+  useEffect(() => {
+    if (!categoryTree.length) {
+      setExpandedCategories(new Set());
+      return;
+    }
+
+    // Ensure top-level categories are expanded by default for quick scanning
+    setExpandedCategories((prev) => {
+      if (prev.size > 0) {
+        return prev;
+      }
+      return new Set(categoryTree.map((node) => node.categoryId));
+    });
+  }, [categoryTree]);
+
+  useEffect(() => {
+    if (!selectedCategoryId) {
+      return;
+    }
+
+    const path = new Set<number>();
+    let current = parentMap.get(selectedCategoryId) ?? null;
+    while (current) {
+      path.add(current);
+      current = parentMap.get(current) ?? null;
+    }
+
+    if (path.size === 0) {
+      return;
+    }
+
+    setExpandedCategories((prev) => {
+      const merged = new Set(prev);
+      path.forEach((id) => merged.add(id));
+      return merged;
+    });
+  }, [selectedCategoryId, parentMap]);
 
   const categoryCounts = useMemo(() => {
     const map = new Map<number, number>();
@@ -685,53 +732,76 @@ const MenuItemsPage: FC = () => {
     }
   };
 
-  const renderCategoryNodes = (nodes: CategoryNode[], depth = 0) => (
-    <Stack gap="xs" key={`depth-${depth}`}>
-      {nodes.map((node) => {
-        const isSelected = node.categoryId === selectedCategoryId;
-        const count = categoryCounts.get(node.categoryId) ?? 0;
-        return (
-          <Box key={node.categoryId}>
-            <Button
-              variant={isSelected ? 'filled' : 'subtle'}
-              color={isSelected ? 'indigo' : 'gray'}
-              fullWidth
-              onClick={() => {
-                setSelectedCategoryId(node.categoryId);
-                setPage(1);
-              }}
-              leftSection={
-                node.children.length > 0 ? (
-                  <IconChevronRight size={16} style={{ opacity: 0.6 }} />
+  const toggleCategoryExpansion = (categoryId: number) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  };
+
+  const handleCategorySelect = (categoryId: number | null) => {
+    setSelectedCategoryId(categoryId);
+    setPage(1);
+  };
+
+  const renderCategoryNodes = (nodes: CategoryNode[], depth = 0): React.ReactNode =>
+    nodes.map((node) => {
+      const isSelected = node.categoryId === selectedCategoryId;
+      const count = categoryCounts.get(node.categoryId) ?? 0;
+      const hasChildren = node.children.length > 0;
+      const forceExpanded = Boolean(categorySearch.trim());
+      const isExpanded = forceExpanded || expandedCategories.has(node.categoryId);
+      const displayChildren = hasChildren && isExpanded;
+
+      const labelColor = isSelected ? 'var(--mantine-color-indigo-7)' : 'var(--mantine-color-gray-7)';
+      const backgroundColor = isSelected ? 'var(--mantine-color-indigo-0)' : 'transparent';
+
+      return (
+        <Stack key={node.categoryId} gap={4}>
+          <UnstyledButton
+            style={{
+              padding: '6px 10px',
+              borderRadius: 8,
+              backgroundColor,
+              transition: 'background-color 120ms ease',
+              width: '100%',
+            }}
+            onClick={() => handleCategorySelect(node.categoryId)}
+          >
+            <Flex align="center" justify="space-between" pl={depth * 16} gap="sm">
+              <Group gap={6} align="center">
+                {hasChildren ? (
+                  <ActionIcon
+                    variant="subtle"
+                    size="sm"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleCategoryExpansion(node.categoryId);
+                    }}
+                  >
+                    {isExpanded ? <IconChevronRight size={16} style={{ transform: 'rotate(90deg)' }} /> : <IconChevronRight size={16} />}
+                  </ActionIcon>
                 ) : (
-                  <IconArrowAutofitContent size={16} style={{ opacity: 0.6 }} />
-                )
-              }
-              styles={{
-                label: {
-                  justifyContent: 'space-between',
-                },
-              }}
-            >
-              <Flex justify="space-between" align="center" w="100%">
-                <Text size="sm" fw={500} truncate>
-                  {node.categoryName}
+                  <Box w={28} />
+                )}
+                <Text size="sm" fw={isSelected ? 600 : 500} c={labelColor} style={{ maxWidth: 160 }} truncate>
+                  {node.categoryName || '(Untitled category)'}
                 </Text>
-                <Badge size="sm" variant={isSelected ? 'light' : 'outline'} color={isSelected ? 'white' : 'gray'}>
-                  {count}
-                </Badge>
-              </Flex>
-            </Button>
-            {node.children.length > 0 && (
-              <Box pl="md" mt="xs">
-                {renderCategoryNodes(node.children, depth + 1)}
-              </Box>
-            )}
-          </Box>
-        );
-      })}
-    </Stack>
-  );
+              </Group>
+              <Badge size="sm" variant={isSelected ? 'filled' : 'outline'} color={isSelected ? 'indigo' : 'gray'}>
+                {count}
+              </Badge>
+            </Flex>
+          </UnstyledButton>
+          {displayChildren && <Stack gap={4}>{renderCategoryNodes(node.children, depth + 1)}</Stack>}
+        </Stack>
+      );
+    });
 
   const renderTags = (item: MenuItemSummary) => (
     <Group gap="xs">
