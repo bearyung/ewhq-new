@@ -926,6 +926,7 @@ const MenuItemsPage: FC = () => {
           </Group>
         }
         spacing="compact"
+        forceCompact
       />
 
       <Container fluid px={0} py={0}>
