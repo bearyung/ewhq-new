@@ -63,6 +63,7 @@ interface CategoryNode extends ItemCategory {
 }
 
 const PAGE_SIZE = 25;
+const PANEL_BORDER_COLOR = '#E3E8EE';
 
 const buildCategoryTree = (categories: ItemCategory[]): CategoryNode[] => {
   const map = new Map<number, CategoryNode>();
@@ -76,8 +77,9 @@ const buildCategoryTree = (categories: ItemCategory[]): CategoryNode[] => {
     const node = map.get(cat.categoryId);
     if (!node) return;
 
-    if (cat.parentCategoryId && map.has(cat.parentCategoryId)) {
-      map.get(cat.parentCategoryId)!.children.push(node);
+    const parentId = cat.parentCategoryId;
+    if (parentId !== null && parentId !== undefined && map.has(parentId)) {
+      map.get(parentId)!.children.push(node);
     } else {
       roots.push(node);
     }
@@ -454,13 +456,13 @@ const MenuItemsPage: FC = () => {
   }, [categoryTree]);
 
   useEffect(() => {
-    if (!selectedCategoryId) {
+    if (selectedCategoryId == null) {
       return;
     }
 
     const path = new Set<number>();
     let current = parentMap.get(selectedCategoryId) ?? null;
-    while (current) {
+    while (current !== null && current !== undefined) {
       path.add(current);
       current = parentMap.get(current) ?? null;
     }
@@ -488,13 +490,13 @@ const MenuItemsPage: FC = () => {
   const totalPages = itemsResponse?.totalPages ?? 1;
 
   const getCategoryLabel = (categoryId?: number | null) => {
-    if (!categoryId || !lookups) return '—';
+    if (categoryId === null || categoryId === undefined || !lookups) return '—';
     const match = lookups.categories.find((cat) => cat.categoryId === categoryId);
     return match ? match.categoryName : '—';
   };
 
   const getDepartmentName = (departmentId?: number) => {
-    if (!departmentId || !lookups) return '—';
+    if (departmentId === null || departmentId === undefined || !lookups) return '—';
     return lookups.departments.find((dep) => dep.departmentId === departmentId)?.departmentName ?? '—';
   };
 
@@ -901,7 +903,14 @@ const MenuItemsPage: FC = () => {
           alignItems: 'center',
         }}
       >
-        <Container size="xl" px="xl" style={{ marginInline: 0 }}>
+        <Container
+          size="xl"
+          px="xl"
+          style={{
+            marginInline: 0,
+            flex: 1,
+          }}
+        >
           <AutoBreadcrumb />
         </Container>
       </Box>
@@ -916,9 +925,10 @@ const MenuItemsPage: FC = () => {
             </Button>
           </Group>
         }
+        spacing="compact"
       />
 
-      <Container size="xl" py="xl">
+      <Container fluid px={0} py={0}>
         {!brandId && (
           <Paper withBorder p="lg" mb="xl">
             <Group gap="sm">
@@ -933,9 +943,15 @@ const MenuItemsPage: FC = () => {
           </Paper>
         )}
 
-        <Grid gutter="xl" align="stretch">
+        <Grid gutter={0} align="stretch">
           <Grid.Col span={{ base: 12, md: 4, lg: 3 }}>
-            <Paper withBorder shadow="xs" p="md" h="100%">
+            <Paper
+              shadow="none"
+              p="md"
+              h="100%"
+              withBorder={false}
+              style={{ borderRight: `1px solid ${PANEL_BORDER_COLOR}` }}
+            >
               <Stack gap="sm">
                 <Group justify="space-between">
                   <Text fw={600}>Categories</Text>
@@ -975,96 +991,114 @@ const MenuItemsPage: FC = () => {
                     </Stack>
                   )}
                 </ScrollArea>
-              </Stack>
-            </Paper>
+                </Stack>
+              </Paper>
           </Grid.Col>
 
           <Grid.Col span={{ base: 12, md: 8, lg: 9 }}>
-            <Stack>
-              <Paper withBorder shadow="xs" p="md">
+            <Stack gap={0}>
+              <Paper
+                withBorder
+                shadow="none"
+                p="md"
+                radius="md"
+                style={{
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                  borderBottomWidth: 0,
+                }}
+              >
                 <Stack gap="md">
                   <Group align="flex-end" justify="space-between">
                     <TextInput
                       label="Search"
-                    placeholder="Search by name or code"
-                    value={search}
-                    onChange={(event) => {
-                      setSearch(event.currentTarget.value);
-                      setPage(1);
-                    }}
-                    leftSection={<IconSearch size={16} />}
-                    w="60%"
-                  />
-                  <Switch
-                    label="Include disabled"
-                    checked={includeDisabled}
-                    onChange={(event) => {
-                      setIncludeDisabled(event.currentTarget.checked);
-                      setPage(1);
-                    }}
-                  />
-                </Group>
+                      placeholder="Search by name or code"
+                      value={search}
+                      onChange={(event) => {
+                        setSearch(event.currentTarget.value);
+                        setPage(1);
+                      }}
+                      leftSection={<IconSearch size={16} />}
+                      w="60%"
+                    />
+                    <Switch
+                      label="Include disabled"
+                      checked={includeDisabled}
+                      onChange={(event) => {
+                        setIncludeDisabled(event.currentTarget.checked);
+                        setPage(1);
+                      }}
+                    />
+                  </Group>
 
-                <Group grow>
-                  <SegmentedControl
-                    value={modifierFilter}
-                    onChange={(value) => {
-                      const next = value as 'all' | 'with' | 'without';
-                      setModifierFilter(next);
-                      setPage(1);
-                    }}
-                    data={[
-                      { label: 'All modifiers', value: 'all' },
-                      { label: 'With modifiers', value: 'with' },
-                      { label: 'Without modifiers', value: 'without' },
-                    ]}
-                  />
-                  <SegmentedControl
-                    value={promoFilter}
-                    onChange={(value) => {
-                      const next = value as 'all' | 'promo' | 'nonpromo';
-                      setPromoFilter(next);
-                      setPage(1);
-                    }}
-                    data={[
-                      { label: 'All items', value: 'all' },
-                      { label: 'Promo only', value: 'promo' },
-                      { label: 'Non promo', value: 'nonpromo' },
-                    ]}
-                  />
-                </Group>
+                  <Group grow>
+                    <SegmentedControl
+                      value={modifierFilter}
+                      onChange={(value) => {
+                        const next = value as 'all' | 'with' | 'without';
+                        setModifierFilter(next);
+                        setPage(1);
+                      }}
+                      data={[
+                        { label: 'All modifiers', value: 'all' },
+                        { label: 'With modifiers', value: 'with' },
+                        { label: 'Without modifiers', value: 'without' },
+                      ]}
+                    />
+                    <SegmentedControl
+                      value={promoFilter}
+                      onChange={(value) => {
+                        const next = value as 'all' | 'promo' | 'nonpromo';
+                        setPromoFilter(next);
+                        setPage(1);
+                      }}
+                      data={[
+                        { label: 'All items', value: 'all' },
+                        { label: 'Promo only', value: 'promo' },
+                        { label: 'Non promo', value: 'nonpromo' },
+                      ]}
+                    />
+                  </Group>
 
-                <Group>
-                  <Select
-                    label="Sort by"
-                    value={sortBy}
-                    onChange={(value) => {
-                      if (!value) return;
-                      setSortBy(value as typeof sortBy);
-                      setPage(1);
-                    }}
-                    data={[
-                      { label: 'Display order', value: 'displayIndex' },
-                      { label: 'Name', value: 'name' },
-                      { label: 'Last updated', value: 'modified' },
-                    ]}
-                    w={220}
-                  />
-                  <Button
-                    variant="light"
-                    leftSection={<IconArrowsSort size={16} />}
-                    onClick={() => {
-                      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                      setPage(1);
-                    }}
-                  >
-                    {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
-                  </Button>
-                </Group>
-              </Stack>
-            </Paper>
-
-            <Paper withBorder shadow="xs">
+                  <Group>
+                    <Select
+                      label="Sort by"
+                      value={sortBy}
+                      onChange={(value) => {
+                        if (!value) return;
+                        setSortBy(value as typeof sortBy);
+                        setPage(1);
+                      }}
+                      data={[
+                        { label: 'Display order', value: 'displayIndex' },
+                        { label: 'Name', value: 'name' },
+                        { label: 'Last updated', value: 'modified' },
+                      ]}
+                      w={220}
+                    />
+                    <Button
+                      variant="light"
+                      leftSection={<IconArrowsSort size={16} />}
+                      onClick={() => {
+                        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                        setPage(1);
+                      }}
+                    >
+                      {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                    </Button>
+                  </Group>
+                </Stack>
+              </Paper>
+            <Paper
+              withBorder
+              shadow="none"
+              radius="md"
+              style={{
+                borderTopLeftRadius: 0,
+                borderTopRightRadius: 0,
+                borderTopWidth: 0,
+              }}
+            >
               {itemsLoading ? (
                 <CenterLoader message="Loading menu items" />
               ) : fetchError ? (
@@ -1110,7 +1144,7 @@ const MenuItemsPage: FC = () => {
               )}
             </Paper>
 
-            <Group justify="space-between" align="center">
+            <Group justify="space-between" align="center" px="md" pb="md">
               <Text size="sm" c="dimmed">
                 Showing page {page} of {totalPages} • {totalItems} items
               </Text>

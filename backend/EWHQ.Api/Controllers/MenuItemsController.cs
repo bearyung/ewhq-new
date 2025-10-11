@@ -321,7 +321,7 @@ public class MenuItemsController : ControllerBase
 
             var categories = await context.ItemCategories
                 .AsNoTracking()
-                .Where(c => c.AccountId == accountId)
+                .Where(c => c.AccountId == accountId && c.Enabled)
                 .OrderBy(c => c.DisplayIndex)
                 .ThenBy(c => c.CategoryName)
                 .Select(c => new ItemCategoryDto

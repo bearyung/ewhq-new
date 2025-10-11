@@ -26,21 +26,31 @@ const getScrollParent = (element: HTMLElement | null): HTMLElement | Window => {
   return window;
 };
 
+type HeaderSpacing = 'comfortable' | 'compact';
+
+const HEADER_SPACING: Record<HeaderSpacing, { pt: string; pb: string }> = {
+  comfortable: { pt: 'xl', pb: 'xl' },
+  compact: { pt: 'md', pb: 'sm' },
+};
+
 interface ScrollingHeaderProps {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
   children?: ReactNode; // For additional content like floating save bars
+  spacing?: HeaderSpacing;
 }
 
 const ScrollingHeader: FC<ScrollingHeaderProps> = ({
   title,
   subtitle,
   actions,
-  children
+  children,
+  spacing = 'comfortable'
 }) => {
   const [isCompact, setIsCompact] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
+  const { pt, pb } = HEADER_SPACING[spacing];
 
   useEffect(() => {
     const element = headerRef.current;
@@ -118,15 +128,7 @@ const ScrollingHeader: FC<ScrollingHeaderProps> = ({
       </Box>
 
       {/* Full Header - Always rendered */}
-      <Box
-        ref={headerRef}
-        pt="xl"
-        px="xl"
-        pb="xl"
-        style={{
-          backgroundColor: 'white',
-        }}
-      >
+      <Box ref={headerRef} pt={pt} px="xl" pb={pb} style={{ backgroundColor: 'white' }}>
         <Container size="xl" style={{ marginInline: 0 }}>
           <Group justify="space-between">
             <Box>
