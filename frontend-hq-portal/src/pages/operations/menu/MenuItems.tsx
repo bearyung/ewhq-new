@@ -29,7 +29,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
-import { useDebouncedValue } from '@mantine/hooks';
+import { useDebouncedValue, useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
   IconAlertCircle,
@@ -64,6 +64,7 @@ interface CategoryNode extends ItemCategory {
 
 const PAGE_SIZE = 25;
 const PANEL_BORDER_COLOR = '#E3E8EE';
+const PAGE_CONTENT_OFFSET = 96; // Breadcrumb (48) + compact header (48)
 
 const buildCategoryTree = (categories: ItemCategory[]): CategoryNode[] => {
   const map = new Map<number, CategoryNode>();
@@ -267,6 +268,7 @@ const MenuItemsPage: FC = () => {
   const { selectedBrand } = useBrands();
   const brandId = selectedBrand ? parseInt(selectedBrand, 10) : null;
   const navigate = useNavigate();
+  const isDesktopLayout = useMediaQuery('(min-width: 62em)');
 
   const [lookups, setLookups] = useState<MenuItemLookups | null>(null);
   const [lookupsLoading, setLookupsLoading] = useState(false);
@@ -930,236 +932,306 @@ const MenuItemsPage: FC = () => {
         compactShadow={false}
       />
 
-      <Container fluid px={0} py={0}>
-        {!brandId && (
-          <Paper withBorder p="lg" mb="xl">
-            <Group gap="sm">
-              <IconAlertCircle size={20} color="var(--mantine-color-red-6)" />
-              <Stack gap={4}>
-                <Text fw={600}>Select a brand to manage menu items</Text>
-                <Text size="sm" c="dimmed">
-                  Choose a brand from the header selector to load menu data.
-                </Text>
-              </Stack>
-            </Group>
-          </Paper>
-        )}
-
-        <Grid gutter={0} align="stretch">
-          <Grid.Col span={{ base: 12, md: 4, lg: 3 }}>
-            <Paper
-              shadow="none"
-              p="md"
-              h="100%"
-              withBorder={false}
-              style={{ borderRight: `1px solid ${PANEL_BORDER_COLOR}` }}
-            >
-              <Stack gap="sm">
-                <Group justify="space-between">
-                  <Text fw={600}>Categories</Text>
-                  <Badge variant="light" color="gray">
-                    {(itemsResponse?.categoryCounts ?? []).reduce((acc, entry) => acc + entry.itemCount, 0)} items
-                  </Badge>
-                </Group>
-                <TextInput
-                  placeholder="Search categories"
-                  value={categorySearch}
-                  onChange={(event) => setCategorySearch(event.currentTarget.value)}
-                  leftSection={<IconSearch size={16} />}
-                />
-                <Button
-                  variant={selectedCategoryId === null ? 'filled' : 'subtle'}
-                  color={selectedCategoryId === null ? 'indigo' : 'gray'}
-                  leftSection={<IconSparkles size={16} />}
-                  onClick={() => {
-                    setSelectedCategoryId(null);
-                    setPage(1);
-                  }}
-                >
-                  All items
-                </Button>
-                <Divider label="Browse" labelPosition="center" />
-                <ScrollArea h={420} type="auto" offsetScrollbars>
-                  {lookupsLoading ? (
-                    <CenterLoader message="Loading categories" />
-                  ) : filteredCategories.length > 0 ? (
-                    <Stack gap="sm">{renderCategoryNodes(filteredCategories)}</Stack>
-                  ) : (
-                    <Stack gap="xs" align="center" py="md">
-                      <IconSparkles size={20} color="var(--mantine-color-gray-6)" />
-                      <Text size="sm" c="dimmed" ta="center">
-                        No categories match your search.
-                      </Text>
-                    </Stack>
-                  )}
-                </ScrollArea>
+      <Container
+        fluid
+        px={0}
+        py={0}
+        style={
+          isDesktopLayout
+            ? {
+                height: `calc(100vh - ${PAGE_CONTENT_OFFSET}px)`,
+                overflow: 'hidden',
+              }
+            : undefined
+        }
+      >
+        <Box
+          px={isDesktopLayout ? 'xl' : 'md'}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: isDesktopLayout ? '100%' : 'auto',
+          }}
+        >
+          {!brandId && (
+            <Paper withBorder p="lg" mb="xl">
+              <Group gap="sm">
+                <IconAlertCircle size={20} color="var(--mantine-color-red-6)" />
+                <Stack gap={4}>
+                  <Text fw={600}>Select a brand to manage menu items</Text>
+                  <Text size="sm" c="dimmed">
+                    Choose a brand from the header selector to load menu data.
+                  </Text>
                 </Stack>
-              </Paper>
-          </Grid.Col>
+              </Group>
+            </Paper>
+          )}
 
-          <Grid.Col span={{ base: 12, md: 8, lg: 9 }}>
-            <Stack gap={0}>
+          <Grid
+            gutter={0}
+            align="stretch"
+            style={isDesktopLayout ? { flex: 1, overflow: 'hidden' } : undefined}
+          >
+            <Grid.Col
+              span={{ base: 12, md: 4, lg: 3 }}
+              style={isDesktopLayout ? { height: '100%' } : undefined}
+            >
               <Paper
-                withBorder
                 shadow="none"
                 p="md"
-                radius="md"
+                withBorder={false}
                 style={{
-                  borderBottomLeftRadius: 0,
-                  borderBottomRightRadius: 0,
-                  borderBottomWidth: 0,
+                  borderRight: `1px solid ${PANEL_BORDER_COLOR}`,
+                  ...(isDesktopLayout
+                    ? {
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                      }
+                    : {}),
                 }}
               >
-                <Stack gap="md">
-                  <Group align="flex-end" justify="space-between">
-                    <TextInput
-                      label="Search"
-                      placeholder="Search by name or code"
-                      value={search}
-                      onChange={(event) => {
-                        setSearch(event.currentTarget.value);
-                        setPage(1);
-                      }}
-                      leftSection={<IconSearch size={16} />}
-                      w="60%"
-                    />
-                    <Switch
-                      label="Include disabled"
-                      checked={includeDisabled}
-                      onChange={(event) => {
-                        setIncludeDisabled(event.currentTarget.checked);
-                        setPage(1);
-                      }}
-                    />
+                <Stack
+                  gap="sm"
+                  style={isDesktopLayout ? { flex: 1, overflow: 'hidden' } : undefined}
+                >
+                  <Group justify="space-between">
+                    <Text fw={600}>Categories</Text>
+                    <Badge variant="light" color="gray">
+                      {(itemsResponse?.categoryCounts ?? []).reduce((acc, entry) => acc + entry.itemCount, 0)} items
+                    </Badge>
                   </Group>
-
-                  <Group grow>
-                    <SegmentedControl
-                      value={modifierFilter}
-                      onChange={(value) => {
-                        const next = value as 'all' | 'with' | 'without';
-                        setModifierFilter(next);
-                        setPage(1);
-                      }}
-                      data={[
-                        { label: 'All modifiers', value: 'all' },
-                        { label: 'With modifiers', value: 'with' },
-                        { label: 'Without modifiers', value: 'without' },
-                      ]}
-                    />
-                    <SegmentedControl
-                      value={promoFilter}
-                      onChange={(value) => {
-                        const next = value as 'all' | 'promo' | 'nonpromo';
-                        setPromoFilter(next);
-                        setPage(1);
-                      }}
-                      data={[
-                        { label: 'All items', value: 'all' },
-                        { label: 'Promo only', value: 'promo' },
-                        { label: 'Non promo', value: 'nonpromo' },
-                      ]}
-                    />
-                  </Group>
-
-                  <Group>
-                    <Select
-                      label="Sort by"
-                      value={sortBy}
-                      onChange={(value) => {
-                        if (!value) return;
-                        setSortBy(value as typeof sortBy);
-                        setPage(1);
-                      }}
-                      data={[
-                        { label: 'Display order', value: 'displayIndex' },
-                        { label: 'Name', value: 'name' },
-                        { label: 'Last updated', value: 'modified' },
-                      ]}
-                      w={220}
-                    />
-                    <Button
-                      variant="light"
-                      leftSection={<IconArrowsSort size={16} />}
-                      onClick={() => {
-                        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                        setPage(1);
-                      }}
-                    >
-                      {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
-                    </Button>
-                  </Group>
+                  <TextInput
+                    placeholder="Search categories"
+                    value={categorySearch}
+                    onChange={(event) => setCategorySearch(event.currentTarget.value)}
+                    leftSection={<IconSearch size={16} />}
+                  />
+                  <Button
+                    variant={selectedCategoryId === null ? 'filled' : 'subtle'}
+                    color={selectedCategoryId === null ? 'indigo' : 'gray'}
+                    leftSection={<IconSparkles size={16} />}
+                    onClick={() => {
+                      setSelectedCategoryId(null);
+                      setPage(1);
+                    }}
+                  >
+                    All items
+                  </Button>
+                  <Divider label="Browse" labelPosition="center" />
+                  <ScrollArea
+                    type="auto"
+                    offsetScrollbars
+                    style={isDesktopLayout ? { flex: 1 } : undefined}
+                  >
+                    {lookupsLoading ? (
+                      <CenterLoader message="Loading categories" />
+                    ) : filteredCategories.length > 0 ? (
+                      <Stack gap="sm">{renderCategoryNodes(filteredCategories)}</Stack>
+                    ) : (
+                      <Stack gap="xs" align="center" py="md">
+                        <IconSparkles size={20} color="var(--mantine-color-gray-6)" />
+                        <Text size="sm" c="dimmed" ta="center">
+                          No categories match your search.
+                        </Text>
+                      </Stack>
+                    )}
+                  </ScrollArea>
                 </Stack>
               </Paper>
-            <Paper
-              withBorder
-              shadow="none"
-              radius="md"
-              style={{
-                borderTopLeftRadius: 0,
-                borderTopRightRadius: 0,
-                borderTopWidth: 0,
-              }}
-            >
-              {itemsLoading ? (
-                <CenterLoader message="Loading menu items" />
-              ) : fetchError ? (
-                <Stack align="center" justify="center" p="xl" gap="sm">
-                  <IconAlertCircle size={24} color="var(--mantine-color-red-6)" />
-                  <Text fw={600}>{fetchError}</Text>
-                  <Button variant="light" onClick={() => setPage((prev) => prev)}>
-                    Retry
-                  </Button>
-                </Stack>
-              ) : (
-                <ScrollArea type="auto">
-                  <Table highlightOnHover withColumnBorders>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Item</Table.Th>
-                        <Table.Th>Category</Table.Th>
-                        <Table.Th>Department</Table.Th>
-                        <Table.Th>Flags</Table.Th>
-                        <Table.Th>Last updated</Table.Th>
-                        <Table.Th style={{ width: 80 }}></Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {itemRows.length > 0 ? (
-                        itemRows
-                      ) : (
-                        <Table.Tr>
-                          <Table.Td colSpan={6}>
-                            <Stack align="center" gap="xs" py="lg">
-                              <IconSparkles size={24} color="var(--mantine-color-gray-6)" />
-                              <Text fw={600}>No items found</Text>
-                              <Text size="sm" c="dimmed" ta="center">
-                                Adjust filters or add a new item to this category.
-                              </Text>
-                            </Stack>
-                          </Table.Td>
-                        </Table.Tr>
-                      )}
-                    </Table.Tbody>
-                  </Table>
-                </ScrollArea>
-              )}
-            </Paper>
+            </Grid.Col>
 
-            <Group justify="space-between" align="center" px="md" pb="md">
-              <Text size="sm" c="dimmed">
-                Showing page {page} of {totalPages} • {totalItems} items
-              </Text>
-              <Pagination
-                value={page}
-                onChange={setPage}
-                total={totalPages}
-                disabled={itemsLoading || totalPages <= 1}
-              />
-            </Group>
-            </Stack>
-          </Grid.Col>
-        </Grid>
+            <Grid.Col
+              span={{ base: 12, md: 8, lg: 9 }}
+              style={isDesktopLayout ? { height: '100%', display: 'flex' } : undefined}
+            >
+              <Stack gap={0} style={isDesktopLayout ? { flex: 1, overflow: 'hidden' } : undefined}>
+                <Paper
+                  withBorder
+                  shadow="none"
+                  p="md"
+                  radius="md"
+                  style={{
+                    borderBottomLeftRadius: 0,
+                    borderBottomRightRadius: 0,
+                    borderBottomWidth: 0,
+                  }}
+                >
+                  <Stack gap="md">
+                    <Group align="flex-end" justify="space-between">
+                      <TextInput
+                        label="Search"
+                        placeholder="Search by name or code"
+                        value={search}
+                        onChange={(event) => {
+                          setSearch(event.currentTarget.value);
+                          setPage(1);
+                        }}
+                        leftSection={<IconSearch size={16} />}
+                        w="60%"
+                      />
+                      <Switch
+                        label="Include disabled"
+                        checked={includeDisabled}
+                        onChange={(event) => {
+                          setIncludeDisabled(event.currentTarget.checked);
+                          setPage(1);
+                        }}
+                      />
+                    </Group>
+
+                    <Group grow>
+                      <SegmentedControl
+                        value={modifierFilter}
+                        onChange={(value) => {
+                          const next = value as 'all' | 'with' | 'without';
+                          setModifierFilter(next);
+                          setPage(1);
+                        }}
+                        data={[
+                          { label: 'All modifiers', value: 'all' },
+                          { label: 'With modifiers', value: 'with' },
+                          { label: 'Without modifiers', value: 'without' },
+                        ]}
+                      />
+                      <SegmentedControl
+                        value={promoFilter}
+                        onChange={(value) => {
+                          const next = value as 'all' | 'promo' | 'nonpromo';
+                          setPromoFilter(next);
+                          setPage(1);
+                        }}
+                        data={[
+                          { label: 'All items', value: 'all' },
+                          { label: 'Promo only', value: 'promo' },
+                          { label: 'Non promo', value: 'nonpromo' },
+                        ]}
+                      />
+                    </Group>
+
+                    <Group>
+                      <Select
+                        label="Sort by"
+                        value={sortBy}
+                        onChange={(value) => {
+                          if (!value) return;
+                          setSortBy(value as typeof sortBy);
+                          setPage(1);
+                        }}
+                        data={[
+                          { label: 'Display order', value: 'displayIndex' },
+                          { label: 'Name', value: 'name' },
+                          { label: 'Last updated', value: 'modified' },
+                        ]}
+                        w={220}
+                      />
+                      <Button
+                        variant="light"
+                        leftSection={<IconArrowsSort size={16} />}
+                        onClick={() => {
+                          setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                          setPage(1);
+                        }}
+                      >
+                        {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                      </Button>
+                    </Group>
+                  </Stack>
+                </Paper>
+                <Paper
+                  withBorder
+                  shadow="none"
+                  radius="md"
+                  style={{
+                    borderTopLeftRadius: 0,
+                    borderTopRightRadius: 0,
+                    borderTopWidth: 0,
+                    ...(isDesktopLayout
+                      ? {
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          overflow: 'hidden',
+                        }
+                      : {}),
+                  }}
+                >
+                  {itemsLoading ? (
+                    <Box
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        ...(isDesktopLayout ? { flex: 1 } : { padding: 'var(--mantine-spacing-xl) 0' }),
+                      }}
+                    >
+                      <CenterLoader message="Loading menu items" />
+                    </Box>
+                  ) : fetchError ? (
+                    <Stack
+                      align="center"
+                      justify="center"
+                      p="xl"
+                      gap="sm"
+                      style={isDesktopLayout ? { flex: 1 } : undefined}
+                    >
+                      <IconAlertCircle size={24} color="var(--mantine-color-red-6)" />
+                      <Text fw={600}>{fetchError}</Text>
+                      <Button variant="light" onClick={() => setPage((prev) => prev)}>
+                        Retry
+                      </Button>
+                    </Stack>
+                  ) : (
+                    <ScrollArea type="auto" style={isDesktopLayout ? { flex: 1 } : undefined}>
+                      <Table highlightOnHover withColumnBorders>
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th>Item</Table.Th>
+                            <Table.Th>Category</Table.Th>
+                            <Table.Th>Department</Table.Th>
+                            <Table.Th>Flags</Table.Th>
+                            <Table.Th>Last updated</Table.Th>
+                            <Table.Th style={{ width: 80 }}></Table.Th>
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {itemRows.length > 0 ? (
+                            itemRows
+                          ) : (
+                            <Table.Tr>
+                              <Table.Td colSpan={6}>
+                                <Stack align="center" gap="xs" py="lg">
+                                  <IconSparkles size={24} color="var(--mantine-color-gray-6)" />
+                                  <Text fw={600}>No items found</Text>
+                                  <Text size="sm" c="dimmed" ta="center">
+                                    Adjust filters or add a new item to this category.
+                                  </Text>
+                                </Stack>
+                              </Table.Td>
+                            </Table.Tr>
+                          )}
+                        </Table.Tbody>
+                      </Table>
+                    </ScrollArea>
+                  )}
+                </Paper>
+
+                <Group justify="space-between" align="center" px="md" pb="md">
+                  <Text size="sm" c="dimmed">
+                    Showing page {page} of {totalPages} • {totalItems} items
+                  </Text>
+                  <Pagination
+                    value={page}
+                    onChange={setPage}
+                    total={totalPages}
+                    disabled={itemsLoading || totalPages <= 1}
+                  />
+                </Group>
+              </Stack>
+            </Grid.Col>
+          </Grid>
+        </Box>
       </Container>
 
       <Drawer
