@@ -40,6 +40,7 @@ interface ScrollingHeaderProps {
   children?: ReactNode; // For additional content like floating save bars
   spacing?: HeaderSpacing;
   forceCompact?: boolean;
+  compactShadow?: boolean;
 }
 
 const ScrollingHeader: FC<ScrollingHeaderProps> = ({
@@ -48,7 +49,8 @@ const ScrollingHeader: FC<ScrollingHeaderProps> = ({
   actions,
   children,
   spacing = 'comfortable',
-  forceCompact = false
+  forceCompact = false,
+  compactShadow = true
 }) => {
   const [isCompact, setIsCompact] = useState(forceCompact);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -122,7 +124,7 @@ const ScrollingHeader: FC<ScrollingHeaderProps> = ({
             alignItems: 'center',
             backgroundColor: 'white',
             borderBottom: '1px solid #E3E8EE',
-            boxShadow: compactVisible ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
+            boxShadow: compactVisible && compactShadow ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
             transform: compactVisible ? 'translateY(0)' : 'translateY(-100%)',
             transition: 'transform 0.3s ease-in-out',
             pointerEvents: compactVisible ? 'auto' : 'none',

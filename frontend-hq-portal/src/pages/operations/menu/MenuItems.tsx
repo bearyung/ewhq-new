@@ -927,6 +927,7 @@ const MenuItemsPage: FC = () => {
         }
         spacing="compact"
         forceCompact
+        compactShadow={false}
       />
 
       <Container fluid px={0} py={0}>
