@@ -19,7 +19,7 @@ public class ModifierGroupHeader
     public string GroupBatchName { get; set; } = string.Empty;
 
     [MaxLength(200)]
-    public string GroupBatchNameAlt { get; set; }
+    public string? GroupBatchNameAlt { get; set; }
 
     public int MaxModifierSelectCount { get; set; }
 
@@ -54,21 +54,22 @@ public class ModifierGroupHeader
     public bool? IsSelfOrderingDisplay { get; set; }
 
     [MaxLength(500)]
-    public string PublicGroupBatchName { get; set; }
+    public string? PublicGroupBatchName { get; set; }
 
     [MaxLength(500)]
-    public string PublicGroupBatchNameAlt { get; set; }
+    public string? PublicGroupBatchNameAlt { get; set; }
 
     public bool? IsTableOrderingDisplay { get; set; }
 
     [MaxLength(50)]
-    public string GroupType { get; set; }
+    public string? GroupType { get; set; }
 
     [MaxLength(20)]
-    public string GroupHeaderCode { get; set; }
+    public string? GroupHeaderCode { get; set; }
 
     [MaxLength(50)]
-    public string SOPLookupType { get; set; }
+    [Column ("SOPLookupType")]
+    public string? SopLookupType { get; set; }
 
     public bool? ShowInNewPage { get; set; }
 

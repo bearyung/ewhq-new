@@ -388,7 +388,7 @@ public class MenuItemsController : ControllerBase
                 {
                     DepartmentId = d.DepartmentId,
                     AccountId = d.AccountId,
-                    DepartmentName = d.DepartmentName ?? string.Empty,
+                    DepartmentName = d.DepartmentName,
                     DepartmentCode = d.DepartmentCode,
                     Enabled = d.Enabled
                 })
