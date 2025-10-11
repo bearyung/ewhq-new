@@ -946,11 +946,12 @@ const MenuItemsPage: FC = () => {
         }
       >
         <Box
-          px={isDesktopLayout ? 'xl' : 'md'}
+          px={0}
           style={{
             display: 'flex',
             flexDirection: 'column',
             height: isDesktopLayout ? '100%' : 'auto',
+            ...(isDesktopLayout ? { overflow: 'hidden' } : {}),
           }}
         >
           {!brandId && (
@@ -970,31 +971,52 @@ const MenuItemsPage: FC = () => {
           <Grid
             gutter={0}
             align="stretch"
-            style={isDesktopLayout ? { flex: 1, overflow: 'hidden' } : undefined}
+            style={
+              isDesktopLayout
+                ? {
+                    flex: 1,
+                    overflow: 'hidden',
+                    paddingInline: 'var(--mantine-spacing-xl)',
+                  }
+                : { paddingInline: 'var(--mantine-spacing-md)' }
+            }
           >
             <Grid.Col
               span={{ base: 12, md: 4, lg: 3 }}
-              style={isDesktopLayout ? { height: '100%' } : undefined}
+              style={
+                isDesktopLayout
+                  ? { height: '100%', minHeight: 0, paddingInline: 0 }
+                  : { paddingInline: 0, paddingBottom: 'var(--mantine-spacing-lg)' }
+              }
             >
               <Paper
                 shadow="none"
                 p="md"
                 withBorder={false}
                 style={{
-                  borderRight: `1px solid ${PANEL_BORDER_COLOR}`,
+                  borderRight: isDesktopLayout ? `1px solid ${PANEL_BORDER_COLOR}` : 'none',
                   ...(isDesktopLayout
                     ? {
                         height: '100%',
                         display: 'flex',
                         flexDirection: 'column',
                         overflow: 'hidden',
+                        minHeight: 0,
                       }
                     : {}),
                 }}
               >
                 <Stack
                   gap="sm"
-                  style={isDesktopLayout ? { flex: 1, overflow: 'hidden' } : undefined}
+                  style={
+                    isDesktopLayout
+                      ? {
+                          flex: 1,
+                          overflow: 'hidden',
+                          minHeight: 0,
+                        }
+                      : undefined
+                  }
                 >
                   <Group justify="space-between">
                     <Text fw={600}>Categories</Text>
@@ -1023,7 +1045,14 @@ const MenuItemsPage: FC = () => {
                   <ScrollArea
                     type="auto"
                     offsetScrollbars
-                    style={isDesktopLayout ? { flex: 1 } : undefined}
+                    style={
+                      isDesktopLayout
+                        ? {
+                            flex: 1,
+                            minHeight: 0,
+                          }
+                        : undefined
+                    }
                   >
                     {lookupsLoading ? (
                       <CenterLoader message="Loading categories" />
@@ -1044,9 +1073,20 @@ const MenuItemsPage: FC = () => {
 
             <Grid.Col
               span={{ base: 12, md: 8, lg: 9 }}
-              style={isDesktopLayout ? { height: '100%', display: 'flex' } : undefined}
+              style={
+                isDesktopLayout
+                  ? { height: '100%', display: 'flex', minHeight: 0, paddingInline: 0 }
+                  : { paddingInline: 0 }
+              }
             >
-              <Stack gap={0} style={isDesktopLayout ? { flex: 1, overflow: 'hidden' } : undefined}>
+              <Stack
+                gap={0}
+                style={
+                  isDesktopLayout
+                    ? { flex: 1, overflow: 'hidden', minHeight: 0 }
+                    : { gap: 'var(--mantine-spacing-md)' }
+                }
+              >
                 <Paper
                   withBorder
                   shadow="none"
@@ -1153,6 +1193,7 @@ const MenuItemsPage: FC = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           overflow: 'hidden',
+                          minHeight: 0,
                         }
                       : {}),
                   }}
@@ -1163,7 +1204,9 @@ const MenuItemsPage: FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        ...(isDesktopLayout ? { flex: 1 } : { padding: 'var(--mantine-spacing-xl) 0' }),
+                        ...(isDesktopLayout
+                          ? { flex: 1, minHeight: 0 }
+                          : { padding: 'var(--mantine-spacing-xl) 0' }),
                       }}
                     >
                       <CenterLoader message="Loading menu items" />
@@ -1174,7 +1217,7 @@ const MenuItemsPage: FC = () => {
                       justify="center"
                       p="xl"
                       gap="sm"
-                      style={isDesktopLayout ? { flex: 1 } : undefined}
+                      style={isDesktopLayout ? { flex: 1, minHeight: 0 } : undefined}
                     >
                       <IconAlertCircle size={24} color="var(--mantine-color-red-6)" />
                       <Text fw={600}>{fetchError}</Text>
@@ -1183,7 +1226,17 @@ const MenuItemsPage: FC = () => {
                       </Button>
                     </Stack>
                   ) : (
-                    <ScrollArea type="auto" style={isDesktopLayout ? { flex: 1 } : undefined}>
+                    <ScrollArea
+                      type="auto"
+                      style={
+                        isDesktopLayout
+                          ? {
+                              flex: 1,
+                              minHeight: 0,
+                            }
+                          : undefined
+                      }
+                    >
                       <Table highlightOnHover withColumnBorders>
                         <Table.Thead>
                           <Table.Tr>
