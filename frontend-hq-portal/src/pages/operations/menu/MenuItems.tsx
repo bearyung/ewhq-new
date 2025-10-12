@@ -826,25 +826,25 @@ const MenuItemsPage: FC = () => {
     });
 
   const renderTags = (item: MenuItemSummary) => (
-    <Group gap="xs">
-      <Badge variant="light" color={item.enabled ? 'green' : 'gray'}>
+    <Group gap="xs" style={{ flexWrap: 'wrap' }}>
+      <Badge variant="light" color={item.enabled ? 'green' : 'gray'} size="sm">
         {item.enabled ? 'Enabled' : 'Disabled'}
       </Badge>
-      <Badge variant="light" color={item.isItemShow ? 'blue' : 'gray'}>
+      <Badge variant="light" color={item.isItemShow ? 'blue' : 'gray'} size="sm">
         {item.isItemShow ? 'Visible' : 'Hidden'}
       </Badge>
       {item.hasModifier && (
-        <Badge variant="light" color="violet">
+        <Badge variant="light" color="violet" size="sm">
           Modifiers
         </Badge>
       )}
       {item.isPromoItem && (
-        <Badge variant="light" color="orange">
+        <Badge variant="light" color="orange" size="sm">
           Promo
         </Badge>
       )}
       {item.isManualPrice && (
-        <Badge variant="light" color="red">
+        <Badge variant="light" color="red" size="sm">
           Manual price
         </Badge>
       )}
@@ -853,23 +853,31 @@ const MenuItemsPage: FC = () => {
 
   const itemRows = (itemsResponse?.items ?? []).map((item) => (
     <Table.Tr key={item.itemId}>
-      <Table.Td>
+      <Table.Td style={{ overflow: 'hidden' }}>
         <Stack gap={2}>
-          <Text fw={600}>{item.itemName || item.itemCode}</Text>
-          <Text size="xs" c="dimmed">
+          <Text fw={600} truncate="end">{item.itemName || item.itemCode}</Text>
+          <Text size="xs" c="dimmed" truncate="end">
             Code: {item.itemCode}
           </Text>
           {item.itemPublicDisplayName && (
-            <Text size="xs" c="dimmed">
+            <Text size="xs" c="dimmed" truncate="end">
               Public: {item.itemPublicDisplayName}
             </Text>
           )}
         </Stack>
       </Table.Td>
-      <Table.Td>{getCategoryLabel(item.categoryId)}</Table.Td>
-      <Table.Td>{getDepartmentName(item.departmentId)}</Table.Td>
-      <Table.Td>{renderTags(item)}</Table.Td>
-      <Table.Td>{formatDateTime(item.modifiedDate)}</Table.Td>
+      <Table.Td style={{ overflow: 'hidden' }}>
+        <Text truncate="end">{getCategoryLabel(item.categoryId)}</Text>
+      </Table.Td>
+      <Table.Td style={{ overflow: 'hidden' }}>
+        <Text truncate="end">{getDepartmentName(item.departmentId)}</Text>
+      </Table.Td>
+      <Table.Td style={{ overflow: 'hidden' }}>
+        {renderTags(item)}
+      </Table.Td>
+      <Table.Td style={{ overflow: 'hidden' }}>
+        <Text size="sm" truncate="end">{formatDateTime(item.modifiedDate)}</Text>
+      </Table.Td>
       <Table.Td>
         <Group gap="xs" justify="flex-end">
           {item.hasModifier && (
@@ -892,12 +900,17 @@ const MenuItemsPage: FC = () => {
   ));
 
   return (
-    <Box>
+    <Box
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
+    >
       <Box
         style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
+          flexShrink: 0,
           backgroundColor: 'white',
           borderBottom: '1px solid #E3E8EE',
           minHeight: 48,
@@ -917,48 +930,37 @@ const MenuItemsPage: FC = () => {
         </Container>
       </Box>
 
-      <ScrollingHeader
-        title="Menu Items"
-        subtitle="Browse, filter, and edit items across your menu"
-        actions={
-          <Group>
-            <Button leftSection={<IconPlus size={16} />} onClick={handleCreate} disabled={!brandId}>
-              New item
-            </Button>
-          </Group>
-        }
-        spacing="compact"
-        forceCompact
-        compactShadow={false}
-      />
+      <Box style={{ flexShrink: 0, backgroundColor: 'white' }}>
+        <ScrollingHeader
+          title="Menu Items"
+          subtitle="Browse, filter, and edit items across your menu"
+          actions={
+            <Group>
+              <Button leftSection={<IconPlus size={16} />} onClick={handleCreate} disabled={!brandId}>
+                New item
+              </Button>
+            </Group>
+          }
+          spacing="compact"
+          forceCompact
+          compactShadow={false}
+        />
+      </Box>
 
-      <Container
-        fluid
-        px={0}
-        py={0}
-        style={
-          isDesktopLayout
-            ? {
-                height: `calc(100vh - ${PAGE_CONTENT_OFFSET}px)`,
-                overflow: 'hidden',
-              }
-            : undefined
-        }
+      <Box
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
       >
-        <Box
-          px={0}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: isDesktopLayout ? '100%' : 'auto',
-            ...(isDesktopLayout ? { overflow: 'hidden' } : {}),
-          }}
-        >
-          {!brandId && (
-            <Paper withBorder p="lg" mb="xl">
-              <Group gap="sm">
-                <IconAlertCircle size={20} color="var(--mantine-color-red-6)" />
-                <Stack gap={4}>
+            {!brandId && (
+              <Paper withBorder p="lg" mb="xl">
+                <Group gap="sm">
+                  <IconAlertCircle size={20} color="var(--mantine-color-red-6)" />
+                  <Stack gap={4}>
                   <Text fw={600}>Select a brand to manage menu items</Text>
                   <Text size="sm" c="dimmed">
                     Choose a brand from the header selector to load menu data.
@@ -966,46 +968,51 @@ const MenuItemsPage: FC = () => {
                 </Stack>
               </Group>
             </Paper>
-          )}
+            )}
 
-          <Grid
-            gutter={0}
-            align="stretch"
-            style={
-              isDesktopLayout
-                ? {
-                    flex: 1,
-                    overflow: 'hidden',
-                    paddingInline: 'var(--mantine-spacing-xl)',
-                  }
-                : { paddingInline: 'var(--mantine-spacing-md)' }
-            }
-          >
-            <Grid.Col
-              span={{ base: 12, md: 4, lg: 3 }}
-              style={
-                isDesktopLayout
-                  ? { height: '100%', minHeight: 0, paddingInline: 0 }
-                  : { paddingInline: 0, paddingBottom: 'var(--mantine-spacing-lg)' }
-              }
+            <Flex
+              direction={isDesktopLayout ? 'row' : 'column'}
+              gap={0}
+              style={{
+                ...(isDesktopLayout
+                  ? {
+                      flex: 1,
+                      minHeight: 0,
+                      overflow: 'hidden',
+                    }
+                  : {}),
+                paddingInline: isDesktopLayout ? 0 : 'var(--mantine-spacing-md)',
+              }}
             >
-              <Paper
-                shadow="none"
-                p="md"
-                withBorder={false}
+              <Box
                 style={{
-                  borderRight: isDesktopLayout ? `1px solid ${PANEL_BORDER_COLOR}` : 'none',
                   ...(isDesktopLayout
                     ? {
-                        height: '100%',
+                        width: 320,
+                        flexShrink: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minHeight: 0,
+                      }
+                    : { paddingBottom: 'var(--mantine-spacing-lg)' }),
+                }}
+              >
+                <Paper
+                  shadow="none"
+                  p="md"
+                  style={{
+                    borderRight: isDesktopLayout ? `1px solid ${PANEL_BORDER_COLOR}` : 'none',
+                    ...(isDesktopLayout
+                      ? {
+                        flex: 1,
                         display: 'flex',
                         flexDirection: 'column',
                         overflow: 'hidden',
                         minHeight: 0,
                       }
                     : {}),
-                }}
-              >
+                  }}
+                >
                 <Stack
                   gap="sm"
                   style={
@@ -1069,33 +1076,36 @@ const MenuItemsPage: FC = () => {
                   </ScrollArea>
                 </Stack>
               </Paper>
-            </Grid.Col>
+              </Box>
 
-            <Grid.Col
-              span={{ base: 12, md: 8, lg: 9 }}
-              style={
-                isDesktopLayout
-                  ? { height: '100%', display: 'flex', minHeight: 0, paddingInline: 0 }
-                  : { paddingInline: 0 }
-              }
-            >
+              <Box
+                style={{
+                  ...(isDesktopLayout
+                    ? {
+                        flex: 1,
+                        minWidth: 0,
+                        minHeight: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                      }
+                    : {}),
+                }}
+              >
               <Stack
                 gap={0}
                 style={
                   isDesktopLayout
-                    ? { flex: 1, overflow: 'hidden', minHeight: 0 }
+                    ? { flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }
                     : { gap: 'var(--mantine-spacing-md)' }
                 }
               >
                 <Paper
-                  withBorder
                   shadow="none"
                   p="md"
-                  radius="md"
                   style={{
-                    borderBottomLeftRadius: 0,
-                    borderBottomRightRadius: 0,
-                    borderBottomWidth: 0,
+                    flexShrink: 0,
+                    borderBottom: `1px solid ${PANEL_BORDER_COLOR}`,
                   }}
                 >
                   <Stack gap="md">
@@ -1179,15 +1189,31 @@ const MenuItemsPage: FC = () => {
                     </Group>
                   </Stack>
                 </Paper>
+
                 <Paper
-                  withBorder
                   shadow="none"
-                  radius="md"
+                  p="md"
                   style={{
-                    borderTopLeftRadius: 0,
-                    borderTopRightRadius: 0,
-                    borderTopWidth: 0,
-                    ...(isDesktopLayout
+                    flexShrink: 0,
+                    borderBottom: `1px solid ${PANEL_BORDER_COLOR}`,
+                  }}
+                >
+                  <Group justify="space-between" align="center">
+                    <Text size="sm" c="dimmed">
+                      Showing page {page} of {totalPages} • {totalItems} items
+                    </Text>
+                    <Pagination
+                      value={page}
+                      onChange={setPage}
+                      total={totalPages}
+                      disabled={itemsLoading || totalPages <= 1}
+                    />
+                  </Group>
+                </Paper>
+
+                <Box
+                  style={
+                    isDesktopLayout
                       ? {
                           flex: 1,
                           display: 'flex',
@@ -1195,9 +1221,23 @@ const MenuItemsPage: FC = () => {
                           overflow: 'hidden',
                           minHeight: 0,
                         }
-                      : {}),
-                  }}
+                      : {}
+                  }
                 >
+                  <Paper
+                    shadow="none"
+                    style={
+                      isDesktopLayout
+                        ? {
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            minHeight: 0,
+                          }
+                        : {}
+                    }
+                  >
                   {itemsLoading ? (
                     <Box
                       style={{
@@ -1237,15 +1277,15 @@ const MenuItemsPage: FC = () => {
                           : undefined
                       }
                     >
-                      <Table highlightOnHover withColumnBorders>
+                      <Table highlightOnHover withColumnBorders style={{ tableLayout: 'fixed', minWidth: '100%' }}>
                         <Table.Thead>
                           <Table.Tr>
-                            <Table.Th>Item</Table.Th>
-                            <Table.Th>Category</Table.Th>
-                            <Table.Th>Department</Table.Th>
-                            <Table.Th>Flags</Table.Th>
-                            <Table.Th>Last updated</Table.Th>
-                            <Table.Th style={{ width: 80 }}></Table.Th>
+                            <Table.Th style={{ width: '25%' }}>Item</Table.Th>
+                            <Table.Th style={{ width: '15%' }}>Category</Table.Th>
+                            <Table.Th style={{ width: '12%' }}>Department</Table.Th>
+                            <Table.Th style={{ width: '25%' }}>Flags</Table.Th>
+                            <Table.Th style={{ width: '15%' }}>Last updated</Table.Th>
+                            <Table.Th style={{ width: '8%' }}></Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
@@ -1268,24 +1308,12 @@ const MenuItemsPage: FC = () => {
                       </Table>
                     </ScrollArea>
                   )}
-                </Paper>
-
-                <Group justify="space-between" align="center" px="md" pb="md">
-                  <Text size="sm" c="dimmed">
-                    Showing page {page} of {totalPages} • {totalItems} items
-                  </Text>
-                  <Pagination
-                    value={page}
-                    onChange={setPage}
-                    total={totalPages}
-                    disabled={itemsLoading || totalPages <= 1}
-                  />
-                </Group>
+                  </Paper>
+                </Box>
               </Stack>
-            </Grid.Col>
-          </Grid>
-        </Box>
-      </Container>
+              </Box>
+            </Flex>
+      </Box>
 
       <Drawer
         opened={drawerOpen}
