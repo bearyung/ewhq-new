@@ -18,7 +18,6 @@ import {
   Pagination,
   Paper,
   ScrollArea,
-  SegmentedControl,
   Select,
   Stack,
   Switch,
@@ -33,7 +32,6 @@ import { useDebouncedValue, useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
   IconAlertCircle,
-  IconArrowsSort,
   IconAdjustments,
   IconCheck,
   IconChevronRight,
@@ -42,10 +40,14 @@ import {
   IconSearch,
   IconSparkles,
   IconX,
+  IconSortAscending,
+  IconSortDescending,
+  IconEye,
+  IconEyeOff,
+  IconList,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
-import { ScrollingHeader } from '../../../components/ScrollingHeader';
 import { useBrands } from '../../../contexts/BrandContext';
 import menuItemService from '../../../services/menuItemService';
 import type {
@@ -283,8 +285,6 @@ const MenuItemsPage: FC = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebouncedValue(search, 300);
   const [includeDisabled, setIncludeDisabled] = useState(false);
-  const [modifierFilter, setModifierFilter] = useState<'all' | 'with' | 'without'>('all');
-  const [promoFilter, setPromoFilter] = useState<'all' | 'promo' | 'nonpromo'>('all');
   const [sortBy, setSortBy] = useState<'displayIndex' | 'name' | 'modified'>('displayIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
@@ -393,10 +393,6 @@ const MenuItemsPage: FC = () => {
           categoryId: selectedCategoryId ?? undefined,
           search: debouncedSearch || undefined,
           includeDisabled,
-          hasModifier:
-            modifierFilter === 'with' ? true : modifierFilter === 'without' ? false : undefined,
-          isPromoItem:
-            promoFilter === 'promo' ? true : promoFilter === 'nonpromo' ? false : undefined,
           sortBy,
           sortDirection,
           page,
@@ -412,7 +408,7 @@ const MenuItemsPage: FC = () => {
     };
 
     loadItems();
-  }, [brandId, filtersReady, selectedCategoryId, debouncedSearch, includeDisabled, modifierFilter, promoFilter, sortBy, sortDirection, page]);
+  }, [brandId, filtersReady, selectedCategoryId, debouncedSearch, includeDisabled, sortBy, sortDirection, page]);
 
   const categoryTree = useMemo(() => buildCategoryTree(lookups?.categories ?? []), [lookups?.categories]);
 
@@ -731,10 +727,6 @@ const MenuItemsPage: FC = () => {
         categoryId: selectedCategoryId ?? undefined,
         search: debouncedSearch || undefined,
         includeDisabled,
-        hasModifier:
-          modifierFilter === 'with' ? true : modifierFilter === 'without' ? false : undefined,
-        isPromoItem:
-          promoFilter === 'promo' ? true : promoFilter === 'nonpromo' ? false : undefined,
         sortBy,
         sortDirection,
         page,
@@ -930,23 +922,6 @@ const MenuItemsPage: FC = () => {
         </Container>
       </Box>
 
-      <Box style={{ flexShrink: 0, backgroundColor: 'white' }}>
-        <ScrollingHeader
-          title="Menu Items"
-          subtitle="Browse, filter, and edit items across your menu"
-          actions={
-            <Group>
-              <Button leftSection={<IconPlus size={16} />} onClick={handleCreate} disabled={!brandId}>
-                New item
-              </Button>
-            </Group>
-          }
-          spacing="compact"
-          forceCompact
-          compactShadow={false}
-        />
-      </Box>
-
       <Box
         style={{
           flex: 1,
@@ -1025,8 +1000,12 @@ const MenuItemsPage: FC = () => {
                       : undefined
                   }
                 >
+                  <Group justify="space-between" align="center">
+                    <Text size="xl" fw={700}>Menu Items</Text>
+                  </Group>
+                  <Divider />
                   <Group justify="space-between">
-                    <Text fw={600}>Categories</Text>
+                    <Text fw={600} size="sm">Categories</Text>
                     <Badge variant="light" color="gray">
                       {(itemsResponse?.categoryCounts ?? []).reduce((acc, entry) => acc + entry.itemCount, 0)} items
                     </Badge>
@@ -1096,7 +1075,7 @@ const MenuItemsPage: FC = () => {
                 gap={0}
                 style={
                   isDesktopLayout
-                    ? { flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }
+                    ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }
                     : { gap: 'var(--mantine-spacing-md)' }
                 }
               >
@@ -1108,61 +1087,32 @@ const MenuItemsPage: FC = () => {
                     borderBottom: `1px solid ${PANEL_BORDER_COLOR}`,
                   }}
                 >
-                  <Stack gap="md">
-                    <Group align="flex-end" justify="space-between">
-                      <TextInput
-                        label="Search"
-                        placeholder="Search by name or code"
-                        value={search}
-                        onChange={(event) => {
-                          setSearch(event.currentTarget.value);
+                  <Group gap="xs" wrap="nowrap">
+                    <TextInput
+                      placeholder="Search by name or code"
+                      value={search}
+                      onChange={(event) => {
+                        setSearch(event.currentTarget.value);
+                        setPage(1);
+                      }}
+                      leftSection={<IconSearch size={16} />}
+                      style={{ flex: 1 }}
+                    />
+                    <Tooltip label={includeDisabled ? 'Showing all items' : 'Showing enabled only'} withArrow>
+                      <ActionIcon
+                        variant={includeDisabled ? 'filled' : 'light'}
+                        color={includeDisabled ? 'indigo' : 'gray'}
+                        size="lg"
+                        onClick={() => {
+                          setIncludeDisabled((prev) => !prev);
                           setPage(1);
                         }}
-                        leftSection={<IconSearch size={16} />}
-                        w="60%"
-                      />
-                      <Switch
-                        label="Include disabled"
-                        checked={includeDisabled}
-                        onChange={(event) => {
-                          setIncludeDisabled(event.currentTarget.checked);
-                          setPage(1);
-                        }}
-                      />
-                    </Group>
-
-                    <Group grow>
-                      <SegmentedControl
-                        value={modifierFilter}
-                        onChange={(value) => {
-                          const next = value as 'all' | 'with' | 'without';
-                          setModifierFilter(next);
-                          setPage(1);
-                        }}
-                        data={[
-                          { label: 'All modifiers', value: 'all' },
-                          { label: 'With modifiers', value: 'with' },
-                          { label: 'Without modifiers', value: 'without' },
-                        ]}
-                      />
-                      <SegmentedControl
-                        value={promoFilter}
-                        onChange={(value) => {
-                          const next = value as 'all' | 'promo' | 'nonpromo';
-                          setPromoFilter(next);
-                          setPage(1);
-                        }}
-                        data={[
-                          { label: 'All items', value: 'all' },
-                          { label: 'Promo only', value: 'promo' },
-                          { label: 'Non promo', value: 'nonpromo' },
-                        ]}
-                      />
-                    </Group>
-
-                    <Group>
+                      >
+                        {includeDisabled ? <IconEye size={18} /> : <IconEyeOff size={18} />}
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Sort by" withArrow>
                       <Select
-                        label="Sort by"
                         value={sortBy}
                         onChange={(value) => {
                           if (!value) return;
@@ -1174,39 +1124,58 @@ const MenuItemsPage: FC = () => {
                           { label: 'Name', value: 'name' },
                           { label: 'Last updated', value: 'modified' },
                         ]}
-                        w={220}
+                        w={160}
+                        leftSection={<IconList size={16} />}
                       />
-                      <Button
+                    </Tooltip>
+                    <Tooltip label={sortDirection === 'asc' ? 'Ascending' : 'Descending'} withArrow>
+                      <ActionIcon
                         variant="light"
-                        leftSection={<IconArrowsSort size={16} />}
+                        color="indigo"
+                        size="lg"
                         onClick={() => {
                           setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
                           setPage(1);
                         }}
                       >
-                        {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
-                      </Button>
-                    </Group>
-                  </Stack>
+                        {sortDirection === 'asc' ? (
+                          <IconSortAscending size={18} />
+                        ) : (
+                          <IconSortDescending size={18} />
+                        )}
+                      </ActionIcon>
+                    </Tooltip>
+                    <Button
+                      leftSection={<IconPlus size={16} />}
+                      onClick={handleCreate}
+                      disabled={!brandId}
+                      size="sm"
+                    >
+                      New item
+                    </Button>
+                  </Group>
                 </Paper>
 
                 <Paper
                   shadow="none"
-                  p="md"
+                  px="md"
+                  py="xs"
                   style={{
                     flexShrink: 0,
                     borderBottom: `1px solid ${PANEL_BORDER_COLOR}`,
                   }}
                 >
-                  <Group justify="space-between" align="center">
-                    <Text size="sm" c="dimmed">
-                      Showing page {page} of {totalPages} • {totalItems} items
-                    </Text>
+                  <Group justify="space-between" align="center" gap="xs">
+                    <Badge variant="light" color="gray" size="lg">
+                      {totalItems} rows
+                    </Badge>
                     <Pagination
                       value={page}
                       onChange={setPage}
                       total={totalPages}
                       disabled={itemsLoading || totalPages <= 1}
+                      size="sm"
+                      withEdges={totalPages > 5}
                     />
                   </Group>
                 </Paper>
