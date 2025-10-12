@@ -2,27 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
 import {
   ActionIcon,
-  Alert,
   Badge,
   Box,
   Button,
-  Checkbox,
   Container,
-  Divider,
-  Drawer,
   Flex,
-  Grid,
   Group,
-  Loader,
-  NumberInput,
   Pagination,
   Paper,
-  ScrollArea,
   Select,
   Stack,
-  Switch,
   Table,
-  Tabs,
   Text,
   TextInput,
   Tooltip,
@@ -39,7 +29,6 @@ import {
   IconPlus,
   IconSearch,
   IconSparkles,
-  IconX,
   IconSortAscending,
   IconSortDescending,
   IconEye,
@@ -47,7 +36,7 @@ import {
   IconList,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
-import { useReactTable, createColumnHelper, getCoreRowModel, flexRender } from '@tanstack/react-table';
+import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
@@ -61,113 +50,19 @@ import type {
   MenuItemDetail,
   CategoryItemCount,
 } from '../../../types/menuItem';
-import type { ItemCategory } from '../../../types/itemCategory';
-
-interface CategoryNode extends ItemCategory {
-  children: CategoryNode[];
-}
-
-const PAGE_SIZE = 1000;
-const PANEL_BORDER_COLOR = '#E3E8EE';
-
-const buildCategoryTree = (categories: ItemCategory[]): CategoryNode[] => {
-  const map = new Map<number, CategoryNode>();
-  const roots: CategoryNode[] = [];
-
-  categories.forEach((cat) => {
-    map.set(cat.categoryId, { ...cat, children: [] });
-  });
-
-  categories.forEach((cat) => {
-    const node = map.get(cat.categoryId);
-    if (!node) return;
-
-    const parentId = cat.parentCategoryId;
-    if (parentId !== null && parentId !== undefined && map.has(parentId)) {
-      map.get(parentId)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  });
-
-  const sortFn = (a: CategoryNode, b: CategoryNode) => {
-    if (a.displayIndex !== b.displayIndex) return a.displayIndex - b.displayIndex;
-    return a.categoryName.localeCompare(b.categoryName);
-  };
-
-  const sortTree = (nodes: CategoryNode[]) => {
-    nodes.sort(sortFn);
-    nodes.forEach((node) => sortTree(node.children));
-  };
-
-  sortTree(roots);
-  return roots;
-};
-
-const createBasePayload = (categoryId: number, departmentId: number): MenuItemUpsertPayload => ({
-  itemCode: '',
-  itemName: '',
-  itemNameAlt: '',
-  itemNameAlt2: '',
-  itemNameAlt3: '',
-  itemNameAlt4: '',
-  itemPosName: '',
-  itemPosNameAlt: '',
-  itemPublicDisplayName: '',
-  itemPublicDisplayNameAlt: '',
-  itemPublicPrintedName: '',
-  itemPublicPrintedNameAlt: '',
-  remark: '',
-  remarkAlt: '',
-  imageFileName: '',
-  imageFileName2: '',
-  tableOrderingImageFileName: '',
-  categoryId,
-  departmentId,
-  subDepartmentId: null,
-  displayIndex: 0,
-  enabled: true,
-  isItemShow: true,
-  isPriceShow: true,
-  hasModifier: false,
-  autoRedirectToModifier: false,
-  isModifier: false,
-  modifierGroupHeaderId: null,
-  buttonStyleId: null,
-  isManualPrice: false,
-  isManualName: false,
-  isPromoItem: false,
-  isModifierConcatToParent: false,
-  isFollowSet: false,
-  isFollowSetDynamic: false,
-  isFollowSetStandard: false,
-  isNonDiscountItem: false,
-  isNonServiceChargeItem: false,
-  isStandaloneAndSetItem: null,
-  isGroupRightItem: false,
-  isPrintLabel: false,
-  isPrintLabelTakeaway: false,
-  isPriceInPercentage: false,
-  isPointPaidItem: null,
-  isNoPointEarnItem: null,
-  isNonTaxableItem: null,
-  isItemShowInKitchenChecklist: null,
-  isSoldoutAutoLock: null,
-  isPrepaidRechargeItem: null,
-  isAutoLinkWithRawMaterial: null,
-  isDinein: true,
-  isTakeaway: true,
-  isDelivery: true,
-  isKitchenPrintInRedColor: null,
-  isManualPriceGroup: null,
-  isExcludeLabelCount: null,
-  servingSize: null,
-  systemRemark: '',
-  isNonSalesItem: null,
-  productionSeconds: null,
-  parentItemId: null,
-  isComboRequired: null,
-});
+import { CenterLoader } from './menu-items/CenterLoader';
+import { MenuItemDrawer } from './menu-items/MenuItemDrawer';
+import { MenuItemsCategorySidebar } from './menu-items/MenuItemsCategorySidebar';
+import { VirtualTableRow } from './menu-items/VirtualTableRow';
+import {
+  PAGE_SIZE,
+  PANEL_BORDER_COLOR,
+  buildCategoryTree,
+  createBasePayload,
+  formatDateTime,
+  normalizePayload,
+  type CategoryNode,
+} from './menu-items/menuItemsUtils';
 
 const mapDetailToPayload = (detail: MenuItemDetail): MenuItemUpsertPayload => ({
   itemCode: detail.itemCode,
@@ -234,102 +129,6 @@ const mapDetailToPayload = (detail: MenuItemDetail): MenuItemUpsertPayload => ({
   isComboRequired: detail.isComboRequired ?? null,
 });
 
-const coerceString = (value?: string | null): string | undefined => {
-  if (value === undefined || value === null) return undefined;
-  const trimmed = value.trim();
-  return trimmed === '' ? undefined : trimmed;
-};
-
-const normalizePayload = (payload: MenuItemUpsertPayload): MenuItemUpsertPayload => ({
-  ...payload,
-  itemName: coerceString(payload.itemName) ?? null,
-  itemNameAlt: coerceString(payload.itemNameAlt) ?? null,
-  itemNameAlt2: coerceString(payload.itemNameAlt2) ?? null,
-  itemNameAlt3: coerceString(payload.itemNameAlt3) ?? null,
-  itemNameAlt4: coerceString(payload.itemNameAlt4) ?? null,
-  itemPosName: coerceString(payload.itemPosName) ?? null,
-  itemPosNameAlt: coerceString(payload.itemPosNameAlt) ?? null,
-  itemPublicDisplayName: coerceString(payload.itemPublicDisplayName) ?? null,
-  itemPublicDisplayNameAlt: coerceString(payload.itemPublicDisplayNameAlt) ?? null,
-  itemPublicPrintedName: coerceString(payload.itemPublicPrintedName) ?? null,
-  itemPublicPrintedNameAlt: coerceString(payload.itemPublicPrintedNameAlt) ?? null,
-  remark: coerceString(payload.remark) ?? null,
-  remarkAlt: coerceString(payload.remarkAlt) ?? null,
-  imageFileName: coerceString(payload.imageFileName) ?? null,
-  imageFileName2: coerceString(payload.imageFileName2) ?? null,
-  tableOrderingImageFileName: coerceString(payload.tableOrderingImageFileName) ?? null,
-  systemRemark: coerceString(payload.systemRemark) ?? null,
-});
-
-const formatDateTime = (value?: string) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString();
-};
-
-interface VirtualTableRowProps {
-  row: any;
-  virtualRow: any;
-  totalTableWidth: number;
-  flexRender: any;
-  showActionShadow: boolean;
-}
-
-const VirtualTableRow: FC<VirtualTableRowProps> = ({
-  row,
-  virtualRow,
-  totalTableWidth,
-  flexRender,
-  showActionShadow,
-}) => {
-  const [isHovered, setIsHovered] = useState(false);
-
-  return (
-    <Table.Tr
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: totalTableWidth,
-        height: 48,
-        transform: `translateY(${virtualRow.start}px)`,
-        borderBottom: '1px solid #dee2e6',
-        borderTop: 'none',
-        backgroundColor: isHovered ? 'var(--mantine-color-gray-0)' : 'transparent',
-        transition: 'background-color 100ms ease',
-      }}
-    >
-      {row.getVisibleCells().map((cell: any) => (
-        <Table.Td
-          key={cell.id}
-          style={{
-            overflow: 'hidden',
-            width: cell.column.getSize(),
-            minWidth: cell.column.getSize(),
-            maxWidth: cell.column.getSize(),
-            height: 48,
-            verticalAlign: 'middle',
-            borderBottom: '1px solid #dee2e6',
-            ...(cell.column.id === 'actions' ? {
-              position: 'sticky',
-              right: 0,
-              backgroundColor: isHovered ? 'var(--mantine-color-gray-0)' : 'white',
-              boxShadow: showActionShadow ? 'inset 3px 0 6px -4px rgba(15, 23, 42, 0.2)' : 'none',
-              zIndex: 1,
-              borderBottom: '1px solid #dee2e6',
-              transition: 'background-color 100ms ease, box-shadow 120ms ease',
-            } : {}),
-          }}
-        >
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </Table.Td>
-      ))}
-    </Table.Tr>
-  );
-};
 
 const MenuItemsPage: FC = () => {
   const { selectedBrand } = useBrands();
@@ -374,16 +173,85 @@ const MenuItemsPage: FC = () => {
   const totalItems = itemsResponse?.totalItems ?? 0;
   const totalPages = itemsResponse?.totalPages ?? 1;
 
-  const getCategoryLabel = (categoryId?: number | null) => {
+  const getCategoryLabel = useCallback((categoryId?: number | null) => {
     if (categoryId === null || categoryId === undefined || !lookups) return '—';
     const match = lookups.categories.find((cat) => cat.categoryId === categoryId);
     return match ? match.categoryName : '—';
-  };
+  }, [lookups]);
 
-  const getDepartmentName = (departmentId?: number) => {
+  const getDepartmentName = useCallback((departmentId?: number) => {
     if (departmentId === null || departmentId === undefined || !lookups) return '—';
     return lookups.departments.find((dep) => dep.departmentId === departmentId)?.departmentName ?? '—';
-  };
+  }, [lookups]);
+
+  const resetDrawerState = useCallback(() => {
+    setDrawerOpen(false);
+    setFormData(null);
+    setEditingItemId(null);
+    setSelectedDetail(null);
+    setPriceEdits({});
+    setAvailabilityEdits({});
+    setDetailLoading(false);
+    setActiveTab('basics');
+  }, []);
+
+  const handleDrawerClose = useCallback(() => {
+    if (saving) return;
+    resetDrawerState();
+  }, [resetDrawerState, saving]);
+
+  const handleCreate = useCallback(() => {
+    if (!lookups || lookups.categories.length === 0 || lookups.departments.length === 0) {
+      notifications.show({
+        title: 'Missing data',
+        message: 'Please configure categories and departments before creating items.',
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />,
+      });
+      return;
+    }
+
+    const defaultCategoryId = selectedCategoryId ?? lookups.categories[0].categoryId;
+    const defaultDepartmentId = lookups.departments[0].departmentId;
+
+    setFormData(createBasePayload(defaultCategoryId, defaultDepartmentId));
+    setDrawerMode('create');
+    setEditingItemId(null);
+    setSelectedDetail(null);
+    setPriceEdits({});
+    setAvailabilityEdits({});
+    setActiveTab('basics');
+    setDrawerOpen(true);
+  }, [lookups, selectedCategoryId]);
+
+  const handleEdit = useCallback(async (item: MenuItemSummary) => {
+    if (!brandId) return;
+    setDrawerMode('edit');
+    setDrawerOpen(true);
+    setActiveTab('basics');
+    setFormData(null);
+    setEditingItemId(item.itemId);
+    setSelectedDetail(null);
+    setPriceEdits({});
+    setAvailabilityEdits({});
+    setDetailLoading(true);
+    try {
+      const detail = await menuItemService.getMenuItem(brandId, item.itemId);
+      setSelectedDetail(detail);
+      setFormData(mapDetailToPayload(detail));
+    } catch (error) {
+      console.error('Failed to load item detail', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Unable to load item details',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+      resetDrawerState();
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [brandId, resetDrawerState]);
 
   const columns = useMemo<ColumnDef<MenuItemSummary>[]>(() => [
     {
@@ -500,7 +368,7 @@ const MenuItemsPage: FC = () => {
         </Group>
       ),
     },
-  ], [lookups]);
+  ], [getCategoryLabel, getDepartmentName, handleEdit, navigate]);
 
   const table = useReactTable({
     data: itemsResponse?.items ?? [],
@@ -722,6 +590,11 @@ const MenuItemsPage: FC = () => {
     return map;
   }, [itemsResponse?.categoryCounts]);
 
+  const totalCategoryItems = useMemo(
+    () => (itemsResponse?.categoryCounts ?? []).reduce((acc, entry) => acc + entry.itemCount, 0),
+    [itemsResponse?.categoryCounts],
+  );
+
   useEffect(() => {
     const container = tableContainerRef.current;
     if (!container) {
@@ -755,59 +628,6 @@ const MenuItemsPage: FC = () => {
   useEffect(() => {
     updateActionShadow();
   }, [updateActionShadow, rows.length, totalTableWidth, isDesktopLayout]);
-
-  const handleCreate = () => {
-    if (!lookups || lookups.categories.length === 0 || lookups.departments.length === 0) {
-      notifications.show({
-        title: 'Missing data',
-        message: 'Please configure categories and departments before creating items.',
-        color: 'orange',
-        icon: <IconAlertCircle size={16} />,
-      });
-      return;
-    }
-
-    const defaultCategoryId = selectedCategoryId ?? lookups.categories[0].categoryId;
-    const defaultDepartmentId = lookups.departments[0].departmentId;
-
-    setFormData(createBasePayload(defaultCategoryId, defaultDepartmentId));
-    setDrawerMode('create');
-    setEditingItemId(null);
-    setSelectedDetail(null);
-    setPriceEdits({});
-    setAvailabilityEdits({});
-    setActiveTab('basics');
-    setDrawerOpen(true);
-  };
-
-  const handleEdit = async (item: MenuItemSummary) => {
-    if (!brandId) return;
-    setDrawerMode('edit');
-    setDrawerOpen(true);
-    setActiveTab('basics');
-    setFormData(null);
-    setEditingItemId(item.itemId);
-    setSelectedDetail(null);
-    setPriceEdits({});
-    setAvailabilityEdits({});
-    setDetailLoading(true);
-    try {
-      const detail = await menuItemService.getMenuItem(brandId, item.itemId);
-      setSelectedDetail(detail);
-      setFormData(mapDetailToPayload(detail));
-    } catch (error) {
-      console.error('Failed to load item detail', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Unable to load item details',
-        color: 'red',
-        icon: <IconAlertCircle size={16} />,
-      });
-      setDrawerOpen(false);
-    } finally {
-      setDetailLoading(false);
-    }
-  };
 
   const updatePriceEdit = (shopId: number, changes: Partial<{ price: number | null; enabled: boolean }>) => {
     setPriceEdits((prev) => {
@@ -974,12 +794,7 @@ const MenuItemsPage: FC = () => {
         });
       }
 
-      setDrawerOpen(false);
-      setFormData(null);
-      setEditingItemId(null);
-      setSelectedDetail(null);
-      setPriceEdits({});
-      setAvailabilityEdits({});
+      resetDrawerState();
       // Refresh list
       const response = await menuItemService.getMenuItems(brandId, {
         categoryId: selectedCategoryId ?? undefined,
@@ -1177,82 +992,30 @@ const MenuItemsPage: FC = () => {
                     borderRight: isDesktopLayout ? `1px solid ${PANEL_BORDER_COLOR}` : 'none',
                     ...(isDesktopLayout
                       ? {
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden',
-                        minHeight: 0,
-                      }
-                    : {}),
-                  }}
-                >
-                <Stack
-                  gap="sm"
-                  style={
-                    isDesktopLayout
-                      ? {
                           flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
                           overflow: 'hidden',
                           minHeight: 0,
                         }
-                      : undefined
-                  }
+                      : {}),
+                  }}
                 >
-                  <Group justify="space-between" align="center">
-                    <Text size="xl" fw={700}>Menu Items</Text>
-                  </Group>
-                  <Divider />
-                  <Group justify="space-between">
-                    <Text fw={600} size="sm">Categories</Text>
-                    <Badge variant="light" color="gray">
-                      {(itemsResponse?.categoryCounts ?? []).reduce((acc, entry) => acc + entry.itemCount, 0)} items
-                    </Badge>
-                  </Group>
-                  <TextInput
-                    placeholder="Search categories"
-                    value={categorySearch}
-                    onChange={(event) => setCategorySearch(event.currentTarget.value)}
-                    leftSection={<IconSearch size={16} />}
-                  />
-                  <Button
-                    variant={selectedCategoryId === null ? 'filled' : 'subtle'}
-                    color={selectedCategoryId === null ? 'indigo' : 'gray'}
-                    leftSection={<IconSparkles size={16} />}
-                    onClick={() => {
+                  <MenuItemsCategorySidebar
+                    isDesktopLayout={isDesktopLayout}
+                    categorySearch={categorySearch}
+                    onCategorySearchChange={(value) => setCategorySearch(value)}
+                    selectedCategoryId={selectedCategoryId}
+                    totalCategoryItems={totalCategoryItems}
+                    lookupsLoading={lookupsLoading}
+                    filteredCategories={filteredCategories}
+                    renderCategoryNodes={renderCategoryNodes}
+                    onAllItems={() => {
                       setSelectedCategoryId(null);
                       setPage(1);
                     }}
-                  >
-                    All items
-                  </Button>
-                  <Divider label="Browse" labelPosition="center" />
-                  <ScrollArea
-                    type="auto"
-                    offsetScrollbars
-                    style={
-                      isDesktopLayout
-                        ? {
-                            flex: 1,
-                            minHeight: 0,
-                          }
-                        : undefined
-                    }
-                  >
-                    {lookupsLoading ? (
-                      <CenterLoader message="Loading categories" />
-                    ) : filteredCategories.length > 0 ? (
-                      <Stack gap="sm">{renderCategoryNodes(filteredCategories)}</Stack>
-                    ) : (
-                      <Stack gap="xs" align="center" py="md">
-                        <IconSparkles size={20} color="var(--mantine-color-gray-6)" />
-                        <Text size="sm" c="dimmed" ta="center">
-                          No categories match your search.
-                        </Text>
-                      </Stack>
-                    )}
-                  </ScrollArea>
-                </Stack>
-              </Paper>
+                  />
+                </Paper>
               </Box>
 
               <Box
@@ -1464,7 +1227,6 @@ const MenuItemsPage: FC = () => {
                     >
                       <div style={{
                         position: 'sticky',
-                        WebkitPosition: 'sticky' as any,
                         top: 0,
                         left: 0,
                         zIndex: 10,
@@ -1531,12 +1293,11 @@ const MenuItemsPage: FC = () => {
                               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                                 const row = rows[virtualRow.index];
                                 return (
-                                  <VirtualTableRow
+                                  <VirtualTableRow<MenuItemSummary>
                                     key={row.id}
                                     row={row}
                                     virtualRow={virtualRow}
                                     totalTableWidth={totalTableWidth}
-                                    flexRender={flexRender}
                                     showActionShadow={showActionShadow}
                                   />
                                 );
@@ -1553,546 +1314,32 @@ const MenuItemsPage: FC = () => {
             </Flex>
       </Box>
 
-      <Drawer
+      <MenuItemDrawer
         opened={drawerOpen}
-        onClose={() => {
-          if (!saving) {
-            setDrawerOpen(false);
-            setFormData(null);
-            setEditingItemId(null);
-            setSelectedDetail(null);
-            setPriceEdits({});
-            setAvailabilityEdits({});
-            setDetailLoading(false);
-          }
-        }}
-        position="right"
-        size="lg"
         title={drawerMode === 'create' ? 'Create menu item' : 'Edit menu item'}
-        overlayProps={{ opacity: 0.15 }}
-      >
-        {detailLoading ? (
-          <CenterLoader message="Loading item" />
-        ) : formData ? (
-          <Stack gap="lg">
-            <Tabs value={activeTab} onChange={(value) => value && setActiveTab(value)}>
-              <Tabs.List>
-                <Tabs.Tab value="basics" leftSection={<IconChevronRight size={14} />}>Basics</Tabs.Tab>
-                <Tabs.Tab value="display" leftSection={<IconChevronRight size={14} />}>Display</Tabs.Tab>
-                <Tabs.Tab value="availability" leftSection={<IconChevronRight size={14} />}>Availability</Tabs.Tab>
-                <Tabs.Tab value="advanced" leftSection={<IconChevronRight size={14} />}>Advanced</Tabs.Tab>
-              </Tabs.List>
-
-              <Tabs.Panel value="basics" mt="md">
-                <Stack gap="md">
-                  <Group grow align="flex-start">
-                    <TextInput
-                      label="Item code"
-                      required
-                      value={formData.itemCode}
-                      onChange={(event) => updateForm('itemCode', event.currentTarget.value)}
-                    />
-                    <NumberInput
-                      label="Display order"
-                      value={formData.displayIndex}
-                      onChange={(value) => updateForm('displayIndex', Number(value) || 0)}
-                      min={0}
-                    />
-                  </Group>
-                  <TextInput
-                    label="Item name"
-                    value={formData.itemName ?? ''}
-                    onChange={(event) => updateForm('itemName', event.currentTarget.value)}
-                  />
-                  <Group grow>
-                    <Select
-                      label="Category"
-                      data={(lookups?.categories ?? []).map((cat) => ({
-                        value: String(cat.categoryId),
-                        label: cat.categoryName,
-                      }))}
-                      value={String(formData.categoryId)}
-                      onChange={(value) => {
-                        if (value) updateForm('categoryId', parseInt(value, 10));
-                      }}
-                    />
-                    <Select
-                      label="Department"
-                      data={(lookups?.departments ?? []).map((dep) => ({
-                        value: String(dep.departmentId),
-                        label: dep.departmentName,
-                      }))}
-                      value={String(formData.departmentId)}
-                      onChange={(value) => {
-                        if (value) updateForm('departmentId', parseInt(value, 10));
-                      }}
-                    />
-                  </Group>
-                  <Group>
-                    <Checkbox
-                      label="Enabled"
-                      checked={formData.enabled}
-                      onChange={(event) => updateForm('enabled', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="Show item"
-                      checked={formData.isItemShow}
-                      onChange={(event) => updateForm('isItemShow', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="Show price"
-                      checked={formData.isPriceShow}
-                      onChange={(event) => updateForm('isPriceShow', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="Promo item"
-                      checked={formData.isPromoItem}
-                      onChange={(event) => updateForm('isPromoItem', event.currentTarget.checked)}
-                    />
-                  </Group>
-                  <Divider label="Modifiers" labelPosition="center" />
-                  <Group align="flex-end" grow>
-                    <Switch
-                      label="Has modifiers"
-                      checked={formData.hasModifier}
-                      onChange={(event) => {
-                        const value = event.currentTarget.checked;
-                        updateForm('hasModifier', value);
-                        if (!value) {
-                          updateForm('modifierGroupHeaderId', null);
-                          updateForm('autoRedirectToModifier', false);
-                        }
-                      }}
-                    />
-                    <Switch
-                      label="Auto open modifier screen"
-                      checked={formData.autoRedirectToModifier}
-                      onChange={(event) => updateForm('autoRedirectToModifier', event.currentTarget.checked)}
-                      disabled={!formData.hasModifier}
-                    />
-                  </Group>
-                  <Select
-                    label="Modifier group"
-                    placeholder="No group linked"
-                    data={(lookups?.modifierGroups ?? []).map((group) => ({
-                      value: String(group.groupHeaderId),
-                      label: group.groupBatchName,
-                    }))}
-                    value={formData.modifierGroupHeaderId ? String(formData.modifierGroupHeaderId) : null}
-                    onChange={(value) =>
-                      updateForm('modifierGroupHeaderId', value ? parseInt(value, 10) : null)
-                    }
-                    disabled={!formData.hasModifier}
-                  />
-                  <Select
-                    label="Button style"
-                    placeholder="Default"
-                    data={(lookups?.buttonStyles ?? []).map((style) => ({
-                      value: String(style.buttonStyleId),
-                      label: style.styleName,
-                    }))}
-                    value={formData.buttonStyleId ? String(formData.buttonStyleId) : null}
-                    onChange={(value) => updateForm('buttonStyleId', value ? parseInt(value, 10) : null)}
-                  />
-                </Stack>
-              </Tabs.Panel>
-
-              <Tabs.Panel value="display" mt="md">
-                <Stack gap="md">
-                  <TextInput
-                    label="POS display name"
-                    value={formData.itemPosName ?? ''}
-                    onChange={(event) => updateForm('itemPosName', event.currentTarget.value)}
-                  />
-                  <TextInput
-                    label="Public display name"
-                    value={formData.itemPublicDisplayName ?? ''}
-                    onChange={(event) => updateForm('itemPublicDisplayName', event.currentTarget.value)}
-                  />
-                  <TextInput
-                    label="POS display name (alt)"
-                    value={formData.itemPosNameAlt ?? ''}
-                    onChange={(event) => updateForm('itemPosNameAlt', event.currentTarget.value)}
-                  />
-                  <TextInput
-                    label="Public display name (alt)"
-                    value={formData.itemPublicDisplayNameAlt ?? ''}
-                    onChange={(event) => updateForm('itemPublicDisplayNameAlt', event.currentTarget.value)}
-                  />
-                  <TextInput
-                    label="POS printed name"
-                    value={formData.itemPublicPrintedName ?? ''}
-                    onChange={(event) => updateForm('itemPublicPrintedName', event.currentTarget.value)}
-                  />
-                  <TextInput
-                    label="Staff note"
-                    value={formData.remark ?? ''}
-                    onChange={(event) => updateForm('remark', event.currentTarget.value)}
-                  />
-                  <TextInput
-                    label="Image file"
-                    value={formData.imageFileName ?? ''}
-                    onChange={(event) => updateForm('imageFileName', event.currentTarget.value)}
-                  />
-                </Stack>
-              </Tabs.Panel>
-
-              <Tabs.Panel value="availability" mt="md">
-                <Stack gap="md">
-                  <Group>
-                    <Checkbox
-                      label="Dine-in"
-                      checked={formData.isDinein}
-                      onChange={(event) => updateForm('isDinein', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="Takeaway"
-                      checked={formData.isTakeaway}
-                      onChange={(event) => updateForm('isTakeaway', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="Delivery"
-                      checked={formData.isDelivery}
-                      onChange={(event) => updateForm('isDelivery', event.currentTarget.checked)}
-                    />
-                  </Group>
-                  <Group grow>
-                    <NumberInput
-                      label="Serving size"
-                      value={formData.servingSize ?? undefined}
-                      onChange={(value) => updateForm('servingSize', value === '' ? null : Number(value))}
-                      min={0}
-                      step={0.1}
-                    />
-                    <NumberInput
-                      label="Production seconds"
-                      value={formData.productionSeconds ?? undefined}
-                      onChange={(value) => updateForm('productionSeconds', value === '' ? null : Number(value))}
-                      min={0}
-                    />
-                  </Group>
-                  <Switch
-                    label="Show in kitchen checklist"
-                    checked={Boolean(formData.isItemShowInKitchenChecklist)}
-                    onChange={(event) => updateForm('isItemShowInKitchenChecklist', event.currentTarget.checked)}
-                  />
-                  <Divider label="Shop overrides" labelPosition="center" />
-                  {drawerMode === 'create' ? (
-                    <Alert variant="light" color="blue">
-                      Pricing and shop availability overrides will be available once the item has been created.
-                    </Alert>
-                  ) : detailLoading ? (
-                    <CenterLoader message="Loading shop data" />
-                  ) : selectedDetail ? (
-                    <Stack gap="lg">
-                      <Stack gap="sm">
-                        <Text fw={600}>Pricing by shop</Text>
-                        <ScrollArea type="auto" h={220} offsetScrollbars>
-                          <Table horizontalSpacing="md" verticalSpacing="sm">
-                            <Table.Thead>
-                              <Table.Tr>
-                                <Table.Th>Shop</Table.Th>
-                                <Table.Th>Price</Table.Th>
-                                <Table.Th>Enabled</Table.Th>
-                                <Table.Th>Last updated</Table.Th>
-                                <Table.Th align="right">Actions</Table.Th>
-                              </Table.Tr>
-                            </Table.Thead>
-                            <Table.Tbody>
-                              {selectedDetail.prices.length === 0 ? (
-                                <Table.Tr>
-                                  <Table.Td colSpan={5}>
-                                    <Text size="sm" c="dimmed">
-                                      No shop pricing data is available.
-                                    </Text>
-                                  </Table.Td>
-                                </Table.Tr>
-                              ) : (
-                                selectedDetail.prices.map((price) => {
-                                  const state = priceEdits[price.shopId] ?? {
-                                    price: price.price ?? null,
-                                    enabled: price.enabled,
-                                  };
-
-                                  return (
-                                    <Table.Tr key={`price-${price.shopId}`}>
-                                      <Table.Td>
-                                        <Text fw={500}>{price.shopName}</Text>
-                                      </Table.Td>
-                                      <Table.Td style={{ width: 140 }}>
-                                        <NumberInput
-                                          value={state.price ?? undefined}
-                                          min={0}
-                                          step={0.1}
-                                          onChange={(value) => {
-                                            if (value === '' || value === null) {
-                                              updatePriceEdit(price.shopId, { price: null });
-                                              return;
-                                            }
-
-                                            const numeric = typeof value === 'number' ? value : Number(value);
-                                            if (!Number.isFinite(numeric)) {
-                                              updatePriceEdit(price.shopId, { price: null });
-                                              return;
-                                            }
-                                            const normalised = Math.round(Number(numeric) * 100) / 100;
-                                            updatePriceEdit(price.shopId, {
-                                              price: normalised,
-                                            });
-                                          }}
-                                        />
-                                      </Table.Td>
-                                      <Table.Td style={{ width: 120 }}>
-                                        <Switch
-                                          checked={state.enabled}
-                                          onChange={(event) =>
-                                            updatePriceEdit(price.shopId, {
-                                              enabled: event.currentTarget.checked,
-                                            })
-                                          }
-                                        />
-                                      </Table.Td>
-                                      <Table.Td style={{ width: 180 }}>
-                                        {price.modifiedDate ? (
-                                          <Tooltip
-                                            label={`Updated by ${price.modifiedBy ?? 'unknown user'}`}
-                                            withArrow
-                                          >
-                                            <Text size="xs">{formatDateTime(price.modifiedDate)}</Text>
-                                          </Tooltip>
-                                        ) : (
-                                          <Text size="xs" c="dimmed">
-                                            —
-                                          </Text>
-                                        )}
-                                      </Table.Td>
-                                      <Table.Td align="right" style={{ width: 120 }}>
-                                        <Button
-                                          size="xs"
-                                          variant="light"
-                                          loading={priceSavingShopId === price.shopId}
-                                          leftSection={priceSavingShopId === price.shopId ? undefined : <IconCheck size={14} />}
-                                          onClick={() => handleSavePrice(price.shopId)}
-                                        >
-                                          Save
-                                        </Button>
-                                      </Table.Td>
-                                    </Table.Tr>
-                                  );
-                                })
-                              )}
-                            </Table.Tbody>
-                          </Table>
-                        </ScrollArea>
-                      </Stack>
-
-                      <Stack gap="sm">
-                        <Text fw={600}>Availability by shop</Text>
-                        <ScrollArea type="auto" h={220} offsetScrollbars>
-                          <Table horizontalSpacing="md" verticalSpacing="sm">
-                            <Table.Thead>
-                              <Table.Tr>
-                                <Table.Th>Shop</Table.Th>
-                                <Table.Th>Enabled</Table.Th>
-                                <Table.Th>Out of stock</Table.Th>
-                                <Table.Th>Limited item</Table.Th>
-                                <Table.Th>Last updated</Table.Th>
-                                <Table.Th align="right">Actions</Table.Th>
-                              </Table.Tr>
-                            </Table.Thead>
-                            <Table.Tbody>
-                              {selectedDetail.shopAvailability.length === 0 ? (
-                                <Table.Tr>
-                                  <Table.Td colSpan={6}>
-                                    <Text size="sm" c="dimmed">
-                                      No shop availability records found.
-                                    </Text>
-                                  </Table.Td>
-                                </Table.Tr>
-                              ) : (
-                                selectedDetail.shopAvailability.map((record) => {
-                                  const state = availabilityEdits[record.shopId] ?? {
-                                    enabled: record.enabled ?? false,
-                                    isOutOfStock: record.isOutOfStock ?? false,
-                                    isLimitedItem: record.isLimitedItem ?? false,
-                                  };
-
-                                  return (
-                                    <Table.Tr key={`availability-${record.shopId}`}>
-                                      <Table.Td>
-                                        <Text fw={500}>{record.shopName}</Text>
-                                      </Table.Td>
-                                      <Table.Td style={{ width: 140 }}>
-                                        <Switch
-                                          checked={Boolean(state.enabled)}
-                                          onChange={(event) =>
-                                            updateAvailabilityEdit(record.shopId, {
-                                              enabled: event.currentTarget.checked,
-                                            })
-                                          }
-                                        />
-                                      </Table.Td>
-                                      <Table.Td style={{ width: 160 }}>
-                                        <Switch
-                                          checked={Boolean(state.isOutOfStock)}
-                                          onChange={(event) =>
-                                            updateAvailabilityEdit(record.shopId, {
-                                              isOutOfStock: event.currentTarget.checked,
-                                            })
-                                          }
-                                          color="red"
-                                        />
-                                      </Table.Td>
-                                      <Table.Td style={{ width: 160 }}>
-                                        <Switch
-                                          checked={Boolean(state.isLimitedItem)}
-                                          onChange={(event) =>
-                                            updateAvailabilityEdit(record.shopId, {
-                                              isLimitedItem: event.currentTarget.checked,
-                                            })
-                                          }
-                                          color="orange"
-                                        />
-                                      </Table.Td>
-                                      <Table.Td style={{ width: 180 }}>
-                                        {record.lastUpdated ? (
-                                          <Tooltip
-                                            label={`Updated by ${record.updatedBy ?? 'unknown user'}`}
-                                            withArrow
-                                          >
-                                            <Text size="xs">{formatDateTime(record.lastUpdated)}</Text>
-                                          </Tooltip>
-                                        ) : (
-                                          <Text size="xs" c="dimmed">
-                                            —
-                                          </Text>
-                                        )}
-                                      </Table.Td>
-                                      <Table.Td align="right" style={{ width: 120 }}>
-                                        <Button
-                                          size="xs"
-                                          variant="light"
-                                          loading={availabilitySavingShopId === record.shopId}
-                                          leftSection={availabilitySavingShopId === record.shopId ? undefined : <IconCheck size={14} />}
-                                          onClick={() => handleSaveAvailability(record.shopId)}
-                                        >
-                                          Save
-                                        </Button>
-                                      </Table.Td>
-                                    </Table.Tr>
-                                  );
-                                })
-                              )}
-                            </Table.Tbody>
-                          </Table>
-                        </ScrollArea>
-                      </Stack>
-                    </Stack>
-                  ) : (
-                    <Alert variant="light" color="blue">
-                      Select a menu item to view shop-specific overrides.
-                    </Alert>
-                  )}
-                </Stack>
-              </Tabs.Panel>
-
-              <Tabs.Panel value="advanced" mt="md">
-                <Stack gap="md">
-                  <Group>
-                    <Checkbox
-                      label="Manual price"
-                      checked={formData.isManualPrice}
-                      onChange={(event) => updateForm('isManualPrice', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="Manual name"
-                      checked={formData.isManualName}
-                      onChange={(event) => updateForm('isManualName', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="Non discountable"
-                      checked={formData.isNonDiscountItem}
-                      onChange={(event) => updateForm('isNonDiscountItem', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="Non service charge"
-                      checked={formData.isNonServiceChargeItem}
-                      onChange={(event) => updateForm('isNonServiceChargeItem', event.currentTarget.checked)}
-                    />
-                  </Group>
-                  <Group>
-                    <Checkbox
-                      label="Allow points payment"
-                      checked={Boolean(formData.isPointPaidItem)}
-                      onChange={(event) => updateForm('isPointPaidItem', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="No point earning"
-                      checked={Boolean(formData.isNoPointEarnItem)}
-                      onChange={(event) => updateForm('isNoPointEarnItem', event.currentTarget.checked)}
-                    />
-                    <Checkbox
-                      label="Non taxable"
-                      checked={Boolean(formData.isNonTaxableItem)}
-                      onChange={(event) => updateForm('isNonTaxableItem', event.currentTarget.checked)}
-                    />
-                  </Group>
-                  <Checkbox
-                    label="Combo required"
-                    checked={Boolean(formData.isComboRequired)}
-                    onChange={(event) => updateForm('isComboRequired', event.currentTarget.checked)}
-                  />
-                  <TextInput
-                    label="System remark"
-                    value={formData.systemRemark ?? ''}
-                    onChange={(event) => updateForm('systemRemark', event.currentTarget.value)}
-                  />
-                </Stack>
-              </Tabs.Panel>
-            </Tabs>
-
-            <Divider />
-            <Group justify="space-between">
-              <Button
-                variant="subtle"
-                color="gray"
-                leftSection={<IconX size={16} />}
-                onClick={() => {
-                  setDrawerOpen(false);
-                  setFormData(null);
-                }}
-                disabled={saving}
-              >
-                Cancel
-              </Button>
-              <Button
-                leftSection={saving ? <Loader size="xs" /> : <IconCheck size={16} />}
-                onClick={handleSubmit}
-                disabled={saving}
-              >
-                Save changes
-              </Button>
-            </Group>
-          </Stack>
-        ) : (
-          <CenterLoader message="Loading item" />
-        )}
-      </Drawer>
+        saving={saving}
+        detailLoading={detailLoading}
+        formData={formData}
+        lookups={lookups}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onClose={handleDrawerClose}
+        onCancel={handleDrawerClose}
+        drawerMode={drawerMode}
+        updateForm={updateForm}
+        selectedDetail={selectedDetail}
+        priceEdits={priceEdits}
+        availabilityEdits={availabilityEdits}
+        updatePriceEdit={updatePriceEdit}
+        updateAvailabilityEdit={updateAvailabilityEdit}
+        handleSavePrice={handleSavePrice}
+        handleSaveAvailability={handleSaveAvailability}
+        priceSavingShopId={priceSavingShopId}
+        availabilitySavingShopId={availabilitySavingShopId}
+        onSubmit={handleSubmit}
+      />
     </Box>
   );
 };
-
-function CenterLoader({ message }: { message?: string }) {
-  return (
-    <Stack align="center" justify="center" py="lg" gap="xs">
-      <Loader color="indigo" />
-      {message && (
-        <Text size="sm" c="dimmed">
-          {message}
-        </Text>
-      )}
-    </Stack>
-  );
-}
 
 export default MenuItemsPage;
