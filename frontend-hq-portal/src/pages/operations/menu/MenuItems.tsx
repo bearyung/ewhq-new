@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
 import {
   ActionIcon,
@@ -47,6 +47,9 @@ import {
   IconList,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useReactTable, createColumnHelper, getCoreRowModel, flexRender } from '@tanstack/react-table';
+import type { ColumnDef } from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../contexts/BrandContext';
 import menuItemService from '../../../services/menuItemService';
@@ -64,9 +67,8 @@ interface CategoryNode extends ItemCategory {
   children: CategoryNode[];
 }
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 1000;
 const PANEL_BORDER_COLOR = '#E3E8EE';
-const PAGE_CONTENT_OFFSET = 96; // Breadcrumb (48) + compact header (48)
 
 const buildCategoryTree = (categories: ItemCategory[]): CategoryNode[] => {
   const map = new Map<number, CategoryNode>();
@@ -266,6 +268,69 @@ const formatDateTime = (value?: string) => {
   return date.toLocaleString();
 };
 
+interface VirtualTableRowProps {
+  row: any;
+  virtualRow: any;
+  totalTableWidth: number;
+  flexRender: any;
+  showActionShadow: boolean;
+}
+
+const VirtualTableRow: FC<VirtualTableRowProps> = ({
+  row,
+  virtualRow,
+  totalTableWidth,
+  flexRender,
+  showActionShadow,
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <Table.Tr
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: totalTableWidth,
+        height: 48,
+        transform: `translateY(${virtualRow.start}px)`,
+        borderBottom: '1px solid #dee2e6',
+        borderTop: 'none',
+        backgroundColor: isHovered ? 'var(--mantine-color-gray-0)' : 'transparent',
+        transition: 'background-color 100ms ease',
+      }}
+    >
+      {row.getVisibleCells().map((cell: any) => (
+        <Table.Td
+          key={cell.id}
+          style={{
+            overflow: 'hidden',
+            width: cell.column.getSize(),
+            minWidth: cell.column.getSize(),
+            maxWidth: cell.column.getSize(),
+            height: 48,
+            verticalAlign: 'middle',
+            borderBottom: '1px solid #dee2e6',
+            ...(cell.column.id === 'actions' ? {
+              position: 'sticky',
+              right: 0,
+              backgroundColor: isHovered ? 'var(--mantine-color-gray-0)' : 'white',
+              boxShadow: showActionShadow ? 'inset 3px 0 6px -4px rgba(15, 23, 42, 0.2)' : 'none',
+              zIndex: 1,
+              borderBottom: '1px solid #dee2e6',
+              transition: 'background-color 100ms ease, box-shadow 120ms ease',
+            } : {}),
+          }}
+        >
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+        </Table.Td>
+      ))}
+    </Table.Tr>
+  );
+};
+
 const MenuItemsPage: FC = () => {
   const { selectedBrand } = useBrands();
   const brandId = selectedBrand ? parseInt(selectedBrand, 10) : null;
@@ -281,6 +346,7 @@ const MenuItemsPage: FC = () => {
 
   const [categorySearch, setCategorySearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [showActionShadow, setShowActionShadow] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebouncedValue(search, 300);
@@ -301,6 +367,178 @@ const MenuItemsPage: FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [priceSavingShopId, setPriceSavingShopId] = useState<number | null>(null);
   const [availabilitySavingShopId, setAvailabilitySavingShopId] = useState<number | null>(null);
+
+  // Table virtualization setup
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const totalItems = itemsResponse?.totalItems ?? 0;
+  const totalPages = itemsResponse?.totalPages ?? 1;
+
+  const getCategoryLabel = (categoryId?: number | null) => {
+    if (categoryId === null || categoryId === undefined || !lookups) return '—';
+    const match = lookups.categories.find((cat) => cat.categoryId === categoryId);
+    return match ? match.categoryName : '—';
+  };
+
+  const getDepartmentName = (departmentId?: number) => {
+    if (departmentId === null || departmentId === undefined || !lookups) return '—';
+    return lookups.departments.find((dep) => dep.departmentId === departmentId)?.departmentName ?? '—';
+  };
+
+  const columns = useMemo<ColumnDef<MenuItemSummary>[]>(() => [
+    {
+      accessorKey: 'itemCode',
+      header: 'Code',
+      size: 100,
+      cell: ({ row }) => (
+        <Text size="sm" fw={500} truncate="end">{row.original.itemCode}</Text>
+      ),
+    },
+    {
+      accessorKey: 'itemName',
+      header: 'Item Name',
+      size: 180,
+      cell: ({ row }) => (
+        <Text size="sm" truncate="end">{row.original.itemName || '—'}</Text>
+      ),
+    },
+    {
+      accessorKey: 'categoryId',
+      header: 'Category',
+      size: 140,
+      cell: ({ row }) => (
+        <Text size="sm" truncate="end">{getCategoryLabel(row.original.categoryId)}</Text>
+      ),
+    },
+    {
+      accessorKey: 'departmentId',
+      header: 'Department',
+      size: 110,
+      cell: ({ row }) => (
+        <Text size="sm" truncate="end">{getDepartmentName(row.original.departmentId)}</Text>
+      ),
+    },
+    {
+      accessorKey: 'enabled',
+      header: 'Enabled',
+      size: 80,
+      cell: ({ row }) => (
+        <Badge variant="light" color={row.original.enabled ? 'green' : 'gray'} size="sm">
+          {row.original.enabled ? 'Yes' : 'No'}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'isItemShow',
+      header: 'Visible',
+      size: 80,
+      cell: ({ row }) => (
+        <Badge variant="light" color={row.original.isItemShow ? 'blue' : 'gray'} size="sm">
+          {row.original.isItemShow ? 'Yes' : 'No'}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'hasModifier',
+      header: 'Modifiers',
+      size: 85,
+      cell: ({ row }) => row.original.hasModifier ? (
+        <Badge variant="light" color="violet" size="sm">Yes</Badge>
+      ) : (
+        <Text size="sm" c="dimmed">—</Text>
+      ),
+    },
+    {
+      accessorKey: 'isPromoItem',
+      header: 'Promo',
+      size: 70,
+      cell: ({ row }) => row.original.isPromoItem ? (
+        <Badge variant="light" color="orange" size="sm">Yes</Badge>
+      ) : (
+        <Text size="sm" c="dimmed">—</Text>
+      ),
+    },
+    {
+      accessorKey: 'isManualPrice',
+      header: 'Manual',
+      size: 75,
+      cell: ({ row }) => row.original.isManualPrice ? (
+        <Badge variant="light" color="red" size="sm">Yes</Badge>
+      ) : (
+        <Text size="sm" c="dimmed">—</Text>
+      ),
+    },
+    {
+      accessorKey: 'modifiedDate',
+      header: 'Last updated',
+      size: 140,
+      cell: ({ row }) => (
+        <Text size="sm" truncate="end">{formatDateTime(row.original.modifiedDate)}</Text>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      size: 100,
+      cell: ({ row }) => (
+        <Group gap="xs" justify="flex-end" wrap="nowrap">
+          {row.original.hasModifier && (
+            <Tooltip label="Manage modifiers" withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="violet"
+                size="sm"
+                onClick={() => navigate(`/menus/modifiers?itemId=${row.original.itemId}`)}
+              >
+                <IconAdjustments size={16} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+          <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => handleEdit(row.original)}>
+            <IconPencil size={16} />
+          </ActionIcon>
+        </Group>
+      ),
+    },
+  ], [lookups]);
+
+  const table = useReactTable({
+    data: itemsResponse?.items ?? [],
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    manualPagination: true,
+    pageCount: totalPages,
+  });
+
+  const { rows } = table.getRowModel();
+
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 48,
+    overscan: 5,
+  });
+
+  // Calculate total width from all columns for fixed layout
+  const totalTableWidth = table.getAllColumns().reduce((sum, col) => sum + col.getSize(), 0);
+
+  const updateActionShadow = useCallback(() => {
+    const container = tableContainerRef.current;
+    if (!container) {
+      setShowActionShadow(false);
+      return;
+    }
+
+    const { scrollWidth, clientWidth, scrollLeft } = container;
+    const hasHorizontalScroll = scrollWidth - clientWidth > 1;
+    if (!hasHorizontalScroll) {
+      setShowActionShadow(false);
+      return;
+    }
+
+    const isAtRightEdge = scrollLeft + clientWidth >= scrollWidth - 1;
+    setShowActionShadow(!isAtRightEdge);
+  }, []);
 
   useEffect(() => {
     if (!brandId) {
@@ -484,19 +722,39 @@ const MenuItemsPage: FC = () => {
     return map;
   }, [itemsResponse?.categoryCounts]);
 
-  const totalItems = itemsResponse?.totalItems ?? 0;
-  const totalPages = itemsResponse?.totalPages ?? 1;
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) {
+      return;
+    }
 
-  const getCategoryLabel = (categoryId?: number | null) => {
-    if (categoryId === null || categoryId === undefined || !lookups) return '—';
-    const match = lookups.categories.find((cat) => cat.categoryId === categoryId);
-    return match ? match.categoryName : '—';
-  };
+    const handleScroll = () => updateActionShadow();
 
-  const getDepartmentName = (departmentId?: number) => {
-    if (departmentId === null || departmentId === undefined || !lookups) return '—';
-    return lookups.departments.find((dep) => dep.departmentId === departmentId)?.departmentName ?? '—';
-  };
+    container.addEventListener('scroll', handleScroll);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => updateActionShadow());
+      resizeObserver.observe(container);
+    } else {
+      window.addEventListener('resize', handleScroll);
+    }
+
+    updateActionShadow();
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      } else {
+        window.removeEventListener('resize', handleScroll);
+      }
+    };
+  }, [updateActionShadow]);
+
+  useEffect(() => {
+    updateActionShadow();
+  }, [updateActionShadow, rows.length, totalTableWidth, isDesktopLayout]);
 
   const handleCreate = () => {
     if (!lookups || lookups.categories.length === 0 || lookups.departments.length === 0) {
@@ -790,16 +1048,30 @@ const MenuItemsPage: FC = () => {
             <Flex align="center" justify="space-between" pl={depth * 16} gap="sm">
               <Group gap={6} align="center">
                 {hasChildren ? (
-                  <ActionIcon
-                    variant="subtle"
-                    size="sm"
+                  <Box
+                    w={28}
+                    h={28}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 4,
+                      transition: 'background-color 150ms ease',
+                    }}
                     onClick={(event) => {
                       event.stopPropagation();
                       toggleCategoryExpansion(node.categoryId);
                     }}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-1)';
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
                     {isExpanded ? <IconChevronRight size={16} style={{ transform: 'rotate(90deg)' }} /> : <IconChevronRight size={16} />}
-                  </ActionIcon>
+                  </Box>
                 ) : (
                   <Box w={28} />
                 )}
@@ -816,80 +1088,6 @@ const MenuItemsPage: FC = () => {
         </Stack>
       );
     });
-
-  const renderTags = (item: MenuItemSummary) => (
-    <Group gap="xs" style={{ flexWrap: 'wrap' }}>
-      <Badge variant="light" color={item.enabled ? 'green' : 'gray'} size="sm">
-        {item.enabled ? 'Enabled' : 'Disabled'}
-      </Badge>
-      <Badge variant="light" color={item.isItemShow ? 'blue' : 'gray'} size="sm">
-        {item.isItemShow ? 'Visible' : 'Hidden'}
-      </Badge>
-      {item.hasModifier && (
-        <Badge variant="light" color="violet" size="sm">
-          Modifiers
-        </Badge>
-      )}
-      {item.isPromoItem && (
-        <Badge variant="light" color="orange" size="sm">
-          Promo
-        </Badge>
-      )}
-      {item.isManualPrice && (
-        <Badge variant="light" color="red" size="sm">
-          Manual price
-        </Badge>
-      )}
-    </Group>
-  );
-
-  const itemRows = (itemsResponse?.items ?? []).map((item) => (
-    <Table.Tr key={item.itemId}>
-      <Table.Td style={{ overflow: 'hidden' }}>
-        <Stack gap={2}>
-          <Text fw={600} truncate="end">{item.itemName || item.itemCode}</Text>
-          <Text size="xs" c="dimmed" truncate="end">
-            Code: {item.itemCode}
-          </Text>
-          {item.itemPublicDisplayName && (
-            <Text size="xs" c="dimmed" truncate="end">
-              Public: {item.itemPublicDisplayName}
-            </Text>
-          )}
-        </Stack>
-      </Table.Td>
-      <Table.Td style={{ overflow: 'hidden' }}>
-        <Text truncate="end">{getCategoryLabel(item.categoryId)}</Text>
-      </Table.Td>
-      <Table.Td style={{ overflow: 'hidden' }}>
-        <Text truncate="end">{getDepartmentName(item.departmentId)}</Text>
-      </Table.Td>
-      <Table.Td style={{ overflow: 'hidden' }}>
-        {renderTags(item)}
-      </Table.Td>
-      <Table.Td style={{ overflow: 'hidden' }}>
-        <Text size="sm" truncate="end">{formatDateTime(item.modifiedDate)}</Text>
-      </Table.Td>
-      <Table.Td>
-        <Group gap="xs" justify="flex-end">
-          {item.hasModifier && (
-            <Tooltip label="Manage modifiers" withArrow>
-              <ActionIcon
-                variant="subtle"
-                color="violet"
-                onClick={() => navigate(`/menus/modifiers?itemId=${item.itemId}`)}
-              >
-                <IconAdjustments size={16} />
-              </ActionIcon>
-            </Tooltip>
-          )}
-          <ActionIcon variant="subtle" color="indigo" onClick={() => handleEdit(item)}>
-            <IconPencil size={16} />
-          </ActionIcon>
-        </Group>
-      </Table.Td>
-    </Table.Tr>
-  ));
 
   return (
     <Box
@@ -1234,48 +1432,119 @@ const MenuItemsPage: FC = () => {
                         Retry
                       </Button>
                     </Stack>
+                  ) : rows.length === 0 ? (
+                    <Stack
+                      align="center"
+                      justify="center"
+                      p="xl"
+                      gap="sm"
+                      style={isDesktopLayout ? { flex: 1, minHeight: 0 } : undefined}
+                    >
+                      <IconSparkles size={24} color="var(--mantine-color-gray-6)" />
+                      <Text fw={600}>No items found</Text>
+                      <Text size="sm" c="dimmed" ta="center">
+                        Adjust filters or add a new item to this category.
+                      </Text>
+                    </Stack>
                   ) : (
-                    <ScrollArea
-                      type="auto"
-                      style={
-                        isDesktopLayout
+                    <Box
+                      ref={tableContainerRef}
+                      style={{
+                        overflow: 'auto',
+                        position: 'relative',
+                        isolation: 'isolate',
+                        WebkitOverflowScrolling: 'touch',
+                        ...(isDesktopLayout
                           ? {
                               flex: 1,
                               minHeight: 0,
                             }
-                          : undefined
-                      }
+                          : { maxHeight: 600 }),
+                      }}
                     >
-                      <Table highlightOnHover withColumnBorders style={{ tableLayout: 'fixed', minWidth: '100%' }}>
-                        <Table.Thead>
-                          <Table.Tr>
-                            <Table.Th style={{ width: '25%' }}>Item</Table.Th>
-                            <Table.Th style={{ width: '15%' }}>Category</Table.Th>
-                            <Table.Th style={{ width: '12%' }}>Department</Table.Th>
-                            <Table.Th style={{ width: '25%' }}>Flags</Table.Th>
-                            <Table.Th style={{ width: '15%' }}>Last updated</Table.Th>
-                            <Table.Th style={{ width: '8%' }}></Table.Th>
-                          </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                          {itemRows.length > 0 ? (
-                            itemRows
-                          ) : (
-                            <Table.Tr>
-                              <Table.Td colSpan={6}>
-                                <Stack align="center" gap="xs" py="lg">
-                                  <IconSparkles size={24} color="var(--mantine-color-gray-6)" />
-                                  <Text fw={600}>No items found</Text>
-                                  <Text size="sm" c="dimmed" ta="center">
-                                    Adjust filters or add a new item to this category.
-                                  </Text>
-                                </Stack>
-                              </Table.Td>
-                            </Table.Tr>
-                          )}
-                        </Table.Tbody>
-                      </Table>
-                    </ScrollArea>
+                      <div style={{
+                        position: 'sticky',
+                        WebkitPosition: 'sticky' as any,
+                        top: 0,
+                        left: 0,
+                        zIndex: 10,
+                        backgroundColor: 'white',
+                        borderBottom: '1px solid #dee2e6',
+                        transform: 'translateZ(0)',
+                        WebkitTransform: 'translateZ(0)',
+                        willChange: 'transform',
+                        width: totalTableWidth,
+                      }}>
+                        <Table highlightOnHover withColumnBorders style={{
+                          tableLayout: 'fixed',
+                          width: totalTableWidth,
+                        }}>
+                            <Table.Thead>
+                              {table.getHeaderGroups().map((headerGroup) => (
+                                <Table.Tr key={headerGroup.id}>
+                                  {headerGroup.headers.map((header) => (
+                                    <Table.Th
+                                      key={header.id}
+                                      style={{
+                                        backgroundColor: 'white',
+                                        borderBottom: '1px solid #dee2e6',
+                                        width: header.column.getSize(),
+                                        minWidth: header.column.getSize(),
+                                        maxWidth: header.column.getSize(),
+                                        ...(header.id === 'actions' ? {
+                                          position: 'sticky',
+                                          right: 0,
+                                          backgroundColor: 'white',
+                                          boxShadow: showActionShadow ? 'inset 3px 0 6px -4px rgba(15, 23, 42, 0.2)' : 'none',
+                                          zIndex: 1,
+                                          borderBottom: '1px solid #dee2e6',
+                                          transition: 'box-shadow 120ms ease',
+                                        } : {}),
+                                      }}
+                                    >
+                                      {header.isPlaceholder
+                                        ? null
+                                        : flexRender(
+                                            header.column.columnDef.header,
+                                            header.getContext()
+                                          )}
+                                    </Table.Th>
+                                  ))}
+                                </Table.Tr>
+                              ))}
+                            </Table.Thead>
+                          </Table>
+                        </div>
+
+                        <div style={{
+                          position: 'relative',
+                          height: `${rowVirtualizer.getTotalSize()}px`,
+                        }}>
+                          <Table highlightOnHover withColumnBorders style={{
+                            tableLayout: 'fixed',
+                            width: totalTableWidth,
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                          }}>
+                            <Table.Tbody>
+                              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                                const row = rows[virtualRow.index];
+                                return (
+                                  <VirtualTableRow
+                                    key={row.id}
+                                    row={row}
+                                    virtualRow={virtualRow}
+                                    totalTableWidth={totalTableWidth}
+                                    flexRender={flexRender}
+                                    showActionShadow={showActionShadow}
+                                  />
+                                );
+                              })}
+                            </Table.Tbody>
+                          </Table>
+                        </div>
+                    </Box>
                   )}
                   </Paper>
                 </Box>
