@@ -148,6 +148,7 @@ const MenuItemsPage: FC = () => {
   const [itemsResponse, setItemsResponse] = useState<MenuItemListResponse | null>(null);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const [categorySearch, setCategorySearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -215,6 +216,11 @@ const MenuItemsPage: FC = () => {
     },
     [setPage],
   );
+
+  const handleRetry = useCallback(() => {
+    if (itemsLoading) return;
+    setReloadToken((token) => token + 1);
+  }, [itemsLoading]);
 
   useEffect(() => {
     if (searchPopoverOpened) {
@@ -652,7 +658,7 @@ const MenuItemsPage: FC = () => {
     };
 
     loadItems();
-  }, [brandId, filtersReady, selectedCategoryId, debouncedSearch, includeDisabled, sortBy, sortDirection, page]);
+  }, [brandId, filtersReady, selectedCategoryId, debouncedSearch, includeDisabled, sortBy, sortDirection, page, reloadToken]);
 
   const categoryTree = useMemo(() => buildCategoryTree(lookups?.categories ?? []), [lookups?.categories]);
 
@@ -1415,9 +1421,9 @@ const MenuItemsPage: FC = () => {
                       </Button>
                     </Group>
                     <Group gap="sm" align="center">
-                      <Badge variant="light" color="gray" size="lg">
+                      <Text size="xs" c="dimmed">
                         {totalItems} rows
-                      </Badge>
+                      </Text>
                       <Group gap="xs" align="center">
                         <ActionIcon
                           variant="subtle"
@@ -1499,7 +1505,7 @@ const MenuItemsPage: FC = () => {
                     >
                       <IconAlertCircle size={24} color="var(--mantine-color-red-6)" />
                       <Text fw={600}>{fetchError}</Text>
-                      <Button variant="light" onClick={() => setPage((prev) => prev)}>
+                      <Button variant="light" onClick={handleRetry} disabled={itemsLoading}>
                         Retry
                       </Button>
                     </Stack>
