@@ -171,7 +171,25 @@ const MenuItemsPage: FC = () => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const totalItems = itemsResponse?.totalItems ?? 0;
-  const totalPages = itemsResponse?.totalPages ?? 1;
+  const totalPages = useMemo(() => {
+    if (!itemsResponse) {
+      return 1;
+    }
+
+    const expectedPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+    const backendPages = Math.max(1, itemsResponse.totalPages);
+
+    return Math.min(backendPages, expectedPages);
+  }, [itemsResponse, totalItems]);
+
+  useEffect(() => {
+    setPage((prev) => {
+      if (prev > totalPages) {
+        return totalPages;
+      }
+      return prev;
+    });
+  }, [totalPages]);
 
   const getCategoryLabel = useCallback((categoryId?: number | null) => {
     if (categoryId === null || categoryId === undefined || !lookups) return '—';

@@ -17,7 +17,7 @@ namespace EWHQ.Api.Controllers;
 [Authorize]
 public class MenuItemsController : ControllerBase
 {
-    private const int MaxPageSize = 200;
+    private const int MaxPageSize = 1000;
 
     private readonly IPOSDbContextService _posContextService;
     private readonly ILogger<MenuItemsController> _logger;
