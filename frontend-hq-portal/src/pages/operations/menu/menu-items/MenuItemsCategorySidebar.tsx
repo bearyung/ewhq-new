@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import { Button, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
+import { Button, Divider, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { IconSearch, IconSparkles } from '@tabler/icons-react';
 import { CenterLoader } from './CenterLoader';
 import type { CategoryNode } from './menuItemsUtils';
