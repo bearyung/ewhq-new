@@ -5,7 +5,7 @@ export interface CategoryNode extends ItemCategory {
   children: CategoryNode[];
 }
 
-export const PAGE_SIZE = 1000;
+export const PAGE_SIZE = 200;
 export const PANEL_BORDER_COLOR = '#E3E8EE';
 
 export const buildCategoryTree = (categories: ItemCategory[]): CategoryNode[] => {
