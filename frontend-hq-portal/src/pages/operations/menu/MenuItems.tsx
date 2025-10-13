@@ -5,11 +5,14 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
   Container,
+  Divider,
   Flex,
   Group,
-  Pagination,
   Paper,
+  Popover,
+  ScrollArea,
   Select,
   Stack,
   Table,
@@ -24,7 +27,9 @@ import {
   IconAlertCircle,
   IconAdjustments,
   IconCheck,
+  IconChevronLeft,
   IconChevronRight,
+  IconColumns,
   IconPencil,
   IconPlus,
   IconSearch,
@@ -34,10 +39,11 @@ import {
   IconEye,
   IconEyeOff,
   IconList,
+  IconX,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { ColumnDef, ColumnSizingState, VisibilityState } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../contexts/BrandContext';
@@ -148,11 +154,19 @@ const MenuItemsPage: FC = () => {
   const [showActionShadow, setShowActionShadow] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
-  const [debouncedSearch] = useDebouncedValue(search, 300);
+  const [debouncedSearch] = useDebouncedValue(search, 800);
   const [includeDisabled, setIncludeDisabled] = useState(false);
   const [sortBy, setSortBy] = useState<'displayIndex' | 'name' | 'modified'>('displayIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
+  const [searchPopoverOpened, setSearchPopoverOpened] = useState(false);
+  const isSearchActive = searchPopoverOpened || Boolean(search);
+  const [sortPopoverOpened, setSortPopoverOpened] = useState(false);
+  const [columnMenuOpened, setColumnMenuOpened] = useState(false);
+  const [columnSearch, setColumnSearch] = useState('');
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+  const [hoveredResizeColumnId, setHoveredResizeColumnId] = useState<string | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
@@ -169,6 +183,8 @@ const MenuItemsPage: FC = () => {
 
   // Table virtualization setup
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const resizeCursorRestoreRef = useRef<string | null>(null);
 
   const totalItems = itemsResponse?.totalItems ?? 0;
   const totalPages = useMemo(() => {
@@ -182,6 +198,39 @@ const MenuItemsPage: FC = () => {
     return Math.min(backendPages, expectedPages);
   }, [itemsResponse, totalItems]);
 
+  const goToPreviousPage = useCallback(() => {
+    setPage((prev) => Math.max(1, prev - 1));
+  }, []);
+
+  const goToNextPage = useCallback(() => {
+    setPage((prev) => Math.min(totalPages, prev + 1));
+  }, [totalPages]);
+
+  const handlePageSelect = useCallback(
+    (value: string | null) => {
+      if (!value) return;
+      const nextPage = Number(value);
+      if (Number.isNaN(nextPage)) return;
+      setPage(nextPage);
+    },
+    [setPage],
+  );
+
+  useEffect(() => {
+    if (searchPopoverOpened) {
+      window.requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
+    }
+  }, [searchPopoverOpened]);
+
+  useEffect(() => {
+    if (!columnMenuOpened) {
+      setColumnSearch('');
+    }
+  }, [columnMenuOpened]);
+
+
   useEffect(() => {
     setPage((prev) => {
       if (prev > totalPages) {
@@ -190,6 +239,28 @@ const MenuItemsPage: FC = () => {
       return prev;
     });
   }, [totalPages]);
+
+  const setBodyResizeCursor = useCallback((active: boolean) => {
+    const bodyStyle = document.body.style;
+    if (active) {
+      if (resizeCursorRestoreRef.current === null) {
+        resizeCursorRestoreRef.current = bodyStyle.cursor || '';
+      }
+      bodyStyle.cursor = 'col-resize';
+    } else {
+      if (resizeCursorRestoreRef.current !== null) {
+        bodyStyle.cursor = resizeCursorRestoreRef.current;
+        resizeCursorRestoreRef.current = null;
+      } else {
+        bodyStyle.cursor = '';
+      }
+    }
+  }, []);
+
+  useEffect(() => () => {
+    setBodyResizeCursor(false);
+    setHoveredResizeColumnId(null);
+  }, [setBodyResizeCursor]);
 
   const getCategoryLabel = useCallback((categoryId?: number | null) => {
     if (categoryId === null || categoryId === undefined || !lookups) return '—';
@@ -276,6 +347,7 @@ const MenuItemsPage: FC = () => {
       accessorKey: 'itemCode',
       header: 'Code',
       size: 100,
+      enableHiding: false,
       cell: ({ row }) => (
         <Text size="sm" fw={500} truncate="end">{row.original.itemCode}</Text>
       ),
@@ -284,6 +356,7 @@ const MenuItemsPage: FC = () => {
       accessorKey: 'itemName',
       header: 'Item Name',
       size: 180,
+      enableHiding: false,
       cell: ({ row }) => (
         <Text size="sm" truncate="end">{row.original.itemName || '—'}</Text>
       ),
@@ -366,6 +439,8 @@ const MenuItemsPage: FC = () => {
       id: 'actions',
       header: '',
       size: 100,
+      enableHiding: false,
+      enableResizing: false,
       cell: ({ row }) => (
         <Group gap="xs" justify="flex-end" wrap="nowrap">
           {row.original.hasModifier && (
@@ -394,7 +469,52 @@ const MenuItemsPage: FC = () => {
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     pageCount: totalPages,
+    columnResizeMode: 'onChange',
+    state: {
+      columnVisibility,
+      columnSizing,
+    },
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnSizingChange: setColumnSizing,
   });
+
+  const pageOptions = useMemo(
+    () =>
+      Array.from({ length: totalPages }, (_, index) => ({
+        value: String(index + 1),
+        label: `Page ${index + 1}`,
+      })),
+    [totalPages],
+  );
+
+  const toggleableColumns = useMemo(
+    () => table.getAllLeafColumns().filter((column) => column.getCanHide()),
+    [table],
+  );
+
+  const filteredToggleColumns = useMemo(() => {
+    const searchTerm = columnSearch.trim().toLowerCase();
+    if (!searchTerm) {
+      return toggleableColumns;
+    }
+
+    return toggleableColumns.filter((column) => {
+      const header = column.columnDef.header;
+      const label = typeof header === 'string' ? header : column.id;
+      return label.toLowerCase().includes(searchTerm);
+    });
+  }, [toggleableColumns, columnSearch]);
+
+  const allToggleColumnsSelected = toggleableColumns.length > 0
+    && toggleableColumns.every((column) => column.getIsVisible());
+  const anyToggleColumnsSelected = toggleableColumns.some((column) => column.getIsVisible());
+
+  const handleToggleAllColumns = useCallback(
+    (visible: boolean) => {
+      toggleableColumns.forEach((column) => column.toggleVisibility(visible));
+    },
+    [toggleableColumns],
+  );
 
   const { rows } = table.getRowModel();
 
@@ -406,7 +526,7 @@ const MenuItemsPage: FC = () => {
   });
 
   // Calculate total width from all columns for fixed layout
-  const totalTableWidth = table.getAllColumns().reduce((sum, col) => sum + col.getSize(), 0);
+  const totalTableWidth = table.getVisibleLeafColumns().reduce((sum, col) => sum + col.getSize(), 0);
 
   const updateActionShadow = useCallback(() => {
     const container = tableContainerRef.current;
@@ -1066,96 +1186,266 @@ const MenuItemsPage: FC = () => {
                     borderBottom: `1px solid ${PANEL_BORDER_COLOR}`,
                   }}
                 >
-                  <Group gap="xs" wrap="nowrap">
-                    <TextInput
-                      placeholder="Search by name or code"
-                      value={search}
-                      onChange={(event) => {
-                        setSearch(event.currentTarget.value);
-                        setPage(1);
-                      }}
-                      leftSection={<IconSearch size={16} />}
-                      style={{ flex: 1 }}
-                    />
-                    <Tooltip label={includeDisabled ? 'Showing all items' : 'Showing enabled only'} withArrow>
-                      <ActionIcon
-                        variant={includeDisabled ? 'filled' : 'light'}
-                        color={includeDisabled ? 'indigo' : 'gray'}
-                        size="lg"
-                        onClick={() => {
-                          setIncludeDisabled((prev) => !prev);
-                          setPage(1);
-                        }}
+                  <Group justify="space-between" align="center" gap="md" wrap="wrap">
+                    <Group gap="xs" wrap="wrap">
+                      <Popover
+                        opened={searchPopoverOpened}
+                        onChange={setSearchPopoverOpened}
+                        withinPortal={false}
+                        position="bottom-start"
+                        shadow="md"
+                        trapFocus={false}
                       >
-                        {includeDisabled ? <IconEye size={18} /> : <IconEyeOff size={18} />}
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Sort by" withArrow>
-                      <Select
-                        value={sortBy}
-                        onChange={(value) => {
-                          if (!value) return;
-                          setSortBy(value as typeof sortBy);
-                          setPage(1);
-                        }}
-                        data={[
-                          { label: 'Display order', value: 'displayIndex' },
-                          { label: 'Name', value: 'name' },
-                          { label: 'Last updated', value: 'modified' },
-                        ]}
-                        w={160}
-                        leftSection={<IconList size={16} />}
-                      />
-                    </Tooltip>
-                    <Tooltip label={sortDirection === 'asc' ? 'Ascending' : 'Descending'} withArrow>
-                      <ActionIcon
-                        variant="light"
-                        color="indigo"
-                        size="lg"
-                        onClick={() => {
-                          setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                          setPage(1);
-                        }}
+                        <Popover.Target>
+                          <Tooltip label="Search" withArrow>
+                            <ActionIcon
+                              variant={isSearchActive ? 'filled' : 'light'}
+                              color={isSearchActive ? 'indigo' : 'gray'}
+                              size="lg"
+                              aria-label="Search menu items"
+                              onClick={() => setSearchPopoverOpened((prev) => !prev)}
+                            >
+                              <IconSearch size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Popover.Target>
+                        <Popover.Dropdown>
+                          <TextInput
+                            ref={searchInputRef}
+                            placeholder="Search by name or code"
+                            value={search}
+                            onChange={(event) => {
+                              setSearch(event.currentTarget.value);
+                              setPage(1);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Escape') {
+                                setSearchPopoverOpened(false);
+                              }
+                            }}
+                            rightSection={
+                              search ? (
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="gray"
+                                  size="sm"
+                                  aria-label="Clear search"
+                                  onClick={() => {
+                                    setSearch('');
+                                    setPage(1);
+                                  }}
+                                >
+                                  <IconX size={14} />
+                                </ActionIcon>
+                              ) : undefined
+                            }
+                          />
+                        </Popover.Dropdown>
+                      </Popover>
+                      <Tooltip label={includeDisabled ? 'Showing all items' : 'Showing enabled only'} withArrow>
+                        <ActionIcon
+                          variant={includeDisabled ? 'filled' : 'light'}
+                          color={includeDisabled ? 'indigo' : 'gray'}
+                          size="lg"
+                          onClick={() => {
+                            setIncludeDisabled((prev) => !prev);
+                            setPage(1);
+                          }}
+                        >
+                          {includeDisabled ? <IconEye size={18} /> : <IconEyeOff size={18} />}
+                        </ActionIcon>
+                      </Tooltip>
+                      <Popover
+                        opened={sortPopoverOpened}
+                        onChange={setSortPopoverOpened}
+                        withinPortal={false}
+                        position="bottom-start"
+                        shadow="md"
+                        trapFocus={false}
                       >
-                        {sortDirection === 'asc' ? (
-                          <IconSortAscending size={18} />
-                        ) : (
-                          <IconSortDescending size={18} />
-                        )}
-                      </ActionIcon>
-                    </Tooltip>
-                    <Button
-                      leftSection={<IconPlus size={16} />}
-                      onClick={handleCreate}
-                      disabled={!brandId}
-                      size="sm"
-                    >
-                      New item
-                    </Button>
-                  </Group>
-                </Paper>
-
-                <Paper
-                  shadow="none"
-                  px="md"
-                  py="xs"
-                  style={{
-                    flexShrink: 0,
-                    borderBottom: `1px solid ${PANEL_BORDER_COLOR}`,
-                  }}
-                >
-                  <Group justify="space-between" align="center" gap="xs">
-                    <Badge variant="light" color="gray" size="lg">
-                      {totalItems} rows
-                    </Badge>
-                    <Pagination
-                      value={page}
-                      onChange={setPage}
-                      total={totalPages}
-                      disabled={itemsLoading || totalPages <= 1}
-                      size="sm"
-                      withEdges={totalPages > 5}
-                    />
+                        <Popover.Target>
+                          <Tooltip label="Sort by" withArrow>
+                            <ActionIcon
+                              variant={sortPopoverOpened ? 'filled' : 'light'}
+                              color={sortPopoverOpened ? 'indigo' : 'gray'}
+                              size="lg"
+                              aria-label="Sort options"
+                              onClick={() => setSortPopoverOpened((prev) => !prev)}
+                            >
+                              <IconList size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Popover.Target>
+                        <Popover.Dropdown p="xs" w={200}>
+                          <Stack gap="xs">
+                            <Text size="xs" fw={600} c="dimmed">
+                              Sort by
+                            </Text>
+                            <Select
+                              data={[
+                                { label: 'Display order', value: 'displayIndex' },
+                                { label: 'Name', value: 'name' },
+                                { label: 'Last updated', value: 'modified' },
+                              ]}
+                              value={sortBy}
+                              onChange={(value) => {
+                                if (!value) return;
+                                setSortBy(value as typeof sortBy);
+                                setPage(1);
+                                setSortPopoverOpened(false);
+                              }}
+                              withinPortal={false}
+                            />
+                          </Stack>
+                        </Popover.Dropdown>
+                      </Popover>
+                      <Popover
+                        opened={columnMenuOpened}
+                        onChange={setColumnMenuOpened}
+                        withinPortal={false}
+                        position="bottom-start"
+                        shadow="md"
+                        trapFocus={false}
+                      >
+                        <Popover.Target>
+                          <Tooltip label="Toggle columns" withArrow>
+                            <ActionIcon
+                              variant={columnMenuOpened ? 'filled' : 'light'}
+                              color={columnMenuOpened ? 'indigo' : 'gray'}
+                              size="lg"
+                              aria-label="Toggle columns"
+                              onClick={() => setColumnMenuOpened((prev) => !prev)}
+                            >
+                              <IconColumns size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Popover.Target>
+                        <Popover.Dropdown p="sm" style={{ minWidth: 240 }}>
+                          <Stack gap="xs">
+                            <Group justify="space-between" align="center">
+                              <Text size="sm" fw={600}>
+                                Columns
+                              </Text>
+                              <Button
+                                variant="subtle"
+                                color="gray"
+                                size="xs"
+                                onClick={() => handleToggleAllColumns(false)}
+                                disabled={!anyToggleColumnsSelected}
+                              >
+                                Deselect all
+                              </Button>
+                            </Group>
+                            <TextInput
+                              placeholder="Search..."
+                              value={columnSearch}
+                              onChange={(event) => setColumnSearch(event.currentTarget.value)}
+                              size="xs"
+                              leftSection={<IconSearch size={14} />}
+                            />
+                            <Divider />
+                            <ScrollArea.Autosize mah={220} type="auto">
+                              <Stack gap={4}>
+                                {filteredToggleColumns.length === 0 ? (
+                                  <Text size="xs" c="dimmed">
+                                    No matching columns
+                                  </Text>
+                                ) : (
+                                  filteredToggleColumns.map((column) => {
+                                    const header = column.columnDef.header;
+                                    const label = typeof header === 'string' ? header : column.id;
+                                    return (
+                                      <Checkbox
+                                        key={column.id}
+                                        label={label}
+                                        checked={column.getIsVisible()}
+                                        onChange={(event) => column.toggleVisibility(event.currentTarget.checked)}
+                                      />
+                                    );
+                                  })
+                                )}
+                              </Stack>
+                            </ScrollArea.Autosize>
+                            <Divider />
+                            <Group justify="space-between">
+                              <Button
+                                variant="light"
+                                size="xs"
+                                onClick={() => handleToggleAllColumns(true)}
+                                disabled={toggleableColumns.length === 0 || allToggleColumnsSelected}
+                              >
+                                Select all
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="xs"
+                                color="gray"
+                                onClick={() => setColumnMenuOpened(false)}
+                              >
+                                Close
+                              </Button>
+                            </Group>
+                          </Stack>
+                        </Popover.Dropdown>
+                      </Popover>
+                      <Tooltip label={sortDirection === 'asc' ? 'Ascending' : 'Descending'} withArrow>
+                        <ActionIcon
+                          variant="light"
+                          color="indigo"
+                          size="lg"
+                          onClick={() => {
+                            setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                            setPage(1);
+                          }}
+                        >
+                          {sortDirection === 'asc' ? (
+                            <IconSortAscending size={18} />
+                          ) : (
+                            <IconSortDescending size={18} />
+                          )}
+                        </ActionIcon>
+                      </Tooltip>
+                      <Button
+                        leftSection={<IconPlus size={16} />}
+                        onClick={handleCreate}
+                        disabled={!brandId}
+                        size="sm"
+                      >
+                        New item
+                      </Button>
+                    </Group>
+                    <Group gap="sm" align="center">
+                      <Badge variant="light" color="gray" size="lg">
+                        {totalItems} rows
+                      </Badge>
+                      <Group gap="xs" align="center">
+                        <ActionIcon
+                          variant="subtle"
+                          size="lg"
+                          aria-label="Previous page"
+                          onClick={goToPreviousPage}
+                          disabled={itemsLoading || page <= 1}
+                        >
+                          <IconChevronLeft size={16} />
+                        </ActionIcon>
+                        <Select
+                          value={String(page)}
+                          onChange={handlePageSelect}
+                          data={pageOptions}
+                          w={120}
+                          disabled={itemsLoading || totalPages <= 1}
+                        />
+                        <ActionIcon
+                          variant="subtle"
+                          size="lg"
+                          aria-label="Next page"
+                          onClick={goToNextPage}
+                          disabled={itemsLoading || page >= totalPages}
+                        >
+                          <IconChevronRight size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Group>
                   </Group>
                 </Paper>
 
@@ -1271,8 +1561,8 @@ const MenuItemsPage: FC = () => {
                                         width: header.column.getSize(),
                                         minWidth: header.column.getSize(),
                                         maxWidth: header.column.getSize(),
+                                        position: header.id === 'actions' ? 'sticky' : 'relative',
                                         ...(header.id === 'actions' ? {
-                                          position: 'sticky',
                                           right: 0,
                                           backgroundColor: 'white',
                                           boxShadow: showActionShadow ? 'inset 3px 0 6px -4px rgba(15, 23, 42, 0.2)' : 'none',
@@ -1282,12 +1572,59 @@ const MenuItemsPage: FC = () => {
                                         } : {}),
                                       }}
                                     >
-                                      {header.isPlaceholder
-                                        ? null
-                                        : flexRender(
+                                      {header.isPlaceholder ? null : (
+                                        <Flex align="center" justify={header.column.id === 'actions' ? 'flex-end' : 'flex-start'} gap="xs">
+                                          {flexRender(
                                             header.column.columnDef.header,
                                             header.getContext()
                                           )}
+                                        </Flex>
+                                      )}
+                                      {header.column.getCanResize() && header.id !== 'actions' && (
+                                        <Box
+                                          onMouseDown={header.getResizeHandler()}
+                                          onTouchStart={header.getResizeHandler()}
+                                          onMouseEnter={() => {
+                                            setHoveredResizeColumnId(header.id);
+                                            setBodyResizeCursor(true);
+                                          }}
+                                          onMouseLeave={() => {
+                                            setBodyResizeCursor(false);
+                                            setHoveredResizeColumnId((current) => (current === header.id ? null : current));
+                                          }}
+                                          style={{
+                                            position: 'absolute',
+                                            top: -6,
+                                            right: -8,
+                                            height: 'calc(100% + 12px)',
+                                            width: 20,
+                                            cursor: 'col-resize',
+                                            userSelect: 'none',
+                                            touchAction: 'none',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            borderRadius: 6,
+                                            transition: 'background-color 120ms ease',
+                                            backgroundColor:
+                                              header.column.getIsResizing() || hoveredResizeColumnId === header.id
+                                                ? 'var(--mantine-color-indigo-0)'
+                                                : 'transparent',
+                                          }}
+                                        >
+                                          <Box
+                                            style={{
+                                              width: 2,
+                                              height: '100%',
+                                              borderRadius: 1,
+                                              backgroundColor:
+                                                header.column.getIsResizing() || hoveredResizeColumnId === header.id
+                                                  ? 'var(--mantine-color-indigo-5)'
+                                                  : 'transparent',
+                                            }}
+                                          />
+                                        </Box>
+                                      )}
                                     </Table.Th>
                                   ))}
                                 </Table.Tr>
