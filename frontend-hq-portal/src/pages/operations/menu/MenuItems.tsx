@@ -567,11 +567,19 @@ const MenuItemsPage: FC = () => {
         const data = await menuItemService.getLookups(brandId);
         if (!active) return;
         setLookups(data);
+        const defaultCategoryId = (() => {
+          const roots = buildCategoryTree(data.categories);
+          if (roots.length > 0) {
+            return roots[0].categoryId;
+          }
+          return data.categories[0]?.categoryId ?? null;
+        })();
+
         setSelectedCategoryId((current) => {
           if (current && data.categories.some((cat) => cat.categoryId === current)) {
             return current;
           }
-          return data.categories[0]?.categoryId ?? null;
+          return defaultCategoryId;
         });
         setPage(1);
         setFiltersReady(true);
