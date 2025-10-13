@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import { Badge, Button, Divider, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
+import { Button, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { IconSearch, IconSparkles } from '@tabler/icons-react';
 import { CenterLoader } from './CenterLoader';
 import type { CategoryNode } from './menuItemsUtils';
@@ -45,13 +45,25 @@ export const MenuItemsCategorySidebar: FC<MenuItemsCategorySidebarProps> = ({
       </Text>
     </Group>
     <Divider />
-    <Group justify="space-between">
-      <Text fw={600} size="sm">
-        Categories
-      </Text>
-      <Badge variant="light" color="gray">
-        {totalCategoryItems} items
-      </Badge>
+    <Group justify="space-between" align="center" gap="xs">
+      <Group gap={6} align="center">
+        <Text fw={600} size="sm">
+          Categories
+        </Text>
+        <Text size="xs" c="dimmed">
+          {totalCategoryItems} items
+        </Text>
+      </Group>
+      <Button
+        variant={selectedCategoryId === null ? 'light' : 'subtle'}
+        color={selectedCategoryId === null ? 'indigo' : 'gray'}
+        leftSection={<IconSparkles size={14} />}
+        size="xs"
+        radius="md"
+        onClick={onAllItems}
+      >
+        All items
+      </Button>
     </Group>
     <TextInput
       placeholder="Search categories"
@@ -59,15 +71,6 @@ export const MenuItemsCategorySidebar: FC<MenuItemsCategorySidebarProps> = ({
       onChange={(event) => onCategorySearchChange(event.currentTarget.value)}
       leftSection={<IconSearch size={16} />}
     />
-    <Button
-      variant={selectedCategoryId === null ? 'filled' : 'subtle'}
-      color={selectedCategoryId === null ? 'indigo' : 'gray'}
-      leftSection={<IconSparkles size={16} />}
-      onClick={onAllItems}
-    >
-      All items
-    </Button>
-    <Divider label="Browse" labelPosition="center" />
     <ScrollArea
       type="auto"
       offsetScrollbars
