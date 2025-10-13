@@ -226,3 +226,28 @@ public class UpdateMenuItemAvailabilityDto
     public bool? IsOutOfStock { get; set; }
     public bool? IsLimitedItem { get; set; }
 }
+
+public class ItemModifierMappingDto
+{
+    public int GroupHeaderId { get; set; }
+    public int Sequence { get; set; }
+    public string? ModifierLinkType { get; set; }
+}
+
+public class ItemModifierMappingsDto
+{
+    public IReadOnlyList<ItemModifierMappingDto> InStore { get; set; } = Array.Empty<ItemModifierMappingDto>();
+    public IReadOnlyList<ItemModifierMappingDto> Online { get; set; } = Array.Empty<ItemModifierMappingDto>();
+}
+
+public class ItemModifierMappingUpsertDto
+{
+    public int GroupHeaderId { get; set; }
+    public int Sequence { get; set; }
+}
+
+public class UpdateItemModifierMappingsDto
+{
+    public IReadOnlyList<ItemModifierMappingUpsertDto> InStore { get; set; } = Array.Empty<ItemModifierMappingUpsertDto>();
+    public IReadOnlyList<ItemModifierMappingUpsertDto> Online { get; set; } = Array.Empty<ItemModifierMappingUpsertDto>();
+}

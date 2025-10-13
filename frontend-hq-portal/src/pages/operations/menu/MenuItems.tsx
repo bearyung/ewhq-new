@@ -41,7 +41,6 @@ import {
   IconList,
   IconX,
 } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table';
 import type { ColumnDef, ColumnSizingState, VisibilityState } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -60,6 +59,7 @@ import { CenterLoader } from './menu-items/CenterLoader';
 import { MenuItemDrawer } from './menu-items/MenuItemDrawer';
 import { MenuItemsCategorySidebar } from './menu-items/MenuItemsCategorySidebar';
 import { VirtualTableRow } from './menu-items/VirtualTableRow';
+import { ManageItemModifiersModal } from './menu-items/ManageItemModifiersModal';
 import {
   PAGE_SIZE,
   PANEL_BORDER_COLOR,
@@ -139,7 +139,6 @@ const mapDetailToPayload = (detail: MenuItemDetail): MenuItemUpsertPayload => ({
 const MenuItemsPage: FC = () => {
   const { selectedBrand } = useBrands();
   const brandId = selectedBrand ? parseInt(selectedBrand, 10) : null;
-  const navigate = useNavigate();
   const isDesktopLayout = useMediaQuery('(min-width: 62em)');
 
   const [lookups, setLookups] = useState<MenuItemLookups | null>(null);
@@ -168,6 +167,7 @@ const MenuItemsPage: FC = () => {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [hoveredResizeColumnId, setHoveredResizeColumnId] = useState<string | null>(null);
+  const [modifierModalItem, setModifierModalItem] = useState<MenuItemSummary | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
@@ -221,6 +221,31 @@ const MenuItemsPage: FC = () => {
     if (itemsLoading) return;
     setReloadToken((token) => token + 1);
   }, [itemsLoading]);
+
+  const handleOpenModifiers = useCallback((item: MenuItemSummary) => {
+    setModifierModalItem(item);
+  }, []);
+
+  const handleCloseModifiers = useCallback(() => {
+    setModifierModalItem(null);
+  }, []);
+
+  const handleModifiersSaved = useCallback(
+    (itemId: number, hasModifier: boolean) => {
+      setItemsResponse((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((entry) => (entry.itemId === itemId ? { ...entry, hasModifier } : entry)),
+        };
+      });
+
+      setSelectedDetail((prev) => (prev && prev.itemId === itemId ? { ...prev, hasModifier } : prev));
+      setFormData((prev) => (prev && editingItemId === itemId ? { ...prev, hasModifier } : prev));
+      setReloadToken((token) => token + 1);
+    },
+    [editingItemId, setItemsResponse, setSelectedDetail, setFormData, setReloadToken],
+  );
 
   useEffect(() => {
     if (searchPopoverOpened) {
@@ -449,25 +474,23 @@ const MenuItemsPage: FC = () => {
       enableResizing: false,
       cell: ({ row }) => (
         <Group gap="xs" justify="flex-end" wrap="nowrap">
-          {row.original.hasModifier && (
-            <Tooltip label="Manage modifiers" withArrow>
-              <ActionIcon
-                variant="subtle"
-                color="violet"
-                size="sm"
-                onClick={() => navigate(`/menus/modifiers?itemId=${row.original.itemId}`)}
-              >
-                <IconAdjustments size={16} />
-              </ActionIcon>
-            </Tooltip>
-          )}
+          <Tooltip label="Manage modifiers" withArrow>
+            <ActionIcon
+              variant="subtle"
+              color={row.original.hasModifier ? 'violet' : 'gray'}
+              size="sm"
+              onClick={() => handleOpenModifiers(row.original)}
+            >
+              <IconAdjustments size={16} />
+            </ActionIcon>
+          </Tooltip>
           <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => handleEdit(row.original)}>
             <IconPencil size={16} />
           </ActionIcon>
         </Group>
       ),
     },
-  ], [getCategoryLabel, getDepartmentName, handleEdit, navigate]);
+  ], [getCategoryLabel, getDepartmentName, handleEdit, handleOpenModifiers]);
 
   const table = useReactTable({
     data: itemsResponse?.items ?? [],
@@ -1704,11 +1727,26 @@ const MenuItemsPage: FC = () => {
         handleSavePrice={handleSavePrice}
         handleSaveAvailability={handleSaveAvailability}
         priceSavingShopId={priceSavingShopId}
-        availabilitySavingShopId={availabilitySavingShopId}
-        onSubmit={handleSubmit}
-      />
-    </Box>
-  );
+      availabilitySavingShopId={availabilitySavingShopId}
+      onSubmit={handleSubmit}
+      onManageModifiers={
+        drawerMode === 'edit' && selectedDetail ? () => handleOpenModifiers(selectedDetail) : undefined
+      }
+    />
+    <ManageItemModifiersModal
+      opened={Boolean(modifierModalItem)}
+      onClose={handleCloseModifiers}
+      brandId={brandId}
+      item={modifierModalItem}
+      modifierGroups={lookups?.modifierGroups ?? null}
+      onSaved={(hasModifier) => {
+        if (modifierModalItem) {
+          handleModifiersSaved(modifierModalItem.itemId, hasModifier);
+        }
+      }}
+    />
+  </Box>
+);
 };
 
 export default MenuItemsPage;

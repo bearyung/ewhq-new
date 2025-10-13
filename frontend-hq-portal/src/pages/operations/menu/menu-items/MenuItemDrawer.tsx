@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import {
   Alert,
+  Badge,
   Button,
   Checkbox,
   Divider,
@@ -18,7 +19,7 @@ import {
   TextInput,
   Tooltip,
 } from '@mantine/core';
-import { IconCheck, IconChevronRight, IconX } from '@tabler/icons-react';
+import { IconAdjustments, IconCheck, IconChevronRight, IconX } from '@tabler/icons-react';
 import { CenterLoader } from './CenterLoader';
 import { formatDateTime } from './menuItemsUtils';
 import type {
@@ -59,6 +60,7 @@ interface MenuItemDrawerProps {
   priceSavingShopId: number | null;
   availabilitySavingShopId: number | null;
   onSubmit: () => void;
+  onManageModifiers?: () => void;
 }
 
 export const MenuItemDrawer: FC<MenuItemDrawerProps> = ({
@@ -84,8 +86,12 @@ export const MenuItemDrawer: FC<MenuItemDrawerProps> = ({
   priceSavingShopId,
   availabilitySavingShopId,
   onSubmit,
-}) => (
-  <Drawer opened={opened} onClose={onClose} position="right" size="lg" title={title} overlayProps={{ opacity: 0.15 }}>
+  onManageModifiers,
+}) => {
+  const canManageModifiers = drawerMode === 'edit' && Boolean(onManageModifiers);
+
+  return (
+    <Drawer opened={opened} onClose={onClose} position="right" size="lg" title={title} overlayProps={{ opacity: 0.15 }}>
     {detailLoading ? (
       <CenterLoader message="Loading item" />
     ) : formData ? (
@@ -176,37 +182,47 @@ export const MenuItemDrawer: FC<MenuItemDrawerProps> = ({
                 />
               </Group>
               <Divider label="Modifiers" labelPosition="center" />
-              <Group align="flex-end" grow>
-                <Switch
-                  label="Has modifiers"
-                  checked={formData.hasModifier}
-                  onChange={(event) => {
-                    const value = event.currentTarget.checked;
-                    updateForm('hasModifier', value);
-                    if (!value) {
-                      updateForm('modifierGroupHeaderId', null);
-                      updateForm('autoRedirectToModifier', false);
-                    }
-                  }}
-                />
-                <Switch
-                  label="Auto open modifier screen"
-                  checked={formData.autoRedirectToModifier}
-                  onChange={(event) => updateForm('autoRedirectToModifier', event.currentTarget.checked)}
-                  disabled={!formData.hasModifier}
-                />
-              </Group>
-              <Select
-                label="Modifier group"
-                placeholder="No group linked"
-                data={(lookups?.modifierGroups ?? []).map((group) => ({
-                  value: String(group.groupHeaderId),
-                  label: group.groupBatchName,
-                }))}
-                value={formData.modifierGroupHeaderId ? String(formData.modifierGroupHeaderId) : null}
-                onChange={(value) => updateForm('modifierGroupHeaderId', value ? parseInt(value, 10) : null)}
-                disabled={!formData.hasModifier}
-              />
+              <Stack gap="xs">
+                <Group justify="space-between" align="center" gap="sm">
+                  <Stack gap={2} style={{ flex: 1 }}>
+                    <Text fw={600} size="sm">
+                      Linked modifier groups
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      Manage linked groups in the dedicated modifiers workspace.
+                    </Text>
+                  </Stack>
+                  {canManageModifiers ? (
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<IconAdjustments size={14} />}
+                      onClick={onManageModifiers}
+                    >
+                      Manage modifiers
+                    </Button>
+                  ) : (
+                    <Tooltip label="Save the item before linking modifiers" withArrow>
+                      <Button size="xs" variant="light" leftSection={<IconAdjustments size={14} />} disabled>
+                        Manage modifiers
+                      </Button>
+                    </Tooltip>
+                  )}
+                </Group>
+                <Group gap="sm" align="center">
+                  <Badge color={formData.hasModifier ? 'indigo' : 'gray'} variant="light">
+                    {formData.hasModifier ? 'Modifiers linked' : 'No modifiers linked'}
+                  </Badge>
+                  <Tooltip label="Automatically open the modifier screen after the item is added" withArrow>
+                    <Switch
+                      label="Auto open modifier screen"
+                      checked={formData.autoRedirectToModifier}
+                      onChange={(event) => updateForm('autoRedirectToModifier', event.currentTarget.checked)}
+                      disabled={!formData.hasModifier}
+                    />
+                  </Tooltip>
+                </Group>
+              </Stack>
               <Select
                 label="Button style"
                 placeholder="Default"
@@ -595,5 +611,6 @@ export const MenuItemDrawer: FC<MenuItemDrawerProps> = ({
     ) : (
       <CenterLoader message="Loading item" />
     )}
-  </Drawer>
-);
+    </Drawer>
+  );
+};

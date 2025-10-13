@@ -207,3 +207,24 @@ export interface UpdateMenuItemAvailabilityPayload {
   isOutOfStock?: boolean | null;
   isLimitedItem?: boolean | null;
 }
+
+export interface ItemModifierMapping {
+  groupHeaderId: number;
+  sequence: number;
+  modifierLinkType: string | null;
+}
+
+export interface ItemModifierMappings {
+  inStore: ItemModifierMapping[];
+  online: ItemModifierMapping[];
+}
+
+export interface ItemModifierMappingUpsert {
+  groupHeaderId: number;
+  sequence: number;
+}
+
+export interface UpdateItemModifierMappingsPayload {
+  inStore: ItemModifierMappingUpsert[];
+  online: ItemModifierMappingUpsert[];
+}

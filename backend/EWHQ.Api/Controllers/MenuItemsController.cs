@@ -18,6 +18,7 @@ namespace EWHQ.Api.Controllers;
 public class MenuItemsController : ControllerBase
 {
     private const int MaxPageSize = 200;
+    private const string NewModifierModeLinkType = "NEW_MODIFIER_MODE";
 
     private readonly IPOSDbContextService _posContextService;
     private readonly ILogger<MenuItemsController> _logger;
@@ -28,6 +29,220 @@ public class MenuItemsController : ControllerBase
     {
         _posContextService = posContextService;
         _logger = logger;
+    }
+
+    [HttpGet("brand/{brandId}/{itemId}/modifiers")]
+    [RequireBrandView]
+    public async Task<ActionResult<ItemModifierMappingsDto>> GetItemModifierMappings(int brandId, int itemId)
+    {
+        try
+        {
+            var (context, accountId) = await _posContextService.GetContextAndAccountIdForBrandAsync(brandId);
+
+            var itemExists = await context.ItemMasters
+                .AsNoTracking()
+                .AnyAsync(i => i.AccountId == accountId && i.ItemId == itemId);
+
+            if (!itemExists)
+            {
+                return NotFound(new { message = "Menu item not found" });
+            }
+
+            var mappings = await context.ItemModifierGroupMappings
+                .AsNoTracking()
+                .Where(m => m.AccountId == accountId && m.ItemId == itemId)
+                .OrderBy(m => m.Seq)
+                .Select(m => new ItemModifierMappingDto
+                {
+                    GroupHeaderId = m.GroupHeaderId,
+                    Sequence = m.Seq,
+                    ModifierLinkType = string.IsNullOrWhiteSpace(m.ModifierLinkType) ? null : m.ModifierLinkType
+                })
+                .ToListAsync();
+
+            var response = new ItemModifierMappingsDto
+            {
+                InStore = mappings
+                    .Where(m => string.Equals(m.ModifierLinkType, NewModifierModeLinkType, StringComparison.OrdinalIgnoreCase))
+                    .ToList(),
+                Online = mappings
+                    .Where(m => string.IsNullOrWhiteSpace(m.ModifierLinkType))
+                    .ToList()
+            };
+
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Brand not found: {BrandId}", brandId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching modifier mappings for item {ItemId}", itemId);
+            return StatusCode(500, new { message = "An error occurred while fetching modifier mappings" });
+        }
+    }
+
+    [HttpPut("brand/{brandId}/{itemId}/modifiers")]
+    [RequireBrandModify]
+    public async Task<ActionResult<ItemModifierMappingsDto>> UpdateItemModifierMappings(int brandId, int itemId, UpdateItemModifierMappingsDto updateDto)
+    {
+        try
+        {
+            var (context, accountId) = await _posContextService.GetContextAndAccountIdForBrandAsync(brandId);
+
+            var item = await context.ItemMasters.FirstOrDefaultAsync(i => i.AccountId == accountId && i.ItemId == itemId);
+            if (item == null)
+            {
+                return NotFound(new { message = "Menu item not found" });
+            }
+
+            List<(int GroupHeaderId, int Sequence)> NormalizeMappings(IEnumerable<ItemModifierMappingUpsertDto> source, string contextName)
+            {
+                var items = source
+                    .Where(m => m != null)
+                    .Select((m, index) => new
+                    {
+                        m.GroupHeaderId,
+                        ProvidedSequence = m.Sequence,
+                        Index = index
+                    })
+                    .ToList();
+
+                if (items.GroupBy(x => x.GroupHeaderId).Any(g => g.Count() > 1))
+                {
+                    throw new InvalidOperationException($"Duplicate modifier groups detected in the {contextName} list.");
+                }
+
+                return items
+                    .OrderBy(x => x.ProvidedSequence > 0 ? x.ProvidedSequence : int.MaxValue)
+                    .ThenBy(x => x.Index)
+                    .Select((x, position) => (x.GroupHeaderId, position + 1))
+                    .ToList();
+            }
+
+            List<(int GroupHeaderId, int Sequence)> inStore;
+            List<(int GroupHeaderId, int Sequence)> online;
+
+            try
+            {
+                inStore = NormalizeMappings(updateDto.InStore ?? Array.Empty<ItemModifierMappingUpsertDto>(), "in-store");
+                online = NormalizeMappings(updateDto.Online ?? Array.Empty<ItemModifierMappingUpsertDto>(), "online");
+            }
+            catch (InvalidOperationException dupEx)
+            {
+                return BadRequest(new { message = dupEx.Message });
+            }
+
+            var allGroupIds = inStore.Select(x => x.GroupHeaderId).Concat(online.Select(x => x.GroupHeaderId)).Distinct().ToList();
+            if (allGroupIds.Count > 0)
+            {
+                var validGroupIds = await context.ModifierGroupHeaders
+                    .AsNoTracking()
+                    .Where(g => g.AccountId == accountId && allGroupIds.Contains(g.GroupHeaderId))
+                    .Select(g => g.GroupHeaderId)
+                    .ToListAsync();
+
+                var invalid = allGroupIds.Except(validGroupIds).ToList();
+                if (invalid.Count > 0)
+                {
+                    return BadRequest(new { message = "One or more modifier groups are invalid for this brand.", invalidGroupIds = invalid });
+                }
+            }
+
+            var currentUser = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
+            var now = DateTime.UtcNow;
+
+            var existing = await context.ItemModifierGroupMappings
+                .Where(m => m.AccountId == accountId && m.ItemId == itemId)
+                .ToListAsync();
+
+            void ApplyMappings(IEnumerable<(int GroupHeaderId, int Sequence)> mappings, string? linkType)
+            {
+                var desired = mappings.ToDictionary(x => x.GroupHeaderId, x => x.Sequence);
+
+                var matches = existing
+                    .Where(m => LinkTypeEquals(m.ModifierLinkType, linkType))
+                    .ToList();
+
+                foreach (var obsolete in matches.Where(m => !desired.ContainsKey(m.GroupHeaderId)).ToList())
+                {
+                    context.ItemModifierGroupMappings.Remove(obsolete);
+                    existing.Remove(obsolete);
+                    matches.Remove(obsolete);
+                }
+
+                foreach (var kvp in desired)
+                {
+                    var current = matches.FirstOrDefault(m => m.GroupHeaderId == kvp.Key);
+                    if (current == null)
+                    {
+                        var newMapping = new ItemModifierGroupMapping
+                        {
+                            AccountId = accountId,
+                            ItemId = itemId,
+                            GroupHeaderId = kvp.Key,
+                            Seq = kvp.Value,
+                            ModifierLinkType = linkType,
+                            CreatedDate = now,
+                            CreatedBy = currentUser,
+                            ModifiedDate = now,
+                            ModifiedBy = currentUser
+                        };
+
+                        context.ItemModifierGroupMappings.Add(newMapping);
+                        existing.Add(newMapping);
+                        matches.Add(newMapping);
+                    }
+                    else
+                    {
+                        current.Seq = kvp.Value;
+                        current.ModifiedDate = now;
+                        current.ModifiedBy = currentUser;
+                        current.ModifierLinkType = linkType;
+                    }
+                }
+            }
+
+            ApplyMappings(inStore, NewModifierModeLinkType);
+            ApplyMappings(online, null);
+
+            var hasMappings = inStore.Count > 0 || online.Count > 0;
+            item.HasModifier = hasMappings;
+            item.ModifierGroupHeaderId = null;
+            item.ModifiedDate = now;
+            item.ModifiedBy = currentUser;
+
+            await context.SaveChangesAsync();
+
+            return await GetItemModifierMappings(brandId, itemId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Brand not found: {BrandId}", brandId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating modifier mappings for item {ItemId}", itemId);
+            return StatusCode(500, new { message = "An error occurred while updating modifier mappings" });
+        }
+    }
+
+    private static bool LinkTypeEquals(string? value, string? expected)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.IsNullOrWhiteSpace(expected);
+        }
+
+        if (string.IsNullOrWhiteSpace(expected))
+        {
+            return false;
+        }
+
+        return string.Equals(value.Trim(), expected.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     [HttpGet("brand/{brandId}")]

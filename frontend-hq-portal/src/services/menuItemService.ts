@@ -9,6 +9,8 @@ import type {
   MenuItemShopAvailability,
   UpdateMenuItemPricePayload,
   UpdateMenuItemAvailabilityPayload,
+  ItemModifierMappings,
+  UpdateItemModifierMappingsPayload,
 } from '../types/menuItem';
 
 const buildQueryString = (query: MenuItemListQuery): string => {
@@ -88,6 +90,20 @@ class MenuItemService {
     payload: UpdateMenuItemAvailabilityPayload,
   ): Promise<MenuItemShopAvailability> {
     const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/availability/${shopId}`, payload);
+    return response.data;
+  }
+
+  async getItemModifierMappings(brandId: number, itemId: number): Promise<ItemModifierMappings> {
+    const response = await api.get(`/menu-items/brand/${brandId}/${itemId}/modifiers`);
+    return response.data;
+  }
+
+  async updateItemModifierMappings(
+    brandId: number,
+    itemId: number,
+    payload: UpdateItemModifierMappingsPayload,
+  ): Promise<ItemModifierMappings> {
+    const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/modifiers`, payload);
     return response.data;
   }
 }
