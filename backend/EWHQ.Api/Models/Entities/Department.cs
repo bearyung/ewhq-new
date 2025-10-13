@@ -33,13 +33,13 @@ public class Department
     public string ModifiedBy { get; set; } = string.Empty;
 
     [MaxLength(200)]
-    public string Description { get; set; }
+    public string? Description { get; set; }
 
     [MaxLength(50)]
-    public string DepartmentCode { get; set; }
+    public string? DepartmentCode { get; set; }
 
     [MaxLength(50)]
-    public string RevenueCenterCode { get; set; }
+    public string? RevenueCenterCode { get; set; }
 
     public bool? IsSubDepartment { get; set; }
 

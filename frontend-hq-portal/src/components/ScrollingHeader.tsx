@@ -26,23 +26,43 @@ const getScrollParent = (element: HTMLElement | null): HTMLElement | Window => {
   return window;
 };
 
+type HeaderSpacing = 'comfortable' | 'compact';
+
+const HEADER_SPACING: Record<HeaderSpacing, { pt: string; pb: string }> = {
+  comfortable: { pt: 'xl', pb: 'xl' },
+  compact: { pt: 'md', pb: 'sm' },
+};
+
 interface ScrollingHeaderProps {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
   children?: ReactNode; // For additional content like floating save bars
+  spacing?: HeaderSpacing;
+  forceCompact?: boolean;
+  compactShadow?: boolean;
 }
 
 const ScrollingHeader: FC<ScrollingHeaderProps> = ({
   title,
   subtitle,
   actions,
-  children
+  children,
+  spacing = 'comfortable',
+  forceCompact = false,
+  compactShadow = true
 }) => {
-  const [isCompact, setIsCompact] = useState(false);
+  const [isCompact, setIsCompact] = useState(forceCompact);
   const headerRef = useRef<HTMLDivElement>(null);
+  const { pt, pb } = HEADER_SPACING[spacing];
+  const compactVisible = forceCompact || isCompact;
 
   useEffect(() => {
+    if (forceCompact) {
+      setIsCompact(true);
+      return;
+    }
+
     const element = headerRef.current;
     if (!element) {
       return;
@@ -74,7 +94,15 @@ const ScrollingHeader: FC<ScrollingHeaderProps> = ({
       scrollTarget.removeEventListener('scroll', updateCompactState, listenerOptions);
       window.removeEventListener('resize', updateCompactState);
     };
-  }, []);
+  }, [forceCompact]);
+
+  useEffect(() => {
+    if (!forceCompact) {
+      return;
+    }
+
+    setIsCompact(true);
+  }, [forceCompact]);
 
   return (
     <>
@@ -96,10 +124,10 @@ const ScrollingHeader: FC<ScrollingHeaderProps> = ({
             alignItems: 'center',
             backgroundColor: 'white',
             borderBottom: '1px solid #E3E8EE',
-            boxShadow: isCompact ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
-            transform: isCompact ? 'translateY(0)' : 'translateY(-100%)',
+            boxShadow: compactVisible && compactShadow ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
+            transform: compactVisible ? 'translateY(0)' : 'translateY(-100%)',
             transition: 'transform 0.3s ease-in-out',
-            pointerEvents: isCompact ? 'auto' : 'none',
+            pointerEvents: compactVisible ? 'auto' : 'none',
           }}
         >
           <Container size="xl" style={{ marginInline: 0, width: '100%' }}>
@@ -118,36 +146,30 @@ const ScrollingHeader: FC<ScrollingHeaderProps> = ({
       </Box>
 
       {/* Full Header - Always rendered */}
-      <Box
-        ref={headerRef}
-        pt="xl"
-        px="xl"
-        pb="xl"
-        style={{
-          backgroundColor: 'white',
-        }}
-      >
-        <Container size="xl" style={{ marginInline: 0 }}>
-          <Group justify="space-between">
-            <Box>
-              <Title order={1} size={28} fw={600}>
-                {title}
-              </Title>
-              {subtitle && (
-                <Text size="sm" c="dimmed" mt={4}>
-                  {subtitle}
-                </Text>
-              )}
-            </Box>
+      {!forceCompact && (
+        <Box ref={headerRef} pt={pt} px="xl" pb={pb} style={{ backgroundColor: 'white' }}>
+          <Container size="xl" style={{ marginInline: 0 }}>
+            <Group justify="space-between">
+              <Box>
+                <Title order={1} size={28} fw={600}>
+                  {title}
+                </Title>
+                {subtitle && (
+                  <Text size="sm" c="dimmed" mt={4}>
+                    {subtitle}
+                  </Text>
+                )}
+              </Box>
 
-            {actions && (
-              <Group gap="sm">
-                {actions}
-              </Group>
-            )}
-          </Group>
-        </Container>
-      </Box>
+              {actions && (
+                <Group gap="sm">
+                  {actions}
+                </Group>
+              )}
+            </Group>
+          </Container>
+        </Box>
+      )}
 
       {/* Additional children (like floating save bars) */}
       {children}

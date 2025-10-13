@@ -2,19 +2,22 @@
 const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5125';
 
 class ApiService {
-  private async getAuthHeader() {
+  private async getAuthHeader(): Promise<Record<string, string>> {
     const token = localStorage.getItem('auth0_token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
   }
 
   async get(endpoint: string) {
     const headers = await this.getAuthHeader();
     const response = await fetch(`${API_URL}/api${endpoint}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers
-      }
+      headers,
     });
 
     if (!response.ok) {
@@ -29,10 +32,7 @@ class ApiService {
     const headers = await this.getAuthHeader();
     const response = await fetch(`${API_URL}/api${endpoint}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers
-      },
+      headers,
       body: JSON.stringify(data)
     });
 
@@ -48,10 +48,7 @@ class ApiService {
     const headers = await this.getAuthHeader();
     const response = await fetch(`${API_URL}/api${endpoint}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers
-      },
+      headers,
       body: JSON.stringify(data)
     });
 
@@ -68,10 +65,7 @@ class ApiService {
     const headers = await this.getAuthHeader();
     const response = await fetch(`${API_URL}/api${endpoint}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers
-      }
+      headers,
     });
 
     if (!response.ok) {
