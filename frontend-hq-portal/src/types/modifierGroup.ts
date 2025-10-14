@@ -5,3 +5,17 @@ export interface ModifierGroupHeader {
   groupBatchNameAlt?: string;
   enabled: boolean;
 }
+
+export interface ModifierGroupPreviewItem {
+  itemId: number;
+  itemCode: string;
+  itemName?: string | null;
+  enabled: boolean;
+  displayIndex: number;
+}
+
+export interface ModifierGroupPreview {
+  groupHeaderId: number;
+  groupBatchName: string;
+  items: ModifierGroupPreviewItem[];
+}

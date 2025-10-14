@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { FC } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { FC, KeyboardEvent } from 'react';
 import {
   ActionIcon,
   Badge,
@@ -16,18 +16,20 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  IconAdjustments,
   IconAlertCircle,
   IconArrowDown,
   IconArrowUp,
   IconCheck,
   IconCopy,
+  IconSquare,
+  IconChevronDown,
+  IconChevronRight,
   IconGripVertical,
   IconSearch,
   IconTrash,
 } from '@tabler/icons-react';
 import type { MenuItemSummary } from '../../../../types/menuItem';
-import type { ModifierGroupHeader } from '../../../../types/modifierGroup';
+import type { ModifierGroupHeader, ModifierGroupPreview } from '../../../../types/modifierGroup';
 import menuItemService from '../../../../services/menuItemService';
 import { CenterLoader } from './CenterLoader';
 import type { ItemModifierMappings, UpdateItemModifierMappingsPayload } from '../../../../types/menuItem';
@@ -106,6 +108,8 @@ const parseSortableId = (value: UniqueIdentifier): { context: ModifierContextKey
   return { context: null, id: null };
 };
 
+const buildMoveFeedbackKey = (context: ModifierContextKey, groupId: number): string => `${context}:${groupId}`;
+
 interface SortableSelectedEntryProps {
   context: ModifierContextKey;
   entryId: number;
@@ -113,8 +117,12 @@ interface SortableSelectedEntryProps {
   total: number;
   saving: boolean;
   group: ModifierGroupHeader | undefined;
-  onMove: (context: ModifierContextKey, index: number, direction: number) => void;
+  onMove: (context: ModifierContextKey, groupId: number, index: number, direction: number) => void;
   onRemove: (context: ModifierContextKey, groupId: number) => void;
+  onSelect: (context: ModifierContextKey, groupId: number) => void;
+  onKeyboardMove: (context: ModifierContextKey, groupId: number, direction: number) => void;
+  selected: boolean;
+  feedbackDirection: 'up' | 'down' | null;
 }
 
 const SortableSelectedEntry: FC<SortableSelectedEntryProps> = ({
@@ -124,6 +132,10 @@ const SortableSelectedEntry: FC<SortableSelectedEntryProps> = ({
   total,
   saving,
   group,
+  onSelect,
+  onKeyboardMove,
+  selected,
+  feedbackDirection,
   onMove,
   onRemove,
 }) => {
@@ -145,6 +157,25 @@ const SortableSelectedEntry: FC<SortableSelectedEntryProps> = ({
     zIndex: isDragging ? 2 : undefined,
   } as const;
 
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (saving) {
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        onKeyboardMove(context, entryId, -1);
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        onKeyboardMove(context, entryId, 1);
+      }
+    },
+    [context, entryId, onKeyboardMove, saving],
+  );
+
+  const upActive = feedbackDirection === 'up';
+  const downActive = feedbackDirection === 'down';
+
   return (
     <Paper
       ref={setNodeRef}
@@ -152,7 +183,16 @@ const SortableSelectedEntry: FC<SortableSelectedEntryProps> = ({
       p="xs"
       withBorder
       shadow="xs"
-      style={{ backgroundColor: 'var(--mantine-color-gray-0)', ...style }}
+      tabIndex={0}
+      onClick={() => onSelect(context, entryId)}
+      onKeyDown={handleKeyDown}
+      style={{
+        backgroundColor: selected ? 'var(--mantine-color-indigo-0)' : 'var(--mantine-color-gray-0)',
+        borderColor: selected ? 'var(--mantine-color-indigo-4)' : undefined,
+        cursor: 'pointer',
+        outline: selected ? '1px solid var(--mantine-color-indigo-5)' : undefined,
+        ...style,
+      }}
     >
       <Group justify="space-between" align="center" gap="sm">
         <Group gap={8} align="center" wrap="nowrap">
@@ -182,20 +222,20 @@ const SortableSelectedEntry: FC<SortableSelectedEntryProps> = ({
         <Group gap={4} wrap="nowrap">
           <Tooltip label="Move up" withArrow>
             <ActionIcon
-              variant="light"
-              color="gray"
+              variant={upActive ? 'filled' : 'light'}
+              color={upActive ? 'indigo' : 'gray'}
               disabled={index === 0 || saving}
-              onClick={() => onMove(context, index, -1)}
+              onClick={() => onMove(context, entryId, index, -1)}
             >
               <IconArrowUp size={14} />
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Move down" withArrow>
             <ActionIcon
-              variant="light"
-              color="gray"
+              variant={downActive ? 'filled' : 'light'}
+              color={downActive ? 'indigo' : 'gray'}
               disabled={index === total - 1 || saving}
-              onClick={() => onMove(context, index, 1)}
+              onClick={() => onMove(context, entryId, index, 1)}
             >
               <IconArrowDown size={14} />
             </ActionIcon>
@@ -230,12 +270,58 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<ModifierState>(defaultState);
   const [search, setSearch] = useState<{ inStore: string; online: string }>({ inStore: '', online: '' });
+  const [expandedGroups, setExpandedGroups] = useState<number[]>([]);
+  const [previewState, setPreviewState] = useState<Record<
+    number,
+    { status: 'idle' | 'loading' | 'loaded' | 'error'; items: ModifierGroupPreview['items']; error?: string }
+  >>({});
+  const [selectedEntry, setSelectedEntry] = useState<{ context: ModifierContextKey; groupId: number } | null>(null);
+  const [moveFeedback, setMoveFeedback] = useState<Record<string, 'up' | 'down'>>({});
+  const moveFeedbackTimers = useRef<Record<string, number>>({});
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { distance: 10 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  useEffect(
+    () => () => {
+      Object.values(moveFeedbackTimers.current).forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+      moveFeedbackTimers.current = {};
+    },
+    [],
+  );
+
+  const expandedGroupSet = useMemo(() => new Set(expandedGroups), [expandedGroups]);
+
+  const triggerMoveFeedback = useCallback((context: ModifierContextKey, groupId: number, direction: number) => {
+    const key = buildMoveFeedbackKey(context, groupId);
+    const nextDirection: 'up' | 'down' = direction < 0 ? 'up' : 'down';
+    const existingTimer = moveFeedbackTimers.current[key];
+    if (existingTimer) {
+      window.clearTimeout(existingTimer);
+    }
+
+    setMoveFeedback((prev) => ({
+      ...prev,
+      [key]: nextDirection,
+    }));
+
+    moveFeedbackTimers.current[key] = window.setTimeout(() => {
+      setMoveFeedback((prev) => {
+        if (!(key in prev)) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      delete moveFeedbackTimers.current[key];
+    }, 320);
+  }, []);
 
   const modifierLookup = useMemo(() => {
     const map = new Map<number, ModifierGroupHeader>();
@@ -248,6 +334,12 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
     setSearch({ inStore: '', online: '' });
     setError(null);
     setActiveTab('inStore');
+    setExpandedGroups([]);
+    setPreviewState({});
+    setSelectedEntry(null);
+    setMoveFeedback({});
+    Object.values(moveFeedbackTimers.current).forEach((timerId) => window.clearTimeout(timerId));
+    moveFeedbackTimers.current = {};
   }, []);
 
   useEffect(() => {
@@ -286,6 +378,58 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
     onClose();
   }, [onClose, saving]);
 
+  const loadPreview = useCallback(
+    async (groupId: number) => {
+      if (!brandId) return;
+      setPreviewState((prev) => ({
+        ...prev,
+        [groupId]: {
+          status: 'loading',
+          items: prev[groupId]?.items ?? [],
+        },
+      }));
+
+      try {
+        const response = await menuItemService.getModifierGroupPreview(brandId, groupId);
+        setPreviewState((prev) => ({
+          ...prev,
+          [groupId]: {
+            status: 'loaded',
+            items: response.items,
+          },
+        }));
+      } catch (err) {
+        console.error('Failed to load modifier group preview', err);
+        setPreviewState((prev) => ({
+          ...prev,
+          [groupId]: {
+            status: 'error',
+            items: [],
+            error: 'Unable to load preview. Please try again.',
+          },
+        }));
+      }
+    },
+    [brandId],
+  );
+
+  const togglePreview = useCallback(
+    (groupId: number) => {
+      setExpandedGroups((prev) => {
+        const isExpanded = prev.includes(groupId);
+        if (isExpanded) {
+          return prev.filter((id) => id !== groupId);
+        }
+        const stateForGroup = previewState[groupId];
+        if (!stateForGroup || stateForGroup.status === 'idle' || stateForGroup.status === 'error') {
+          void loadPreview(groupId);
+        }
+        return [...prev, groupId];
+      });
+    },
+    [loadPreview, previewState],
+  );
+
   const toggleSelection = useCallback(
     (context: ModifierContextKey, groupId: number) => {
       setState((prev) => {
@@ -301,27 +445,83 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
     [],
   );
 
-  const moveSelection = useCallback((context: ModifierContextKey, index: number, direction: number) => {
-    setState((prev) => {
-      const items = [...prev[context]];
-      const target = index + direction;
-      if (target < 0 || target >= items.length) {
-        return prev;
+  const moveSelection = useCallback(
+    (
+      context: ModifierContextKey,
+      groupId: number,
+      index: number,
+      direction: number,
+      options: { highlight?: boolean } = { highlight: true },
+    ) => {
+      let didMove = false;
+      setState((prev) => {
+        const items = [...prev[context]];
+        const target = index + direction;
+        if (target < 0 || target >= items.length) {
+          return prev;
+        }
+
+        const currentGroupId = items[index];
+        if (currentGroupId !== groupId) {
+          return prev;
+        }
+
+        const [moved] = items.splice(index, 1);
+        items.splice(target, 0, moved);
+        didMove = true;
+
+        return {
+          ...prev,
+          [context]: items,
+        };
+      });
+
+      if (didMove && options.highlight !== false) {
+        triggerMoveFeedback(context, groupId, direction);
       }
-      const [moved] = items.splice(index, 1);
-      items.splice(target, 0, moved);
-      return {
-        ...prev,
-        [context]: items,
-      };
-    });
+    },
+    [triggerMoveFeedback],
+  );
+
+  const handleSelectEntry = useCallback((context: ModifierContextKey, groupId: number) => {
+    setSelectedEntry({ context, groupId });
   }, []);
+
+  const handleKeyboardMove = useCallback(
+    (context: ModifierContextKey, groupId: number, direction: number) => {
+      const index = state[context].indexOf(groupId);
+      if (index === -1) return;
+      moveSelection(context, groupId, index, direction);
+      setSelectedEntry({ context, groupId });
+    },
+    [moveSelection, state],
+  );
 
   const removeSelection = useCallback((context: ModifierContextKey, groupId: number) => {
     setState((prev) => ({
       ...prev,
       [context]: prev[context].filter((id) => id !== groupId),
     }));
+    setSelectedEntry((prev) => {
+      if (prev && prev.context === context && prev.groupId === groupId) {
+        return null;
+      }
+      return prev;
+    });
+    const key = buildMoveFeedbackKey(context, groupId);
+    setMoveFeedback((prev) => {
+      if (!(key in prev)) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    const timerId = moveFeedbackTimers.current[key];
+    if (timerId) {
+      window.clearTimeout(timerId);
+      delete moveFeedbackTimers.current[key];
+    }
   }, []);
 
   const clearSelection = useCallback((context: ModifierContextKey) => {
@@ -329,6 +529,24 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
       ...prev,
       [context]: [],
     }));
+    setSelectedEntry((prev) => (prev?.context === context ? null : prev));
+    setMoveFeedback((prev) => {
+      const updatedEntries = Object.entries(prev).filter(([key]) => !key.startsWith(`${context}:`));
+      if (updatedEntries.length === Object.entries(prev).length) {
+        return prev;
+      }
+      const next: Record<string, 'up' | 'down'> = {};
+      updatedEntries.forEach(([key, value]) => {
+        next[key] = value;
+      });
+      return next;
+    });
+    Object.keys(moveFeedbackTimers.current)
+      .filter((key) => key.startsWith(`${context}:`))
+      .forEach((key) => {
+        window.clearTimeout(moveFeedbackTimers.current[key]);
+        delete moveFeedbackTimers.current[key];
+      });
   }, []);
 
   const copySelection = useCallback(
@@ -339,6 +557,24 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
         [to]: [...prev[from]],
       }));
       setActiveTab(to);
+      setSelectedEntry((prev) => (prev?.context === to ? null : prev));
+      setMoveFeedback((prev) => {
+        const filtered = Object.entries(prev).filter(([key]) => !key.startsWith(`${to}:`));
+        if (filtered.length === Object.entries(prev).length) {
+          return prev;
+        }
+        const next: Record<string, 'up' | 'down'> = {};
+        filtered.forEach(([key, value]) => {
+          next[key] = value;
+        });
+        return next;
+      });
+      Object.keys(moveFeedbackTimers.current)
+        .filter((key) => key.startsWith(`${to}:`))
+        .forEach((key) => {
+          window.clearTimeout(moveFeedbackTimers.current[key]);
+          delete moveFeedbackTimers.current[key];
+        });
     },
     [],
   );
@@ -426,6 +662,8 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
             ) : (
               filtered.map((group) => {
                 const selected = selectedIds.has(group.groupHeaderId);
+                const expanded = expandedGroupSet.has(group.groupHeaderId);
+                const preview = previewState[group.groupHeaderId];
                 return (
                   <Paper
                     key={group.groupHeaderId}
@@ -439,33 +677,119 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
                     }}
                     onClick={() => toggleSelection(context, group.groupHeaderId)}
                   >
-                    <Group justify="space-between" align="center">
-                      <Stack gap={2}>
-                        <Group gap={6} align="center">
-                          <Text fw={500} size="sm">
-                            {group.groupBatchName}
-                          </Text>
-                          {!group.enabled && (
-                            <Badge size="xs" color="gray" variant="light">
-                              disabled
-                            </Badge>
-                          )}
+                    <Stack gap="xs">
+                      <Group justify="space-between" align="center" wrap="nowrap">
+                        <Group gap={8} align="center" wrap="nowrap">
+                          <ActionIcon
+                            variant="subtle"
+                            color="gray"
+                            size="sm"
+                            aria-label={expanded ? 'Collapse preview' : 'Expand preview'}
+                            disabled={!brandId}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (brandId) {
+                                togglePreview(group.groupHeaderId);
+                              }
+                            }}
+                          >
+                            {expanded ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+                          </ActionIcon>
+                          <Stack gap={2}>
+                            <Group gap={6} align="center">
+                              <Text fw={500} size="sm">
+                                {group.groupBatchName}
+                              </Text>
+                              {!group.enabled && (
+                                <Badge size="xs" color="gray" variant="light">
+                                  disabled
+                                </Badge>
+                              )}
+                            </Group>
+                            {group.groupBatchNameAlt && (
+                              <Text size="xs" c="dimmed">
+                                {group.groupBatchNameAlt}
+                              </Text>
+                            )}
+                          </Stack>
                         </Group>
-                        {group.groupBatchNameAlt && (
-                          <Text size="xs" c="dimmed">
-                            {group.groupBatchNameAlt}
-                          </Text>
-                        )}
-                      </Stack>
-                      <ActionIcon
-                        variant={selected ? 'filled' : 'light'}
-                        color={selected ? 'indigo' : 'gray'}
-                        size="sm"
-                        aria-label={selected ? 'Remove group' : 'Add group'}
-                      >
-                        {selected ? <IconCheck size={14} /> : <IconAdjustments size={14} />}
-                      </ActionIcon>
-                    </Group>
+                        <ActionIcon
+                          variant={selected ? 'filled' : 'light'}
+                          color={selected ? 'indigo' : 'gray'}
+                          size="sm"
+                          aria-label={selected ? 'Remove group' : 'Add group'}
+                        >
+                          {selected ? <IconCheck size={14} /> : <IconSquare size={14} />}
+                        </ActionIcon>
+                      </Group>
+                      {expanded && (
+                        <Paper
+                          withBorder
+                          radius="sm"
+                          p="xs"
+                          style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}
+                        >
+                          {preview?.status === 'loading' ? (
+                            <Text size="xs" c="dimmed">
+                              Loading preview…
+                            </Text>
+                          ) : preview?.status === 'error' ? (
+                            <Group gap={6} wrap="nowrap" align="center">
+                              <Text size="xs" c="var(--mantine-color-red-6)" style={{ flex: '1 1 auto' }}>
+                                {preview.error ?? 'Unable to load preview.'}
+                              </Text>
+                              <Button
+                                variant="subtle"
+                                size="xs"
+                                compact
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void loadPreview(group.groupHeaderId);
+                                }}
+                              >
+                                Retry
+                              </Button>
+                            </Group>
+                          ) : preview?.status === 'loaded' ? (
+                            preview.items.length > 0 ? (
+                              <Stack gap={4}>
+                                {preview.items.map((item) => (
+                                  <Group key={item.itemId} justify="space-between" gap={6}>
+                                    <Group gap={6}>
+                                      <Text size="xs" fw={600} c={item.enabled ? undefined : 'dimmed'}>
+                                        {item.itemCode}
+                                      </Text>
+                                      <Text
+                                        size="xs"
+                                        c={item.enabled ? 'dimmed' : 'var(--mantine-color-red-6)'}
+                                      >
+                                        {item.itemName ?? 'Unnamed item'}
+                                      </Text>
+                                    </Group>
+                                    <Text size="xs" c="dimmed">
+                                      #{item.displayIndex}
+                                    </Text>
+                                  </Group>
+                                ))}
+                                {preview.items.length === 25 && (
+                                  <Text size="xs" c="dimmed">
+                                    Showing first 25 modifiers. Open the group to view all items.
+                                  </Text>
+                                )}
+                              </Stack>
+                            ) : (
+                              <Text size="xs" c="dimmed">
+                                No modifier items configured.
+                              </Text>
+                            )
+                          ) : (
+                            <Text size="xs" c="dimmed">
+                              {brandId ? 'Select to load preview.' : 'Connect to a brand to view preview.'}
+                            </Text>
+                          )}
+                        </Paper>
+                      )}
+                    </Stack>
                   </Paper>
                 );
               })
@@ -530,10 +854,12 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
           <SortableContext items={sortableItems} strategy={verticalListSortingStrategy}>
             <Stack gap={6}>
               {entries.length === 0 ? (
-                <Text size="sm" c="dimmed">
-                  {CONTEXTS.find((c) => c.key === context)?.emptyMessage ??
-                    'No modifier groups are linked in this context.'}
-                </Text>
+                <Paper withBorder p="md" radius="md" shadow="xs">
+                  <Text size="sm" c="dimmed">
+                    {CONTEXTS.find((c) => c.key === context)?.emptyMessage ??
+                      'No modifier groups are linked in this context.'}
+                  </Text>
+                </Paper>
               ) : (
                 entries.map((entry, index) => (
                   <SortableSelectedEntry
@@ -544,8 +870,12 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
                     total={entries.length}
                     saving={saving}
                     group={entry.group}
+                    selected={selectedEntry?.context === context && selectedEntry.groupId === entry.id}
                     onMove={moveSelection}
                     onRemove={removeSelection}
+                    onSelect={handleSelectEntry}
+                    onKeyboardMove={handleKeyboardMove}
+                    feedbackDirection={moveFeedback[buildMoveFeedbackKey(context, entry.id)] ?? null}
                   />
                 ))
               )}
@@ -586,6 +916,8 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
             [context]: reordered,
           };
         });
+
+        setSelectedEntry({ context, groupId: activeMeta.id! });
       },
     [],
   );

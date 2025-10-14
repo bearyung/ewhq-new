@@ -230,6 +230,63 @@ public class MenuItemsController : ControllerBase
         }
     }
 
+    [HttpGet("brand/{brandId}/modifier-groups/{groupHeaderId}/preview")]
+    [RequireBrandView]
+    public async Task<ActionResult<ModifierGroupPreviewDto>> GetModifierGroupPreview(int brandId, int groupHeaderId)
+    {
+        try
+        {
+            var (context, accountId) = await _posContextService.GetContextAndAccountIdForBrandAsync(brandId);
+
+            var group = await context.ModifierGroupHeaders
+                .AsNoTracking()
+                .FirstOrDefaultAsync(mg => mg.AccountId == accountId && mg.GroupHeaderId == groupHeaderId);
+
+            if (group == null)
+            {
+                return NotFound(new { message = "Modifier group not found" });
+            }
+
+            var items = await context.ModifierGroupDetails
+                .AsNoTracking()
+                .Where(detail => detail.AccountId == accountId && detail.GroupHeaderId == groupHeaderId)
+                .OrderBy(detail => detail.DisplayIndex)
+                .Take(25)
+                .Join(
+                    context.ItemMasters.AsNoTracking(),
+                    detail => new { detail.ItemId, detail.AccountId },
+                    item => new { item.ItemId, item.AccountId },
+                    (detail, item) => new ModifierGroupPreviewItemDto
+                    {
+                        ItemId = item.ItemId,
+                        ItemCode = item.ItemCode,
+                        ItemName = item.ItemName ?? item.ItemPosName ?? item.ItemPublicDisplayName,
+                        Enabled = item.Enabled,
+                        DisplayIndex = detail.DisplayIndex
+                    })
+                .ToListAsync();
+
+            var response = new ModifierGroupPreviewDto
+            {
+                GroupHeaderId = group.GroupHeaderId,
+                GroupBatchName = group.GroupBatchName ?? string.Empty,
+                Items = items
+            };
+
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Brand not found: {BrandId}", brandId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching modifier group preview for group {GroupHeaderId}", groupHeaderId);
+            return StatusCode(500, new { message = "An error occurred while fetching modifier group preview" });
+        }
+    }
+
     private static bool LinkTypeEquals(string? value, string? expected)
     {
         if (string.IsNullOrWhiteSpace(value))

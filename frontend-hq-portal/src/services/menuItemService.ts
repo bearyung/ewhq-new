@@ -12,6 +12,7 @@ import type {
   ItemModifierMappings,
   UpdateItemModifierMappingsPayload,
 } from '../types/menuItem';
+import type { ModifierGroupPreview } from '../types/modifierGroup';
 
 const buildQueryString = (query: MenuItemListQuery): string => {
   const params = new URLSearchParams();
@@ -95,6 +96,11 @@ class MenuItemService {
 
   async getItemModifierMappings(brandId: number, itemId: number): Promise<ItemModifierMappings> {
     const response = await api.get(`/menu-items/brand/${brandId}/${itemId}/modifiers`);
+    return response.data;
+  }
+
+  async getModifierGroupPreview(brandId: number, groupHeaderId: number): Promise<ModifierGroupPreview> {
+    const response = await api.get(`/menu-items/brand/${brandId}/modifier-groups/${groupHeaderId}/preview`);
     return response.data;
   }
 
