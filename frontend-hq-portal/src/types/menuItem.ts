@@ -228,3 +228,56 @@ export interface UpdateItemModifierMappingsPayload {
   inStore: ItemModifierMappingUpsert[];
   online: ItemModifierMappingUpsert[];
 }
+
+export interface ItemRelationshipTree {
+  root: ItemRelationshipNode;
+}
+
+export interface ItemRelationshipNode {
+  item: MenuItemSummary;
+  inStore: ItemRelationshipContext;
+  online: ItemRelationshipContext;
+}
+
+export interface ItemRelationshipContext {
+  modifiers: ItemRelationshipModifier[];
+  itemSets: ItemRelationshipItemSet[];
+}
+
+export interface ItemRelationshipModifier {
+  groupHeaderId: number;
+  sequence: number;
+  linkType: string | null;
+  group: ModifierGroupHeader;
+}
+
+export interface ItemRelationshipItemSet {
+  itemSetId: number | null;
+  groupHeaderId: number;
+  sequence: number;
+  linkType: string | null;
+  group: ModifierGroupHeader;
+  children: ItemRelationshipNode[];
+}
+
+export interface UpdateItemRelationshipTreePayload {
+  root: UpdateItemRelationshipNodePayload;
+}
+
+export interface UpdateItemRelationshipNodePayload {
+  itemId: number;
+  inStore: UpdateItemRelationshipContextPayload;
+  online: UpdateItemRelationshipContextPayload;
+}
+
+export interface UpdateItemRelationshipContextPayload {
+  modifiers: ItemModifierMappingUpsert[];
+  itemSets: UpdateItemRelationshipSetPayload[];
+}
+
+export interface UpdateItemRelationshipSetPayload {
+  itemSetId?: number | null;
+  groupHeaderId: number;
+  sequence: number;
+  children: UpdateItemRelationshipNodePayload[];
+}

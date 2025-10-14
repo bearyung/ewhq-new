@@ -59,7 +59,7 @@ import { CenterLoader } from './menu-items/CenterLoader';
 import { MenuItemDrawer } from './menu-items/MenuItemDrawer';
 import { MenuItemsCategorySidebar } from './menu-items/MenuItemsCategorySidebar';
 import { VirtualTableRow } from './menu-items/VirtualTableRow';
-import { ManageItemModifiersModal } from './menu-items/ManageItemModifiersModal';
+import { ManageItemRelationshipsModal } from './menu-items/ManageItemRelationshipsModal';
 import {
   PAGE_SIZE,
   PANEL_BORDER_COLOR,
@@ -1732,7 +1732,7 @@ const MenuItemsPage: FC = () => {
         drawerMode === 'edit' && selectedDetail ? () => handleOpenModifiers(selectedDetail) : undefined
       }
     />
-    <ManageItemModifiersModal
+    <ManageItemRelationshipsModal
       opened={Boolean(modifierModalItem)}
       onClose={handleCloseModifiers}
       brandId={brandId}

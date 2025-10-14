@@ -11,6 +11,8 @@ import type {
   UpdateMenuItemAvailabilityPayload,
   ItemModifierMappings,
   UpdateItemModifierMappingsPayload,
+  ItemRelationshipTree,
+  UpdateItemRelationshipTreePayload,
 } from '../types/menuItem';
 import type { ModifierGroupPreview } from '../types/modifierGroup';
 
@@ -110,6 +112,20 @@ class MenuItemService {
     payload: UpdateItemModifierMappingsPayload,
   ): Promise<ItemModifierMappings> {
     const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/modifiers`, payload);
+    return response.data;
+  }
+
+  async getItemRelationships(brandId: number, itemId: number): Promise<ItemRelationshipTree> {
+    const response = await api.get(`/menu-items/brand/${brandId}/${itemId}/relationships`);
+    return response.data;
+  }
+
+  async updateItemRelationships(
+    brandId: number,
+    itemId: number,
+    payload: UpdateItemRelationshipTreePayload,
+  ): Promise<ItemRelationshipTree> {
+    const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/relationships`, payload);
     return response.data;
   }
 }
