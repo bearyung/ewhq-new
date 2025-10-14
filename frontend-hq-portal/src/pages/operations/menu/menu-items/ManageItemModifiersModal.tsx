@@ -22,6 +22,7 @@ import {
   IconArrowUp,
   IconCheck,
   IconCopy,
+  IconGripVertical,
   IconSearch,
   IconTrash,
 } from '@tabler/icons-react';
@@ -30,6 +31,26 @@ import type { ModifierGroupHeader } from '../../../../types/modifierGroup';
 import menuItemService from '../../../../services/menuItemService';
 import { CenterLoader } from './CenterLoader';
 import type { ItemModifierMappings, UpdateItemModifierMappingsPayload } from '../../../../types/menuItem';
+import {
+  DndContext,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  closestCenter,
+  type DragEndEvent,
+  type UniqueIdentifier,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface ManageItemModifiersModalProps {
   opened: boolean;
@@ -72,6 +93,129 @@ const defaultState: ModifierState = {
   online: [],
 };
 
+const buildSortableId = (context: ModifierContextKey, id: number): string => `${context}:${id}`;
+
+const parseSortableId = (value: UniqueIdentifier): { context: ModifierContextKey | null; id: number | null } => {
+  const [context, id] = String(value).split(':');
+  if ((context === 'inStore' || context === 'online') && id) {
+    const numericId = Number(id);
+    if (!Number.isNaN(numericId)) {
+      return { context, id: numericId };
+    }
+  }
+  return { context: null, id: null };
+};
+
+interface SortableSelectedEntryProps {
+  context: ModifierContextKey;
+  entryId: number;
+  index: number;
+  total: number;
+  saving: boolean;
+  group: ModifierGroupHeader | undefined;
+  onMove: (context: ModifierContextKey, index: number, direction: number) => void;
+  onRemove: (context: ModifierContextKey, groupId: number) => void;
+}
+
+const SortableSelectedEntry: FC<SortableSelectedEntryProps> = ({
+  context,
+  entryId,
+  index,
+  total,
+  saving,
+  group,
+  onMove,
+  onRemove,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: buildSortableId(context, entryId), disabled: saving });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    boxShadow: isDragging ? 'var(--mantine-shadow-sm)' : undefined,
+    opacity: isDragging ? 0.9 : 1,
+    zIndex: isDragging ? 2 : undefined,
+  } as const;
+
+  return (
+    <Paper
+      ref={setNodeRef}
+      key={`${context}-selected-${entryId}`}
+      p="xs"
+      withBorder
+      shadow="xs"
+      style={{ backgroundColor: 'var(--mantine-color-gray-0)', ...style }}
+    >
+      <Group justify="space-between" align="center" gap="sm">
+        <Group gap={8} align="center" wrap="nowrap">
+          <Tooltip label="Drag to reorder" withArrow>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              ref={setActivatorNodeRef}
+              {...attributes}
+              {...listeners}
+            >
+              <IconGripVertical size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Stack gap={2} style={{ flex: '1 1 auto' }}>
+            <Text fw={600} size="sm">
+              {group?.groupBatchName ?? `Group #${entryId}`}
+            </Text>
+            {group?.groupBatchNameAlt && (
+              <Text size="xs" c="dimmed">
+                {group.groupBatchNameAlt}
+              </Text>
+            )}
+          </Stack>
+        </Group>
+        <Group gap={4} wrap="nowrap">
+          <Tooltip label="Move up" withArrow>
+            <ActionIcon
+              variant="light"
+              color="gray"
+              disabled={index === 0 || saving}
+              onClick={() => onMove(context, index, -1)}
+            >
+              <IconArrowUp size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Move down" withArrow>
+            <ActionIcon
+              variant="light"
+              color="gray"
+              disabled={index === total - 1 || saving}
+              onClick={() => onMove(context, index, 1)}
+            >
+              <IconArrowDown size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Remove" withArrow>
+            <ActionIcon
+              variant="light"
+              color="red"
+              disabled={saving}
+              onClick={() => onRemove(context, entryId)}
+            >
+              <IconTrash size={14} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      </Group>
+    </Paper>
+  );
+};
+
 export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
   opened,
   onClose,
@@ -86,6 +230,12 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<ModifierState>(defaultState);
   const [search, setSearch] = useState<{ inStore: string; online: string }>({ inStore: '', online: '' });
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const modifierLookup = useMemo(() => {
     const map = new Map<number, ModifierGroupHeader>();
@@ -332,6 +482,9 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
       group: modifierLookup.get(id),
     }));
 
+    const dragEndHandler = handleSelectedDragEnd(context);
+    const sortableItems = entries.map((entry) => buildSortableId(context, entry.id));
+
     return (
       <Stack gap="xs">
         <Group justify="space-between" align="center">
@@ -368,72 +521,74 @@ export const ManageItemModifiersModal: FC<ManageItemModifiersModalProps> = ({
             </Tooltip>
           </Group>
         </Group>
-        <Stack gap={6}>
-          {entries.length === 0 ? (
-            <Text size="sm" c="dimmed">
-              {CONTEXTS.find((c) => c.key === context)?.emptyMessage ??
-                'No modifier groups are linked in this context.'}
-            </Text>
-          ) : (
-            entries.map((entry, index) => (
-              <Paper
-                key={`${context}-selected-${entry.id}`}
-                p="xs"
-                withBorder
-                shadow="xs"
-                style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}
-              >
-                <Group justify="space-between" align="center">
-                  <Stack gap={2}>
-                    <Text fw={600} size="sm">
-                      {entry.group?.groupBatchName ?? `Group #${entry.id}`}
-                    </Text>
-                    {entry.group?.groupBatchNameAlt && (
-                      <Text size="xs" c="dimmed">
-                        {entry.group.groupBatchNameAlt}
-                      </Text>
-                    )}
-                  </Stack>
-                  <Group gap={4}>
-                    <Tooltip label="Move up" withArrow>
-                      <ActionIcon
-                        variant="light"
-                        color="gray"
-                        disabled={index === 0 || saving}
-                        onClick={() => moveSelection(context, index, -1)}
-                      >
-                        <IconArrowUp size={14} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Move down" withArrow>
-                      <ActionIcon
-                        variant="light"
-                        color="gray"
-                        disabled={index === entries.length - 1 || saving}
-                        onClick={() => moveSelection(context, index, 1)}
-                      >
-                        <IconArrowDown size={14} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Remove" withArrow>
-                      <ActionIcon
-                        variant="light"
-                        color="red"
-                        disabled={saving}
-                        onClick={() => removeSelection(context, entry.id)}
-                      >
-                        <IconTrash size={14} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
-                </Group>
-              </Paper>
-            ))
-          )}
-        </Stack>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[restrictToVerticalAxis]}
+          onDragEnd={dragEndHandler}
+        >
+          <SortableContext items={sortableItems} strategy={verticalListSortingStrategy}>
+            <Stack gap={6}>
+              {entries.length === 0 ? (
+                <Text size="sm" c="dimmed">
+                  {CONTEXTS.find((c) => c.key === context)?.emptyMessage ??
+                    'No modifier groups are linked in this context.'}
+                </Text>
+              ) : (
+                entries.map((entry, index) => (
+                  <SortableSelectedEntry
+                    key={`${context}-selected-${entry.id}`}
+                    context={context}
+                    entryId={entry.id}
+                    index={index}
+                    total={entries.length}
+                    saving={saving}
+                    group={entry.group}
+                    onMove={moveSelection}
+                    onRemove={removeSelection}
+                  />
+                ))
+              )}
+            </Stack>
+          </SortableContext>
+        </DndContext>
       </Stack>
     );
   };
+
+  const handleSelectedDragEnd = useCallback(
+    (context: ModifierContextKey) =>
+      (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!active || !over || active.id === over.id) {
+          return;
+        }
+
+        const activeMeta = parseSortableId(active.id);
+        const overMeta = parseSortableId(over.id);
+
+        if (activeMeta.context !== context || overMeta.context !== context || activeMeta.id === null || overMeta.id === null) {
+          return;
+        }
+
+        setState((prev) => {
+          const items = [...prev[context]];
+          const oldIndex = items.indexOf(activeMeta.id!);
+          const newIndex = items.indexOf(overMeta.id!);
+
+          if (oldIndex === -1 || newIndex === -1) {
+            return prev;
+          }
+
+          const reordered = arrayMove(items, oldIndex, newIndex);
+          return {
+            ...prev,
+            [context]: reordered,
+          };
+        });
+      },
+    [],
+  );
 
   const renderContext = (context: ModifierContextKey) => (
     <Group align="flex-start" gap="xl" wrap="wrap">

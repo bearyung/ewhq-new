@@ -1331,7 +1331,6 @@ const MenuItemsPage: FC = () => {
                                 setPage(1);
                                 setSortPopoverOpened(false);
                               }}
-                              withinPortal={false}
                             />
                           </Stack>
                         </Popover.Dropdown>
