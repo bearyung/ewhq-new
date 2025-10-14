@@ -78,8 +78,16 @@ interface FlowNodeData {
   modifier?: ItemRelationshipModifier;
   itemSet?: ItemRelationshipItemSet;
   parentItemId?: number;
-  onAddModifier?: (itemId: number, context: 'inStore' | 'online') => void;
-  onAddItemSet?: (itemId: number, context: 'inStore' | 'online') => void;
+  onAddModifier?: (
+    itemId: number,
+    context: 'inStore' | 'online',
+    insertAfterGroupHeaderId?: number | null,
+  ) => void;
+  onAddItemSet?: (
+    itemId: number,
+    context: 'inStore' | 'online',
+    insertAfterGroupHeaderId?: number | null,
+  ) => void;
   onRemoveModifier?: (itemId: number, groupHeaderId: number, context: 'inStore' | 'online') => void;
   onMoveModifier?: (
     itemId: number,
@@ -110,6 +118,7 @@ interface GroupSelectionState {
   mode: 'modifier' | 'set';
   context: 'inStore' | 'online';
   itemId: number;
+  insertAfterGroupHeaderId: number | null;
 }
 
 const cloneModifier = (modifier: ItemRelationshipModifier): ItemRelationshipModifier => ({
@@ -290,7 +299,7 @@ const ItemFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
           color="indigo"
           size="sm"
           disabled={data.disabled}
-          onClick={() => data.onAddModifier?.(data.itemNode!.item.itemId, data.context)}
+          onClick={() => data.onAddModifier?.(data.itemNode!.item.itemId, data.context, null)}
           style={{
             position: 'absolute',
             bottom: -28,
@@ -307,7 +316,7 @@ const ItemFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
           color="teal"
           size="sm"
           disabled={data.disabled}
-          onClick={() => data.onAddItemSet?.(data.itemNode!.item.itemId, data.context)}
+          onClick={() => data.onAddItemSet?.(data.itemNode!.item.itemId, data.context, null)}
           style={{
             position: 'absolute',
             top: '50%',
@@ -417,7 +426,9 @@ const ModifierFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
           color="indigo"
           size="sm"
           disabled={data.disabled}
-          onClick={() => data.onAddModifier?.(data.parentItemId!, data.context)}
+          onClick={() =>
+            data.onAddModifier?.(data.parentItemId!, data.context, data.modifier?.groupHeaderId ?? null)
+          }
           style={{
             position: 'absolute',
             bottom: -28,
@@ -554,7 +565,9 @@ const ItemSetFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
           color="teal"
           size="sm"
           disabled={data.disabled}
-          onClick={() => data.onAddItemSet?.(data.parentItemId!, data.context)}
+          onClick={() =>
+            data.onAddItemSet?.(data.parentItemId!, data.context, data.itemSet?.groupHeaderId ?? null)
+          }
           style={{
             position: 'absolute',
             top: '50%',
@@ -660,8 +673,16 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
 }
 
 interface FlowGraphHandlers {
-  onAddModifier: (itemId: number, context: 'inStore' | 'online') => void;
-  onAddItemSet: (itemId: number, context: 'inStore' | 'online') => void;
+  onAddModifier: (
+    itemId: number,
+    context: 'inStore' | 'online',
+    insertAfterGroupHeaderId?: number | null,
+  ) => void;
+  onAddItemSet: (
+    itemId: number,
+    context: 'inStore' | 'online',
+    insertAfterGroupHeaderId?: number | null,
+  ) => void;
   onRemoveModifier: (itemId: number, groupHeaderId: number, context: 'inStore' | 'online') => void;
   onMoveModifier: (
     itemId: number,
@@ -1104,16 +1125,45 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
     [updateNode],
   );
 
-  const handleAddModifier = useCallback((itemId: number, context: 'inStore' | 'online') => {
-    setGroupSelection({ mode: 'modifier', itemId, context });
-  }, []);
+  const handleAddModifier = useCallback(
+    (
+      itemId: number,
+      context: 'inStore' | 'online',
+      insertAfterGroupHeaderId: number | null = null,
+    ) => {
+      setGroupSelection({
+        mode: 'modifier',
+        itemId,
+        context,
+        insertAfterGroupHeaderId,
+      });
+    },
+    [],
+  );
 
-  const handleAddItemSet = useCallback((itemId: number, context: 'inStore' | 'online') => {
-    setGroupSelection({ mode: 'set', itemId, context });
-  }, []);
+  const handleAddItemSet = useCallback(
+    (
+      itemId: number,
+      context: 'inStore' | 'online',
+      insertAfterGroupHeaderId: number | null = null,
+    ) => {
+      setGroupSelection({
+        mode: 'set',
+        itemId,
+        context,
+        insertAfterGroupHeaderId,
+      });
+    },
+    [],
+  );
 
   const addModifierGroupToNode = useCallback(
-    (itemId: number, context: 'inStore' | 'online', group: ModifierGroupHeader): boolean => {
+    (
+      itemId: number,
+      context: 'inStore' | 'online',
+      group: ModifierGroupHeader,
+      insertAfterGroupHeaderId: number | null,
+    ): boolean => {
       let added = false;
       updateNode(itemId, (node) => {
         const ctx = context === 'inStore' ? node.inStore : node.online;
@@ -1126,15 +1176,27 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
           return;
         }
 
-        ctx.modifiers = [
-          ...ctx.modifiers,
-          {
-            groupHeaderId: group.groupHeaderId,
-            sequence: ctx.modifiers.length + 1,
-            linkType: context === 'inStore' ? MODE_NEW_MODIFIER : null,
-            group: { ...group },
-          },
-        ];
+        const anchorIndex =
+          insertAfterGroupHeaderId == null
+            ? -1
+            : ctx.modifiers.findIndex((modifier) => modifier.groupHeaderId === insertAfterGroupHeaderId);
+
+        const insertIndex =
+          insertAfterGroupHeaderId == null
+            ? 0
+            : anchorIndex === -1
+              ? ctx.modifiers.length
+              : anchorIndex + 1;
+
+        const nextModifiers = [...ctx.modifiers];
+        nextModifiers.splice(insertIndex, 0, {
+          groupHeaderId: group.groupHeaderId,
+          sequence: insertIndex + 1,
+          linkType: context === 'inStore' ? MODE_NEW_MODIFIER : null,
+          group: { ...group },
+        });
+
+        ctx.modifiers = nextModifiers;
         resyncModifierSequences(ctx);
         added = true;
       });
@@ -1145,7 +1207,12 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
   );
 
   const addItemSetToNode = useCallback(
-    async (itemId: number, context: 'inStore' | 'online', group: ModifierGroupHeader): Promise<boolean> => {
+    async (
+      itemId: number,
+      context: 'inStore' | 'online',
+      group: ModifierGroupHeader,
+      insertAfterGroupHeaderId: number | null,
+    ): Promise<boolean> => {
       if (!brandId) {
         return false;
       }
@@ -1189,26 +1256,37 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
         let added = false;
         updateNode(itemId, (node) => {
           const ctx = context === 'inStore' ? node.inStore : node.online;
-          if (ctx.itemSets.some((set) => set.groupHeaderId === group.groupHeaderId)) {
-            notifications.show({
-              color: 'yellow',
-              title: 'Item set already linked',
-              message: `${group.groupBatchName} is already linked to this item.`,
-            });
-            return;
-          }
+        if (ctx.itemSets.some((set) => set.groupHeaderId === group.groupHeaderId)) {
+          notifications.show({
+            color: 'yellow',
+            title: 'Item set already linked',
+            message: `${group.groupBatchName} is already linked to this item.`,
+          });
+          return;
+        }
 
-          ctx.itemSets = [
-            ...ctx.itemSets,
-            {
-              itemSetId: null,
-              groupHeaderId: group.groupHeaderId,
-              sequence: ctx.itemSets.length + 1,
-              linkType: context === 'inStore' ? MODE_NEW_MODIFIER : null,
-              group: { ...group },
-              children,
-            },
-          ];
+          const anchorIndex =
+            insertAfterGroupHeaderId == null
+              ? -1
+              : ctx.itemSets.findIndex((set) => set.groupHeaderId === insertAfterGroupHeaderId);
+          const insertIndex =
+            insertAfterGroupHeaderId == null
+              ? 0
+              : anchorIndex === -1
+                ? ctx.itemSets.length
+                : anchorIndex + 1;
+
+          const nextItemSets = [...ctx.itemSets];
+          nextItemSets.splice(insertIndex, 0, {
+            itemSetId: null,
+            groupHeaderId: group.groupHeaderId,
+            sequence: insertIndex + 1,
+            linkType: context === 'inStore' ? MODE_NEW_MODIFIER : null,
+            group: { ...group },
+            children,
+          });
+
+          ctx.itemSets = nextItemSets;
           resyncItemSetSequences(ctx);
           added = true;
         });
@@ -1277,9 +1355,19 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
 
     let added = false;
     if (groupSelection.mode === 'modifier') {
-      added = addModifierGroupToNode(groupSelection.itemId, groupSelection.context, group);
+      added = addModifierGroupToNode(
+        groupSelection.itemId,
+        groupSelection.context,
+        group,
+        groupSelection.insertAfterGroupHeaderId,
+      );
     } else {
-      added = await addItemSetToNode(groupSelection.itemId, groupSelection.context, group);
+      added = await addItemSetToNode(
+        groupSelection.itemId,
+        groupSelection.context,
+        group,
+        groupSelection.insertAfterGroupHeaderId,
+      );
     }
 
     if (added) {
