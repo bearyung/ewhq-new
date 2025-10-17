@@ -198,29 +198,6 @@ function getHasModifierFlag(node: ItemRelationshipNode): boolean {
     node.online.itemSets.some((set) => set.children.some(getHasModifierFlag));
 }
 
-function computeItemNodeWidthUnits(node: ItemRelationshipNode, context: 'inStore' | 'online'): number {
-  const scopedContext = context === 'inStore' ? node.inStore : node.online;
-  if (scopedContext.itemSets.length === 0) {
-    return 1;
-  }
-
-  return scopedContext.itemSets.reduce(
-    (total, itemSet) => total + computeItemSetWidthUnits(itemSet, context),
-    0,
-  );
-}
-
-function computeItemSetWidthUnits(itemSet: ItemRelationshipItemSet, context: 'inStore' | 'online'): number {
-  if (itemSet.children.length === 0) {
-    return 1;
-  }
-
-  return itemSet.children.reduce(
-    (total, child) => total + computeItemNodeWidthUnits(child, context),
-    0,
-  );
-}
-
 const ITEM_SET_CHILD_GAP = 32;
 const ITEM_SET_HORIZONTAL_OFFSET = 40;
 const ITEM_SET_HORIZONTAL_GAP = 60;
@@ -289,11 +266,6 @@ function getSubtreeBounds(
   return { minX, maxX };
 }
 
-function widthUnitsToPixels(units: number): number {
-  const clampedUnits = Math.max(1, units);
-  return clampedUnits * (REACT_FLOW_NODE_WIDTH + ITEM_SET_CHILD_GAP) - ITEM_SET_CHILD_GAP;
-}
-
 function alignItemSetChildren(
   setNodeId: string,
   nodeMap: Map<string, Node<FlowNodeData>>,
@@ -313,42 +285,47 @@ function alignItemSetChildren(
     return;
   }
 
-  const positionedChildren = childEntries.map((entry) => {
-    const targetNode = nodeMap.get(entry.targetId);
-    const widthUnits =
-      targetNode?.data?.itemNode && targetNode.data.context
-        ? computeItemNodeWidthUnits(targetNode.data.itemNode, targetNode.data.context)
-        : 1;
-    return {
-      entry,
-      widthPx: widthUnitsToPixels(widthUnits),
-    };
-  });
+  const adjustedBounds: Array<{ id: string; minX: number; maxX: number }> = [];
+  let cursor = Number.NEGATIVE_INFINITY;
 
-  const totalWidth =
-    positionedChildren.reduce((acc, child) => acc + child.widthPx, 0) +
-    ITEM_SET_CHILD_GAP * (positionedChildren.length - 1);
-
-  const parentCenter = parentNode.position.x + REACT_FLOW_NODE_WIDTH / 2;
-  let cursorX = parentCenter - totalWidth / 2;
-
-  positionedChildren.forEach(({ entry, widthPx }) => {
-    const bounds = getSubtreeBounds(entry.targetId, nodeMap, childMap, new Set());
+  childEntries.forEach((entry) => {
+    let bounds = getSubtreeBounds(entry.targetId, nodeMap, childMap, new Set());
     if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
-      cursorX += widthPx + ITEM_SET_CHILD_GAP;
+      adjustedBounds.push({ id: entry.targetId, minX: bounds.minX, maxX: bounds.maxX });
       return;
     }
 
-    const currentCenter = (bounds.minX + bounds.maxX) / 2;
-    const desiredCenter = cursorX + widthPx / 2;
-    const deltaX = desiredCenter - currentCenter;
-
-    if (Math.abs(deltaX) > 0.5) {
-      shiftSubtree(entry.targetId, deltaX, 0, nodeMap, childMap, new Set());
+    if (cursor !== Number.NEGATIVE_INFINITY) {
+      const desiredMin = cursor + ITEM_SET_CHILD_GAP;
+      if (bounds.minX < desiredMin) {
+        const delta = desiredMin - bounds.minX;
+        shiftSubtree(entry.targetId, delta, 0, nodeMap, childMap, new Set());
+        bounds = getSubtreeBounds(entry.targetId, nodeMap, childMap, new Set());
+      }
     }
 
-    cursorX += widthPx + ITEM_SET_CHILD_GAP;
+    adjustedBounds.push({ id: entry.targetId, minX: bounds.minX, maxX: bounds.maxX });
+    cursor = bounds.maxX;
   });
+
+  const validBounds = adjustedBounds.filter(
+    (bounds) => Number.isFinite(bounds.minX) && Number.isFinite(bounds.maxX),
+  );
+  if (validBounds.length === 0) {
+    return;
+  }
+
+  const groupMin = validBounds.reduce((acc, bounds) => Math.min(acc, bounds.minX), Number.POSITIVE_INFINITY);
+  const groupMax = validBounds.reduce((acc, bounds) => Math.max(acc, bounds.maxX), Number.NEGATIVE_INFINITY);
+  const groupCenter = (groupMin + groupMax) / 2;
+  const parentCenter = parentNode.position.x + REACT_FLOW_NODE_WIDTH / 2;
+  const shift = parentCenter - groupCenter;
+
+  if (Math.abs(shift) > 0.5) {
+    childEntries.forEach((entry) => {
+      shiftSubtree(entry.targetId, shift, 0, nodeMap, childMap, new Set());
+    });
+  }
 }
 
 function layoutItemSetSubtrees(
@@ -357,7 +334,6 @@ function layoutItemSetSubtrees(
   childMap: Map<string, string[]>,
   childEdgesMap: Map<string, ChildEdgeLink[]>,
   visited: Set<string>,
-  alignmentShiftMap: Map<string, number>,
 ) {
   if (visited.has(nodeId)) {
     return;
@@ -377,34 +353,18 @@ function layoutItemSetSubtrees(
         edge.sourceHandle === 'item-sets',
     )
     .forEach(({ targetId }) => {
-      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited, alignmentShiftMap);
+      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited);
     });
 
   childEdges
     .filter((entry) => entry.edge.sourceHandle === 'item-set-children')
     .forEach(({ targetId }) => {
-      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited, alignmentShiftMap);
+      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited);
     });
 
   const node = nodeMap.get(nodeId);
   if (node?.data?.kind === 'set') {
-    const beforeBounds = getSubtreeBounds(nodeId, nodeMap, childMap, new Set());
     alignItemSetChildren(nodeId, nodeMap, childMap, childEdgesMap);
-    const afterBounds = getSubtreeBounds(nodeId, nodeMap, childMap, new Set());
-    if (
-      Number.isFinite(beforeBounds.minX) &&
-      Number.isFinite(beforeBounds.maxX) &&
-      Number.isFinite(afterBounds.minX) &&
-      Number.isFinite(afterBounds.maxX)
-    ) {
-      const beforeCenter = (beforeBounds.minX + beforeBounds.maxX) / 2;
-      const afterCenter = (afterBounds.minX + afterBounds.maxX) / 2;
-      const delta = afterCenter - beforeCenter;
-      if (Math.abs(delta) > 0.5) {
-        alignmentShiftMap.set(nodeId, delta);
-        shiftSubtree(nodeId, -delta, 0, nodeMap, childMap, new Set());
-      }
-    }
   }
 }
 
@@ -827,10 +787,9 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
     (node) => node.data?.kind === 'item' && (incomingCounts.get(node.id) ?? 0) === 0,
   );
 
-  const alignmentShiftMap = new Map<string, number>();
   const visitedSubtrees = new Set<string>();
   rootItems.forEach((root) => {
-    layoutItemSetSubtrees(root.id, nodeMap, childMap, childEdgesMap, visitedSubtrees, alignmentShiftMap);
+    layoutItemSetSubtrees(root.id, nodeMap, childMap, childEdgesMap, visitedSubtrees);
   });
 
   const itemSetEdgesByAnchor = new Map<string, Array<{ edge: Edge; order: number }>>();
@@ -857,24 +816,18 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
 
     sortedEdges.forEach(({ edge }) => {
       const targetId = edge.target;
-      const childNode = nodeMap.get(targetId);
-      if (!childNode) {
+      let bounds = getSubtreeBounds(targetId, nodeMap, childMap, new Set());
+      if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
         return;
       }
 
-      const widthUnits =
-        childNode.data?.itemSet && childNode.data.context
-          ? computeItemSetWidthUnits(childNode.data.itemSet, childNode.data.context)
-          : 1;
-      const widthPx = widthUnitsToPixels(widthUnits);
-      const shiftCorrection = alignmentShiftMap.get(targetId) ?? 0;
-      const desiredCenter = cursorX + widthPx / 2 + shiftCorrection;
-      const bounds = getSubtreeBounds(targetId, nodeMap, childMap, new Set());
-      if (Number.isFinite(bounds.minX) && Number.isFinite(bounds.maxX)) {
-        const currentCenter = (bounds.minX + bounds.maxX) / 2;
-        const deltaX = desiredCenter - currentCenter;
-        if (Math.abs(deltaX) > 0.5) {
-          shiftSubtree(targetId, deltaX, 0, nodeMap, childMap, new Set());
+      const desiredMin = cursorX;
+      const delta = desiredMin - bounds.minX;
+      if (Math.abs(delta) > 0.5) {
+        shiftSubtree(targetId, delta, 0, nodeMap, childMap, new Set());
+        bounds = getSubtreeBounds(targetId, nodeMap, childMap, new Set());
+        if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
+          return;
         }
       }
 
@@ -886,7 +839,7 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
         };
       }
 
-      cursorX += widthPx + ITEM_SET_HORIZONTAL_GAP;
+      cursorX = bounds.maxX + ITEM_SET_HORIZONTAL_GAP;
     });
   });
 
