@@ -198,8 +198,34 @@ function getHasModifierFlag(node: ItemRelationshipNode): boolean {
     node.online.itemSets.some((set) => set.children.some(getHasModifierFlag));
 }
 
-const ITEM_SET_HORIZONTAL_OFFSET = REACT_FLOW_NODE_WIDTH + 40;
-const ITEM_SET_HORIZONTAL_GAP = REACT_FLOW_NODE_WIDTH + 40;
+function computeItemNodeWidthUnits(node: ItemRelationshipNode, context: 'inStore' | 'online'): number {
+  const scopedContext = context === 'inStore' ? node.inStore : node.online;
+  if (scopedContext.itemSets.length === 0) {
+    return 1;
+  }
+
+  return scopedContext.itemSets.reduce(
+    (total, itemSet) => total + computeItemSetWidthUnits(itemSet, context),
+    0,
+  );
+}
+
+function computeItemSetWidthUnits(itemSet: ItemRelationshipItemSet, context: 'inStore' | 'online'): number {
+  if (itemSet.children.length === 0) {
+    return 1;
+  }
+
+  return itemSet.children.reduce(
+    (total, child) => total + computeItemNodeWidthUnits(child, context),
+    0,
+  );
+}
+
+const ITEM_SET_CHILD_GAP = 32;
+const ITEM_SET_HORIZONTAL_OFFSET = 40;
+const ITEM_SET_HORIZONTAL_GAP = 60;
+
+type ChildEdgeLink = { targetId: string; edge: Edge };
 
 function shiftSubtree(
   nodeId: string,
@@ -230,6 +256,139 @@ function shiftSubtree(
   children.forEach((childId) => {
     shiftSubtree(childId, deltaX, deltaY, nodeMap, childMap, visited);
   });
+}
+
+function getSubtreeBounds(
+  nodeId: string,
+  nodeMap: Map<string, Node<FlowNodeData>>,
+  childMap: Map<string, string[]>,
+  visited: Set<string>,
+): { minX: number; maxX: number } {
+  if (visited.has(nodeId)) {
+    return { minX: Number.POSITIVE_INFINITY, maxX: Number.NEGATIVE_INFINITY };
+  }
+
+  visited.add(nodeId);
+  const node = nodeMap.get(nodeId);
+  if (!node) {
+    return { minX: Number.POSITIVE_INFINITY, maxX: Number.NEGATIVE_INFINITY };
+  }
+
+  let minX = node.position.x;
+  let maxX = node.position.x + REACT_FLOW_NODE_WIDTH;
+
+  const children = childMap.get(nodeId);
+  if (children) {
+    children.forEach((childId) => {
+      const bounds = getSubtreeBounds(childId, nodeMap, childMap, visited);
+      minX = Math.min(minX, bounds.minX);
+      maxX = Math.max(maxX, bounds.maxX);
+    });
+  }
+
+  return { minX, maxX };
+}
+
+function widthUnitsToPixels(units: number): number {
+  const clampedUnits = Math.max(1, units);
+  return clampedUnits * (REACT_FLOW_NODE_WIDTH + ITEM_SET_CHILD_GAP) - ITEM_SET_CHILD_GAP;
+}
+
+function alignItemSetChildren(
+  setNodeId: string,
+  nodeMap: Map<string, Node<FlowNodeData>>,
+  childMap: Map<string, string[]>,
+  childEdgesMap: Map<string, ChildEdgeLink[]>,
+) {
+  const parentNode = nodeMap.get(setNodeId);
+  if (!parentNode) {
+    return;
+  }
+
+  const childEntries = childEdgesMap
+    .get(setNodeId)
+    ?.filter((entry) => entry.edge.sourceHandle === 'item-set-children');
+
+  if (!childEntries || childEntries.length === 0) {
+    return;
+  }
+
+  const positionedChildren = childEntries.map((entry) => {
+    const targetNode = nodeMap.get(entry.targetId);
+    const widthUnits =
+      targetNode?.data?.itemNode && targetNode.data.context
+        ? computeItemNodeWidthUnits(targetNode.data.itemNode, targetNode.data.context)
+        : 1;
+    return {
+      entry,
+      widthPx: widthUnitsToPixels(widthUnits),
+    };
+  });
+
+  const totalWidth =
+    positionedChildren.reduce((acc, child) => acc + child.widthPx, 0) +
+    ITEM_SET_CHILD_GAP * (positionedChildren.length - 1);
+
+  const parentCenter = parentNode.position.x + REACT_FLOW_NODE_WIDTH / 2;
+  let cursorX = parentCenter - totalWidth / 2;
+
+  positionedChildren.forEach(({ entry, widthPx }) => {
+    const bounds = getSubtreeBounds(entry.targetId, nodeMap, childMap, new Set());
+    if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
+      cursorX += widthPx + ITEM_SET_CHILD_GAP;
+      return;
+    }
+
+    const currentCenter = (bounds.minX + bounds.maxX) / 2;
+    const desiredCenter = cursorX + widthPx / 2;
+    const deltaX = desiredCenter - currentCenter;
+
+    if (Math.abs(deltaX) > 0.5) {
+      shiftSubtree(entry.targetId, deltaX, 0, nodeMap, childMap, new Set());
+    }
+
+    cursorX += widthPx + ITEM_SET_CHILD_GAP;
+  });
+}
+
+function layoutItemSetSubtrees(
+  nodeId: string,
+  nodeMap: Map<string, Node<FlowNodeData>>,
+  childMap: Map<string, string[]>,
+  childEdgesMap: Map<string, ChildEdgeLink[]>,
+  visited: Set<string>,
+) {
+  if (visited.has(nodeId)) {
+    return;
+  }
+  visited.add(nodeId);
+
+  const childEdges = childEdgesMap.get(nodeId);
+  if (!childEdges || childEdges.length === 0) {
+    return;
+  }
+
+  childEdges
+    .filter(
+      ({ edge }) =>
+        (edge.data && typeof edge.data === 'object' && (edge.data as { kind?: string }).kind === 'item-set') ||
+        edge.sourceHandle === 'item-set-chain' ||
+        edge.sourceHandle === 'item-sets',
+    )
+    .forEach(({ targetId }) => {
+      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited);
+    });
+
+  childEdges
+    .filter((entry) => entry.edge.sourceHandle === 'item-set-children')
+    .forEach(({ targetId }) => {
+      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited);
+    });
+
+  const node = nodeMap.get(nodeId);
+  if (node?.data?.kind === 'set') {
+    alignItemSetChildren(nodeId, nodeMap, childMap, childEdgesMap);
+  }
 }
 
 const ItemFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
@@ -630,44 +789,87 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
 
   const nodeMap = new Map(positionedNodes.map((node) => [node.id, node]));
   const childMap = new Map<string, string[]>();
+  const childEdgesMap = new Map<string, ChildEdgeLink[]>();
+  const incomingCounts = new Map<string, number>();
 
   edges.forEach((edge) => {
     if (!childMap.has(edge.source)) {
       childMap.set(edge.source, []);
     }
     childMap.get(edge.source)!.push(edge.target);
+
+    if (!childEdgesMap.has(edge.source)) {
+      childEdgesMap.set(edge.source, []);
+    }
+    childEdgesMap.get(edge.source)!.push({ targetId: edge.target, edge });
+
+    incomingCounts.set(edge.target, (incomingCounts.get(edge.target) ?? 0) + 1);
   });
 
-  edges
-    .filter(
-      (edge) => edge.data && typeof edge.data === 'object' && (edge.data as { kind?: string }).kind === 'item-set',
-    )
-    .forEach((edge) => {
+  const rootItems = positionedNodes.filter(
+    (node) => node.data?.kind === 'item' && (incomingCounts.get(node.id) ?? 0) === 0,
+  );
+
+  const visitedSubtrees = new Set<string>();
+  rootItems.forEach((root) => {
+    layoutItemSetSubtrees(root.id, nodeMap, childMap, childEdgesMap, visitedSubtrees);
+  });
+
+  const itemSetEdgesByAnchor = new Map<string, Array<{ edge: Edge; order: number }>>();
+
+  edges.forEach((edge) => {
+    if (edge.data && typeof edge.data === 'object' && (edge.data as { kind?: string }).kind === 'item-set') {
       const edgeData = edge.data as { kind: string; order?: number; anchor?: string };
-      const parentNode =
-        edgeData.anchor && nodeMap.has(edgeData.anchor)
-          ? nodeMap.get(edgeData.anchor)!
-          : nodeMap.get(edge.source);
-      const childNode = nodeMap.get(edge.target);
-      if (!parentNode || !childNode) {
+      const anchor = edgeData.anchor ?? edge.source;
+      if (!itemSetEdgesByAnchor.has(anchor)) {
+        itemSetEdgesByAnchor.set(anchor, []);
+      }
+      itemSetEdgesByAnchor.get(anchor)!.push({ edge, order: edgeData.order ?? 0 });
+    }
+  });
+
+  itemSetEdgesByAnchor.forEach((edgeList, anchorId) => {
+    const parentNode = nodeMap.get(anchorId);
+    if (!parentNode) {
+      return;
+    }
+
+    const sortedEdges = edgeList.sort((a, b) => a.order - b.order);
+    let cursorX = parentNode.position.x + REACT_FLOW_NODE_WIDTH + ITEM_SET_HORIZONTAL_OFFSET;
+
+    sortedEdges.forEach(({ edge }) => {
+      const targetId = edge.target;
+      const childNode = nodeMap.get(targetId);
+      if (!childNode) {
         return;
       }
 
-      const order = edgeData.order ?? 0;
-
-      const desiredX =
-        parentNode.position.x + ITEM_SET_HORIZONTAL_OFFSET + ITEM_SET_HORIZONTAL_GAP * order;
-      const desiredY = parentNode.position.y;
-
-      const deltaX = desiredX - childNode.position.x;
-      const deltaY = desiredY - childNode.position.y;
-
-      if (deltaX === 0 && deltaY === 0) {
-        return;
+      const widthUnits =
+        childNode.data?.itemSet && childNode.data.context
+          ? computeItemSetWidthUnits(childNode.data.itemSet, childNode.data.context)
+          : 1;
+      const widthPx = widthUnitsToPixels(widthUnits);
+      const desiredCenter = cursorX + widthPx / 2;
+      const bounds = getSubtreeBounds(targetId, nodeMap, childMap, new Set());
+      if (Number.isFinite(bounds.minX) && Number.isFinite(bounds.maxX)) {
+        const currentCenter = (bounds.minX + bounds.maxX) / 2;
+        const deltaX = desiredCenter - currentCenter;
+        if (Math.abs(deltaX) > 0.5) {
+          shiftSubtree(targetId, deltaX, 0, nodeMap, childMap, new Set());
+        }
       }
 
-      shiftSubtree(edge.target, deltaX, deltaY, nodeMap, childMap, new Set());
+      const updatedChildNode = nodeMap.get(targetId);
+      if (updatedChildNode) {
+        updatedChildNode.position = {
+          ...updatedChildNode.position,
+          y: parentNode.position.y,
+        };
+      }
+
+      cursorX += widthPx + ITEM_SET_HORIZONTAL_GAP;
     });
+  });
 
   return { nodes: positionedNodes, edges };
 }
