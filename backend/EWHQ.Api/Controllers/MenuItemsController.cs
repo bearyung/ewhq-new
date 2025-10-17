@@ -497,7 +497,8 @@ public class MenuItemsController : ControllerBase
                 AccountId = g.AccountId,
                 GroupBatchName = g.GroupBatchName ?? string.Empty,
                 GroupBatchNameAlt = g.GroupBatchNameAlt,
-                Enabled = g.Enabled
+                Enabled = g.Enabled,
+                IsFollowSet = g.IsFollowSet ?? false
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -1263,7 +1264,8 @@ public class MenuItemsController : ControllerBase
                     AccountId = mg.AccountId,
                     GroupBatchName = mg.GroupBatchName ?? string.Empty,
                     GroupBatchNameAlt = mg.GroupBatchNameAlt,
-                    Enabled = mg.Enabled
+                    Enabled = mg.Enabled,
+                    IsFollowSet = mg.IsFollowSet ?? false
                 })
                 .ToListAsync();
 

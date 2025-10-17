@@ -7,4 +7,5 @@ public class ModifierGroupHeaderDto
     public string GroupBatchName { get; set; } = string.Empty;
     public string? GroupBatchNameAlt { get; set; }
     public bool Enabled { get; set; }
+    public bool IsFollowSet { get; set; }
 }

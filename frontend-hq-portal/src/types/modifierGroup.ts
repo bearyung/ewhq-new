@@ -4,6 +4,7 @@ export interface ModifierGroupHeader {
   groupBatchName: string;
   groupBatchNameAlt?: string;
   enabled: boolean;
+  isFollowSet: boolean;
 }
 
 export interface ModifierGroupPreviewItem {

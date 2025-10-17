@@ -357,6 +357,7 @@ function layoutItemSetSubtrees(
   childMap: Map<string, string[]>,
   childEdgesMap: Map<string, ChildEdgeLink[]>,
   visited: Set<string>,
+  alignmentShiftMap: Map<string, number>,
 ) {
   if (visited.has(nodeId)) {
     return;
@@ -376,18 +377,34 @@ function layoutItemSetSubtrees(
         edge.sourceHandle === 'item-sets',
     )
     .forEach(({ targetId }) => {
-      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited);
+      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited, alignmentShiftMap);
     });
 
   childEdges
     .filter((entry) => entry.edge.sourceHandle === 'item-set-children')
     .forEach(({ targetId }) => {
-      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited);
+      layoutItemSetSubtrees(targetId, nodeMap, childMap, childEdgesMap, visited, alignmentShiftMap);
     });
 
   const node = nodeMap.get(nodeId);
   if (node?.data?.kind === 'set') {
+    const beforeBounds = getSubtreeBounds(nodeId, nodeMap, childMap, new Set());
     alignItemSetChildren(nodeId, nodeMap, childMap, childEdgesMap);
+    const afterBounds = getSubtreeBounds(nodeId, nodeMap, childMap, new Set());
+    if (
+      Number.isFinite(beforeBounds.minX) &&
+      Number.isFinite(beforeBounds.maxX) &&
+      Number.isFinite(afterBounds.minX) &&
+      Number.isFinite(afterBounds.maxX)
+    ) {
+      const beforeCenter = (beforeBounds.minX + beforeBounds.maxX) / 2;
+      const afterCenter = (afterBounds.minX + afterBounds.maxX) / 2;
+      const delta = afterCenter - beforeCenter;
+      if (Math.abs(delta) > 0.5) {
+        alignmentShiftMap.set(nodeId, delta);
+        shiftSubtree(nodeId, -delta, 0, nodeMap, childMap, new Set());
+      }
+    }
   }
 }
 
@@ -810,9 +827,10 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
     (node) => node.data?.kind === 'item' && (incomingCounts.get(node.id) ?? 0) === 0,
   );
 
+  const alignmentShiftMap = new Map<string, number>();
   const visitedSubtrees = new Set<string>();
   rootItems.forEach((root) => {
-    layoutItemSetSubtrees(root.id, nodeMap, childMap, childEdgesMap, visitedSubtrees);
+    layoutItemSetSubtrees(root.id, nodeMap, childMap, childEdgesMap, visitedSubtrees, alignmentShiftMap);
   });
 
   const itemSetEdgesByAnchor = new Map<string, Array<{ edge: Edge; order: number }>>();
@@ -849,7 +867,8 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
           ? computeItemSetWidthUnits(childNode.data.itemSet, childNode.data.context)
           : 1;
       const widthPx = widthUnitsToPixels(widthUnits);
-      const desiredCenter = cursorX + widthPx / 2;
+      const shiftCorrection = alignmentShiftMap.get(targetId) ?? 0;
+      const desiredCenter = cursorX + widthPx / 2 + shiftCorrection;
       const bounds = getSubtreeBounds(targetId, nodeMap, childMap, new Set());
       if (Number.isFinite(bounds.minX) && Number.isFinite(bounds.maxX)) {
         const currentCenter = (bounds.minX + bounds.maxX) / 2;
@@ -869,6 +888,48 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
 
       cursorX += widthPx + ITEM_SET_HORIZONTAL_GAP;
     });
+  });
+
+  rootItems.forEach((root) => {
+    const itemSetChildren = childEdgesMap
+      .get(root.id)
+      ?.filter(
+        ({ edge }) =>
+          edge.sourceHandle === 'item-sets' ||
+          edge.sourceHandle === 'item-set-chain' ||
+          (edge.data && typeof edge.data === 'object' && (edge.data as { kind?: string }).kind === 'item-set'),
+      )
+      .map(({ targetId }) => targetId);
+
+    if (!itemSetChildren || itemSetChildren.length === 0) {
+      return;
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+
+    itemSetChildren.forEach((childId) => {
+      const bounds = getSubtreeBounds(childId, nodeMap, childMap, new Set());
+      if (Number.isFinite(bounds.minX)) {
+        minX = Math.min(minX, bounds.minX);
+      }
+      if (Number.isFinite(bounds.maxX)) {
+        maxX = Math.max(maxX, bounds.maxX);
+      }
+    });
+
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX) || minX > maxX) {
+      return;
+    }
+
+    const desiredCenter = (minX + maxX) / 2;
+    const maxAllowedCenter = minX - (ITEM_SET_HORIZONTAL_OFFSET + REACT_FLOW_NODE_WIDTH / 2);
+    const targetCenter = Math.min(desiredCenter, maxAllowedCenter);
+
+    root.position = {
+      ...root.position,
+      x: targetCenter - REACT_FLOW_NODE_WIDTH / 2,
+    };
   });
 
   return { nodes: positionedNodes, edges };
@@ -1520,6 +1581,8 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
       return [];
     }
 
+    const shouldMatchFollowSet = groupSelection.mode === 'set';
+
     const node = findNodeById(relationship.root, groupSelection.itemId);
     const existingIds = new Set<number>();
 
@@ -1533,6 +1596,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
     }
 
     return availableGroups
+      .filter((group) => group.isFollowSet === shouldMatchFollowSet)
       .filter((group) => !existingIds.has(group.groupHeaderId))
       .map((group) => ({
         value: String(group.groupHeaderId),
