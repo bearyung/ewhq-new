@@ -1749,13 +1749,11 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
           </Stack>
         }
         styles={{
-          content: isMaximized
-            ? {
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-              }
-            : undefined,
+          content: {
+            display: 'flex',
+            flexDirection: 'column',
+            ...(isMaximized ? { height: '100%' } : {}),
+          },
           body: {
             display: 'flex',
             flexDirection: 'column',
@@ -1791,7 +1789,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              minHeight: isMaximized ? 0 : undefined,
+              minHeight: 0,
             }}
           >
             <Group justify="space-between" align="center">
@@ -1845,7 +1843,13 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
                       minWidth: 0,
                       overflow: 'hidden',
                     }
-                  : { height: 520 }
+                  : {
+                      flex: '1 1 520px',
+                      minHeight: 360,
+                      maxHeight: '60vh',
+                      minWidth: 0,
+                      overflow: 'hidden',
+                    }
               }
             >
               <ReactFlow
@@ -1861,7 +1865,10 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
                 <Controls position="bottom-right" showInteractive={false} />
               </ReactFlow>
             </Box>
-            <Group justify="space-between" style={{ marginTop: 'auto' }}>
+            <Group
+              justify="space-between"
+              style={{ marginTop: 'auto', paddingBottom: 'var(--mantine-spacing-sm)' }}
+            >
               <Button variant="subtle" onClick={handleCloseModal} disabled={saving}>
                 Cancel
               </Button>
