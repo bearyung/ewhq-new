@@ -295,6 +295,40 @@ const ModifierGroupPropertiesContent: FC<ModifierGroupPropertiesContentProps> = 
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<MenuItemSummary[]>([]);
 
+  const copy = useMemo(() => {
+    if (mode === 'modifier') {
+      return {
+        badgeLabel: 'Modifier group',
+        membersDividerLabel: 'Modifiers',
+        membersIntro:
+          'These modifiers will be offered after the customer selects the item. Use the arrows to adjust the order.',
+        searchInputLabel: 'Search modifiers',
+        searchPlaceholder: 'Search modifier items by name or code',
+        searchButton: 'Search modifiers',
+        searchResultsLabel: 'Modifier results',
+        addButtonLabel: 'Add modifier',
+        emptyStateTitle: 'No modifiers linked',
+        emptyStateMessage: 'This group has no modifiers yet. Search above to add existing modifier items.',
+        tableItemHeader: 'Modifier',
+      };
+    }
+
+    return {
+      badgeLabel: 'Item set group',
+      membersDividerLabel: 'Set items',
+      membersIntro:
+        'Set items are presented as part of this combo. Reorder them to control how they appear to the staff.',
+      searchInputLabel: 'Search set items',
+      searchPlaceholder: 'Search items to include in this set',
+      searchButton: 'Search items',
+      searchResultsLabel: 'Set item results',
+      addButtonLabel: 'Add item',
+      emptyStateTitle: 'No set items linked',
+      emptyStateMessage: 'This group does not contain any set items yet. Search above to add menu items.',
+      tableItemHeader: 'Set item',
+    };
+  }, [mode]);
+
   const contextLabel = useMemo(() => {
     if (!originContext) return null;
     return originContext === 'inStore' ? 'POS flow' : 'Online flow';
@@ -495,7 +529,7 @@ const ModifierGroupPropertiesContent: FC<ModifierGroupPropertiesContentProps> = 
             </Text>
           </Stack>
           <Stack gap={4} align="flex-end">
-            <Badge color={mode === 'modifier' ? 'grape' : 'teal'}>{mode === 'modifier' ? 'Modifier group' : 'Item set group'}</Badge>
+            <Badge color={mode === 'modifier' ? 'grape' : 'teal'}>{copy.badgeLabel}</Badge>
             {contextLabel && (
               <Badge color={originContext === 'inStore' ? 'indigo' : 'gray'} variant="light">
                 {contextLabel}
@@ -522,14 +556,23 @@ const ModifierGroupPropertiesContent: FC<ModifierGroupPropertiesContentProps> = 
         <Switch label="Enabled" checked={enabled} onChange={(event) => setEnabled(event.currentTarget.checked)} />
       </Stack>
 
-      <Divider label="Members" labelPosition="center" />
+      <Divider label={copy.membersDividerLabel} labelPosition="center" />
       <Stack gap="sm">
+        <Text size="sm" c="dimmed">
+          {copy.membersIntro}
+        </Text>
         <Group gap="sm" align="end">
           <TextInput
-            label="Search items"
-            placeholder="Search by name or code"
+            label={copy.searchInputLabel}
+            placeholder={copy.searchPlaceholder}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void handleSearch();
+              }
+            }}
             style={{ flex: 1 }}
           />
           <Button
@@ -537,8 +580,9 @@ const ModifierGroupPropertiesContent: FC<ModifierGroupPropertiesContentProps> = 
             onClick={() => void handleSearch()}
             loading={searchLoading}
             variant="light"
+            aria-label={copy.searchButton}
           >
-            Search
+            {copy.searchButton}
           </Button>
         </Group>
         {filteredSearchResults.length > 0 && (
@@ -552,7 +596,7 @@ const ModifierGroupPropertiesContent: FC<ModifierGroupPropertiesContentProps> = 
             <Stack gap="xs">
               <Group justify="space-between" align="center">
                 <Text fw={600} size="sm">
-                  Search results
+                  {copy.searchResultsLabel}
                 </Text>
                 <Text size="xs" c="dimmed">
                   {filteredSearchResults.length} item{filteredSearchResults.length === 1 ? '' : 's'} found
@@ -575,7 +619,7 @@ const ModifierGroupPropertiesContent: FC<ModifierGroupPropertiesContentProps> = 
                       onClick={() => handleAddMember(item)}
                       variant="light"
                     >
-                      Add
+                      {copy.addButtonLabel}
                     </Button>
                   </Group>
                 ))}
@@ -584,15 +628,15 @@ const ModifierGroupPropertiesContent: FC<ModifierGroupPropertiesContentProps> = 
           </Box>
         )}
         {members.length === 0 ? (
-          <Alert color="yellow" title="No items linked">
-            This group does not have any items linked yet. Search and add items above.
+          <Alert color="yellow" title={copy.emptyStateTitle}>
+            {copy.emptyStateMessage}
           </Alert>
         ) : (
           <Table striped highlightOnHover withTableBorder withColumnBorders>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th style={{ width: 60 }}>Seq</Table.Th>
-                <Table.Th>Item</Table.Th>
+                <Table.Th>{copy.tableItemHeader}</Table.Th>
                 <Table.Th style={{ width: 100 }}>Enabled</Table.Th>
                 <Table.Th style={{ width: 120 }}>Reorder</Table.Th>
                 <Table.Th style={{ width: 80 }}>Remove</Table.Th>
