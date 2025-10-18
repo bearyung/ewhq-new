@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
 import {
   ActionIcon,
@@ -22,6 +22,7 @@ import {
   IconArrowUp,
   IconArrowsMaximize,
   IconArrowsMinimize,
+  IconAdjustments,
   IconChevronRight,
   IconGripVertical,
   IconPlus,
@@ -56,6 +57,7 @@ import {
 } from '../../../../types/menuItem';
 import menuItemService from '../../../../services/menuItemService';
 import { CenterLoader } from './CenterLoader';
+import { NodePropertiesDrawer, type NodePropertiesDrawerState } from './NodePropertiesDrawer';
 
 const MODE_NEW_MODIFIER = 'NEW_MODIFIER_MODE';
 const CONTEXT_OPTIONS: Array<{ value: 'inStore' | 'online'; label: string }> = [
@@ -103,6 +105,7 @@ interface FlowNodeData {
     direction: -1 | 1,
   ) => void;
   disabled?: boolean;
+  onOpenProperties?: (state: NodePropertiesDrawerState) => void;
 }
 
 interface ManageItemRelationshipsModalProps {
@@ -385,14 +388,32 @@ const ItemFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
     >
       <Handle type="target" position={Position.Top} id="modifier-parent" />
       <Stack gap={6}>
-        <Stack gap={2} style={{ flex: '1 1 auto' }}>
-          <Text fw={600} size="sm" lineClamp={2}>
-            {itemName}
-          </Text>
-          <Text size="xs" c="dimmed">
-            {data.itemNode?.item.itemCode}
-          </Text>
-        </Stack>
+        <Group justify="space-between" align="flex-start">
+          <Stack gap={2} style={{ flex: '1 1 auto' }}>
+            <Text fw={600} size="sm" lineClamp={2}>
+              {itemName}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {data.itemNode?.item.itemCode}
+            </Text>
+          </Stack>
+          <Tooltip label="Open properties" withArrow>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              disabled={data.disabled}
+              onClick={() =>
+                data.onOpenProperties?.({
+                  kind: 'item',
+                  itemId: data.itemNode!.item.itemId,
+                })
+              }
+            >
+              <IconAdjustments size={16} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
         <Badge size="xs" variant="light" color={data.context === 'inStore' ? 'indigo' : 'gray'}>
           {data.context === 'inStore' ? 'POS flow' : 'Online flow'}
         </Badge>
@@ -498,6 +519,24 @@ const ModifierFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
             </Stack>
           </Group>
           <Group gap={4}>
+            <Tooltip label="Open properties" withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                disabled={data.disabled}
+                onClick={() =>
+                  data.onOpenProperties?.({
+                    kind: 'modifier',
+                    itemId: data.parentItemId!,
+                    groupHeaderId: modifier.groupHeaderId,
+                    originContext: data.context,
+                  })
+                }
+              >
+                <IconAdjustments size={16} />
+              </ActionIcon>
+            </Tooltip>
             <Tooltip label="Move up" withArrow>
               <ActionIcon
                 variant="light"
@@ -627,6 +666,24 @@ const ItemSetFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
             </Stack>
           </Group>
           <Group gap={4}>
+            <Tooltip label="Open properties" withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                disabled={data.disabled}
+                onClick={() =>
+                  data.onOpenProperties?.({
+                    kind: 'item-set',
+                    itemId: data.parentItemId!,
+                    groupHeaderId: itemSet.groupHeaderId,
+                    originContext: data.context,
+                  })
+                }
+              >
+                <IconAdjustments size={16} />
+              </ActionIcon>
+            </Tooltip>
             <Tooltip label="Move up" withArrow>
               <ActionIcon
                 variant="light"
@@ -914,6 +971,7 @@ interface FlowGraphHandlers {
     direction: -1 | 1,
   ) => void;
   disabled: boolean;
+  onOpenProperties: (state: NodePropertiesDrawerState) => void;
 }
 
 function findNodeById(node: ItemRelationshipNode, itemId: number): ItemRelationshipNode | null {
@@ -982,6 +1040,7 @@ function buildFlowGraph(
       onAddModifier: handlers.onAddModifier,
       onAddItemSet: handlers.onAddItemSet,
       disabled: handlers.disabled,
+      onOpenProperties: handlers.onOpenProperties,
     },
     position: { x: 0, y: 0 },
   });
@@ -1029,6 +1088,7 @@ function buildFlowGraph(
         onMoveModifier: handlers.onMoveModifier,
         onAddModifier: handlers.onAddModifier,
         disabled: handlers.disabled,
+        onOpenProperties: handlers.onOpenProperties,
       },
       position: { x: 0, y: 0 },
     });
@@ -1066,6 +1126,7 @@ function buildFlowGraph(
         onMoveItemSet: handlers.onMoveItemSet,
         onAddItemSet: handlers.onAddItemSet,
         disabled: handlers.disabled,
+        onOpenProperties: handlers.onOpenProperties,
       },
       position: { x: 0, y: 0 },
     });
@@ -1123,7 +1184,17 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const [shouldFitView, setShouldFitView] = useState(false);
+  const [propertiesDrawer, setPropertiesDrawer] = useState<NodePropertiesDrawerState | null>(null);
+  const [groupLookups, setGroupLookups] = useState<ModifierGroupHeader[]>(modifierGroups ?? []);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (modifierGroups) {
+      setGroupLookups(modifierGroups);
+    } else {
+      setGroupLookups([]);
+    }
+  }, [modifierGroups]);
 
   const itemAccountId = item?.accountId ?? null;
   const itemCategoryId = item?.categoryId ?? null;
@@ -1135,7 +1206,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
 
-  const availableGroups = useMemo(() => modifierGroups ?? [], [modifierGroups]);
+  const availableGroups = groupLookups;
 
   const loadRelationships = useCallback(async () => {
     if (!brandId || !item) {
@@ -1162,6 +1233,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
       setError(null);
       setGroupSelection(null);
       setSelectedGroupId(null);
+      setPropertiesDrawer(null);
       childRelationshipCache.current.clear();
       setIsMaximized(false);
       setShouldFitView(false);
@@ -1195,6 +1267,14 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
     },
     [brandId],
   );
+
+  const handleModifierGroupUpdated = useCallback((header: ModifierGroupHeader) => {
+    setGroupLookups((prev) => {
+      const next = [...prev.filter((group) => group.groupHeaderId !== header.groupHeaderId), header];
+      next.sort((a, b) => a.groupBatchName.localeCompare(b.groupBatchName));
+      return next;
+    });
+  }, []);
 
   const updateNode = useCallback(
     (targetItemId: number, updater: (node: ItemRelationshipNode) => void) => {
@@ -1601,6 +1681,10 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
     selectedGroupId,
   ]);
 
+  const handleOpenProperties = useCallback((drawerState: NodePropertiesDrawerState) => {
+    setPropertiesDrawer(drawerState);
+  }, []);
+
   const rebuildGraph = useCallback(() => {
     if (!relationship) {
       setNodes([]);
@@ -1616,6 +1700,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
       onRemoveItemSet: handleRemoveItemSet,
       onMoveItemSet: handleMoveItemSet,
       disabled: saving,
+      onOpenProperties: handleOpenProperties,
     });
 
     const layouted = layoutGraph(graph.nodes, graph.edges);
@@ -1636,6 +1721,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
     handleMoveModifier,
     handleRemoveItemSet,
     handleMoveItemSet,
+    handleOpenProperties,
     saving,
     setEdges,
     setNodes,
@@ -1684,6 +1770,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
 
   const handleCloseModal = useCallback(() => {
     if (!saving) {
+      setPropertiesDrawer(null);
       onClose();
     }
   }, [onClose, saving]);
@@ -1691,6 +1778,26 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
   const handleRetry = useCallback(() => {
     void loadRelationships();
   }, [loadRelationships]);
+
+  const refreshRelationships = useCallback(async () => {
+    if (!brandId || !item) {
+      return;
+    }
+
+    try {
+      const tree = await menuItemService.getItemRelationships(brandId, item.itemId);
+      childRelationshipCache.current.clear();
+      setRelationship(tree);
+      setShouldFitView(true);
+    } catch (err) {
+      console.error('Failed to refresh item relationships', err);
+      notifications.show({
+        color: 'red',
+        title: 'Unable to refresh relationships',
+        message: 'An error occurred while refreshing the relationships graph.',
+      });
+    }
+  }, [brandId, item]);
 
   const selectionTitle =
     groupSelection?.mode === 'modifier' ? 'Add modifier group' : 'Add item set group';
@@ -1729,6 +1836,31 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
   const handleAutoLayout = useCallback(() => {
     rebuildGraph();
   }, [rebuildGraph]);
+
+  const flowContainerStyles = useMemo<CSSProperties>(() => {
+    if (isMaximized) {
+      return {
+        flexGrow: 1,
+        flexShrink: 1,
+        minHeight: 0,
+        minWidth: 0,
+        overflow: 'hidden',
+        display: 'flex',
+        height: '100%',
+      };
+    }
+
+    return {
+      flexGrow: 1,
+      flexShrink: 1,
+      minHeight: 360,
+      maxHeight: '60vh',
+      height: 'min(60vh, 520px)',
+      minWidth: 0,
+      overflow: 'hidden',
+      display: 'flex',
+    };
+  }, [isMaximized]);
 
   return (
     <>
@@ -1835,22 +1967,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
             </Group>
             <Box
               ref={flowContainerRef}
-              style={
-                isMaximized
-                  ? {
-                      flex: 1,
-                      minHeight: 0,
-                      minWidth: 0,
-                      overflow: 'hidden',
-                    }
-                  : {
-                      flex: '1 1 520px',
-                      minHeight: 360,
-                      maxHeight: '60vh',
-                      minWidth: 0,
-                      overflow: 'hidden',
-                    }
-              }
+              style={flowContainerStyles}
             >
               <ReactFlow
                 nodes={nodes}
@@ -1860,6 +1977,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
                 nodeTypes={nodeTypes}
                 proOptions={{ hideAttribution: true }}
                 onInit={setReactFlowInstance}
+                style={{ flexGrow: 1, minHeight: 0, width: '100%', height: '100%' }}
               >
                 <Background gap={16} size={1} />
                 <Controls position="bottom-right" showInteractive={false} />
@@ -1932,6 +2050,13 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
           </Group>
         </Stack>
       </Modal>
+      <NodePropertiesDrawer
+        state={propertiesDrawer}
+        brandId={brandId}
+        onClose={() => setPropertiesDrawer(null)}
+        onAfterSave={refreshRelationships}
+        onModifierGroupUpdated={handleModifierGroupUpdated}
+      />
     </>
   );
 };
