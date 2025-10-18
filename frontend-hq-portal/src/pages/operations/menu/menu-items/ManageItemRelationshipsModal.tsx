@@ -387,16 +387,19 @@ const ItemFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
       }}
     >
       <Handle type="target" position={Position.Top} id="modifier-parent" />
-      <Stack gap={6}>
-        <Group justify="space-between" align="flex-start">
-          <Stack gap={2} style={{ flex: '1 1 auto' }}>
-            <Text fw={600} size="sm" lineClamp={2}>
-              {itemName}
-            </Text>
-            <Text size="xs" c="dimmed">
-              {data.itemNode?.item.itemCode}
-            </Text>
-          </Stack>
+      <Stack gap={8}>
+        <Stack gap={2} style={{ flex: '1 1 auto' }}>
+          <Text fw={600} size="sm" lineClamp={2}>
+            {itemName}
+          </Text>
+          <Text size="xs" c="dimmed">
+            {data.itemNode?.item.itemCode}
+          </Text>
+        </Stack>
+        <Badge size="xs" variant="light" color={data.context === 'inStore' ? 'indigo' : 'gray'}>
+          {data.context === 'inStore' ? 'POS flow' : 'Online flow'}
+        </Badge>
+        <Group justify="flex-end">
           <Tooltip label="Open properties" withArrow>
             <ActionIcon
               variant="subtle"
@@ -414,9 +417,6 @@ const ItemFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
             </ActionIcon>
           </Tooltip>
         </Group>
-        <Badge size="xs" variant="light" color={data.context === 'inStore' ? 'indigo' : 'gray'}>
-          {data.context === 'inStore' ? 'POS flow' : 'Online flow'}
-        </Badge>
       </Stack>
       <Handle
         type="source"
@@ -503,82 +503,80 @@ const ModifierFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
       }}
     >
       <Handle type="target" position={Position.Top} />
-      <Stack gap={6}>
-        <Group justify="space-between" align="center">
-          <Group gap={6} align="center">
-            <IconGripVertical size={16} color="var(--mantine-color-gray-6)" />
-            <Stack gap={2}>
-              <Text fw={600} size="sm" lineClamp={2}>
-                {modifier.group.groupBatchName}
+      <Stack gap={8}>
+        <Group justify="flex-start" align="flex-start" gap={6} wrap="nowrap">
+          <IconGripVertical size={16} color="var(--mantine-color-gray-6)" />
+          <Stack gap={2} style={{ flex: '1 1 auto', minWidth: 0 }}>
+            <Text fw={600} size="sm" lineClamp={2} style={{ minWidth: 0 }}>
+              {modifier.group.groupBatchName}
+            </Text>
+            {modifier.group.groupBatchNameAlt && (
+              <Text size="xs" c="dimmed" lineClamp={1} style={{ minWidth: 0 }}>
+                {modifier.group.groupBatchNameAlt}
               </Text>
-              {modifier.group.groupBatchNameAlt && (
-                <Text size="xs" c="dimmed" lineClamp={1}>
-                  {modifier.group.groupBatchNameAlt}
-                </Text>
-              )}
-            </Stack>
-          </Group>
-          <Group gap={4}>
-            <Tooltip label="Open properties" withArrow>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size="sm"
-                disabled={data.disabled}
-                onClick={() =>
-                  data.onOpenProperties?.({
-                    kind: 'modifier',
-                    itemId: data.parentItemId!,
-                    groupHeaderId: modifier.groupHeaderId,
-                    originContext: data.context,
-                  })
-                }
-              >
-                <IconAdjustments size={16} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Move up" withArrow>
-              <ActionIcon
-                variant="light"
-                size="sm"
-                disabled={data.disabled}
-                onClick={() =>
-                  data.onMoveModifier?.(data.parentItemId!, modifier.groupHeaderId, data.context, -1)
-                }
-              >
-                <IconArrowUp size={14} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Move down" withArrow>
-              <ActionIcon
-                variant="light"
-                size="sm"
-                disabled={data.disabled}
-                onClick={() =>
-                  data.onMoveModifier?.(data.parentItemId!, modifier.groupHeaderId, data.context, 1)
-                }
-              >
-                <IconArrowDown size={14} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Remove" withArrow>
-              <ActionIcon
-                variant="light"
-                color="red"
-                size="sm"
-                disabled={data.disabled}
-                onClick={() =>
-                  data.onRemoveModifier?.(data.parentItemId!, modifier.groupHeaderId, data.context)
-                }
-              >
-                <IconTrash size={14} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
+            )}
+          </Stack>
         </Group>
         <Badge size="xs" variant="light">
           Sequence {modifier.sequence}
         </Badge>
+        <Group justify="flex-end" gap={4} wrap="nowrap">
+          <Tooltip label="Open properties" withArrow>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              disabled={data.disabled}
+              onClick={() =>
+                data.onOpenProperties?.({
+                  kind: 'modifier',
+                  itemId: data.parentItemId!,
+                  groupHeaderId: modifier.groupHeaderId,
+                  originContext: data.context,
+                })
+              }
+            >
+              <IconAdjustments size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Move up" withArrow>
+            <ActionIcon
+              variant="light"
+              size="sm"
+              disabled={data.disabled}
+              onClick={() =>
+                data.onMoveModifier?.(data.parentItemId!, modifier.groupHeaderId, data.context, -1)
+              }
+            >
+              <IconArrowUp size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Move down" withArrow>
+            <ActionIcon
+              variant="light"
+              size="sm"
+              disabled={data.disabled}
+              onClick={() =>
+                data.onMoveModifier?.(data.parentItemId!, modifier.groupHeaderId, data.context, 1)
+              }
+            >
+              <IconArrowDown size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Remove" withArrow>
+            <ActionIcon
+              variant="light"
+              color="red"
+              size="sm"
+              disabled={data.disabled}
+              onClick={() =>
+                data.onRemoveModifier?.(data.parentItemId!, modifier.groupHeaderId, data.context)
+              }
+            >
+              <IconTrash size={14} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Stack>
       <Handle
         type="source"
@@ -650,82 +648,80 @@ const ItemSetFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
           zIndex: 5,
         }}
       />
-      <Stack gap={6}>
-        <Group justify="space-between" align="center">
-          <Group gap={6} align="center">
-            <IconChevronRight size={16} color="var(--mantine-color-gray-6)" />
-            <Stack gap={2} style={{ flex: '1 1 auto' }}>
-              <Text fw={600} size="sm" lineClamp={2}>
-                {itemSet.group.groupBatchName}
+      <Stack gap={8}>
+        <Group justify="flex-start" align="flex-start" gap={6} wrap="nowrap">
+          <IconChevronRight size={16} color="var(--mantine-color-gray-6)" />
+          <Stack gap={2} style={{ flex: '1 1 auto', minWidth: 0 }}>
+            <Text fw={600} size="sm" lineClamp={2} style={{ minWidth: 0 }}>
+              {itemSet.group.groupBatchName}
+            </Text>
+            {itemSet.group.groupBatchNameAlt && (
+              <Text size="xs" c="dimmed" lineClamp={1} style={{ minWidth: 0 }}>
+                {itemSet.group.groupBatchNameAlt}
               </Text>
-              {itemSet.group.groupBatchNameAlt && (
-                <Text size="xs" c="dimmed" lineClamp={1}>
-                  {itemSet.group.groupBatchNameAlt}
-                </Text>
-              )}
-            </Stack>
-          </Group>
-          <Group gap={4}>
-            <Tooltip label="Open properties" withArrow>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size="sm"
-                disabled={data.disabled}
-                onClick={() =>
-                  data.onOpenProperties?.({
-                    kind: 'item-set',
-                    itemId: data.parentItemId!,
-                    groupHeaderId: itemSet.groupHeaderId,
-                    originContext: data.context,
-                  })
-                }
-              >
-                <IconAdjustments size={16} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Move up" withArrow>
-              <ActionIcon
-                variant="light"
-                size="sm"
-                disabled={data.disabled}
-                onClick={() =>
-                  data.onMoveItemSet?.(data.parentItemId!, itemSet.groupHeaderId, data.context, -1)
-                }
-              >
-                <IconArrowUp size={14} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Move down" withArrow>
-              <ActionIcon
-                variant="light"
-                size="sm"
-                disabled={data.disabled}
-                onClick={() =>
-                  data.onMoveItemSet?.(data.parentItemId!, itemSet.groupHeaderId, data.context, 1)
-                }
-              >
-                <IconArrowDown size={14} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Remove" withArrow>
-              <ActionIcon
-                variant="light"
-                color="red"
-                size="sm"
-                disabled={data.disabled}
-                onClick={() =>
-                  data.onRemoveItemSet?.(data.parentItemId!, itemSet.groupHeaderId, data.context)
-                }
-              >
-                <IconTrash size={14} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
+            )}
+          </Stack>
         </Group>
         <Badge size="xs" variant="light" color="teal">
           {itemSet.children.length} items
         </Badge>
+        <Group justify="flex-end" gap={4} wrap="nowrap">
+          <Tooltip label="Open properties" withArrow>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              disabled={data.disabled}
+              onClick={() =>
+                data.onOpenProperties?.({
+                  kind: 'item-set',
+                  itemId: data.parentItemId!,
+                  groupHeaderId: itemSet.groupHeaderId,
+                  originContext: data.context,
+                })
+              }
+            >
+              <IconAdjustments size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Move up" withArrow>
+            <ActionIcon
+              variant="light"
+              size="sm"
+              disabled={data.disabled}
+              onClick={() =>
+                data.onMoveItemSet?.(data.parentItemId!, itemSet.groupHeaderId, data.context, -1)
+              }
+            >
+              <IconArrowUp size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Move down" withArrow>
+            <ActionIcon
+              variant="light"
+              size="sm"
+              disabled={data.disabled}
+              onClick={() =>
+                data.onMoveItemSet?.(data.parentItemId!, itemSet.groupHeaderId, data.context, 1)
+              }
+            >
+              <IconArrowDown size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Remove" withArrow>
+            <ActionIcon
+              variant="light"
+              color="red"
+              size="sm"
+              disabled={data.disabled}
+              onClick={() =>
+                data.onRemoveItemSet?.(data.parentItemId!, itemSet.groupHeaderId, data.context)
+              }
+            >
+              <IconTrash size={14} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Stack>
       <Handle
         type="source"
