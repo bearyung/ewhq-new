@@ -388,10 +388,28 @@ const ItemFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
       p="sm"
       style={{
         width: REACT_FLOW_NODE_WIDTH - 20,
+        paddingRight: '2.5rem',
         position: 'relative',
         overflow: 'visible',
       }}
     >
+      <Tooltip label="Open properties" withArrow>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          size="sm"
+          disabled={data.disabled}
+          onClick={() =>
+            data.onOpenProperties?.({
+              kind: 'item',
+              itemId: data.itemNode!.item.itemId,
+            })
+          }
+          style={{ position: 'absolute', top: 6, right: 6 }}
+        >
+          <IconAdjustments size={16} />
+        </ActionIcon>
+      </Tooltip>
       <Handle type="target" position={Position.Top} id="modifier-parent" />
       <Stack gap={8}>
         <Stack gap={2} style={{ flex: '1 1 auto' }}>
@@ -405,24 +423,6 @@ const ItemFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
         <Badge size="xs" variant="light" color={data.context === 'inStore' ? 'indigo' : 'gray'}>
           {data.context === 'inStore' ? 'POS flow' : 'Online flow'}
         </Badge>
-        <Group justify="flex-end">
-          <Tooltip label="Open properties" withArrow>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              disabled={data.disabled}
-              onClick={() =>
-                data.onOpenProperties?.({
-                  kind: 'item',
-                  itemId: data.itemNode!.item.itemId,
-                })
-              }
-            >
-              <IconAdjustments size={16} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
       </Stack>
       <Handle
         type="source"
@@ -504,10 +504,30 @@ const ModifierFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
       p="sm"
       style={{
         width: REACT_FLOW_NODE_WIDTH - 20,
+        paddingRight: '2.5rem',
         position: 'relative',
         overflow: 'visible',
       }}
     >
+      <Tooltip label="Open properties" withArrow>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          size="sm"
+          disabled={data.disabled}
+          onClick={() =>
+            data.onOpenProperties?.({
+              kind: 'modifier',
+              itemId: data.parentItemId!,
+              groupHeaderId: modifier.groupHeaderId,
+              originContext: data.context,
+            })
+          }
+          style={{ position: 'absolute', top: 6, right: 6 }}
+        >
+          <IconAdjustments size={16} />
+        </ActionIcon>
+      </Tooltip>
       <Handle type="target" position={Position.Top} />
       <Stack gap={8}>
         <Group justify="flex-start" align="flex-start" gap={6} wrap="nowrap">
@@ -527,24 +547,6 @@ const ModifierFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
           Sequence {modifier.sequence}
         </Badge>
         <Group justify="flex-end" gap={4} wrap="nowrap">
-          <Tooltip label="Open properties" withArrow>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              disabled={data.disabled}
-              onClick={() =>
-                data.onOpenProperties?.({
-                  kind: 'modifier',
-                  itemId: data.parentItemId!,
-                  groupHeaderId: modifier.groupHeaderId,
-                  originContext: data.context,
-                })
-              }
-            >
-              <IconAdjustments size={16} />
-            </ActionIcon>
-          </Tooltip>
           <Tooltip label="Move up" withArrow>
             <ActionIcon
               variant="light"
@@ -632,10 +634,30 @@ const ItemSetFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
       p="sm"
       style={{
         width: REACT_FLOW_NODE_WIDTH - 20,
+        paddingRight: '2.5rem',
         position: 'relative',
         overflow: 'visible',
       }}
     >
+      <Tooltip label="Open properties" withArrow>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          size="sm"
+          disabled={data.disabled}
+          onClick={() =>
+            data.onOpenProperties?.({
+              kind: 'item-set',
+              itemId: data.parentItemId!,
+              groupHeaderId: itemSet.groupHeaderId,
+              originContext: data.context,
+            })
+          }
+          style={{ position: 'absolute', top: 6, right: 6 }}
+        >
+          <IconAdjustments size={16} />
+        </ActionIcon>
+      </Tooltip>
       <Handle
         type="target"
         position={Position.Left}
@@ -672,24 +694,6 @@ const ItemSetFlowNode: FC<NodeProps<FlowNodeData>> = ({ data }) => {
           {itemSet.children.length} items
         </Badge>
         <Group justify="flex-end" gap={4} wrap="nowrap">
-          <Tooltip label="Open properties" withArrow>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              disabled={data.disabled}
-              onClick={() =>
-                data.onOpenProperties?.({
-                  kind: 'item-set',
-                  itemId: data.parentItemId!,
-                  groupHeaderId: itemSet.groupHeaderId,
-                  originContext: data.context,
-                })
-              }
-            >
-              <IconAdjustments size={16} />
-            </ActionIcon>
-          </Tooltip>
           <Tooltip label="Move up" withArrow>
             <ActionIcon
               variant="light"
