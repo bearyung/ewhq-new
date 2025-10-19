@@ -248,7 +248,9 @@ function getSubtreeBounds(
   nodeId: string,
   nodeMap: Map<string, Node<FlowNodeData>>,
   childMap: Map<string, string[]>,
+  childEdgesMap: Map<string, ChildEdgeLink[]>,
   visited: Set<string>,
+  options: { excludeItemSetChains?: boolean } = {},
 ): { minX: number; maxX: number } {
   if (visited.has(nodeId)) {
     return { minX: Number.POSITIVE_INFINITY, maxX: Number.NEGATIVE_INFINITY };
@@ -263,13 +265,31 @@ function getSubtreeBounds(
   let minX = node.position.x;
   let maxX = node.position.x + REACT_FLOW_NODE_WIDTH;
 
-  const children = childMap.get(nodeId);
-  if (children) {
-    children.forEach((childId) => {
-      const bounds = getSubtreeBounds(childId, nodeMap, childMap, visited);
+  const childEdges = childEdgesMap.get(nodeId);
+  if (childEdges && childEdges.length > 0) {
+    childEdges.forEach(({ targetId, edge }) => {
+      if (
+        options.excludeItemSetChains &&
+        (edge.sourceHandle === 'item-set-chain' ||
+          edge.sourceHandle === 'item-sets' ||
+          (edge.data && typeof edge.data === 'object' && (edge.data as { kind?: string }).kind === 'item-set'))
+      ) {
+        return;
+      }
+
+      const bounds = getSubtreeBounds(targetId, nodeMap, childMap, childEdgesMap, visited, options);
       minX = Math.min(minX, bounds.minX);
       maxX = Math.max(maxX, bounds.maxX);
     });
+  } else {
+    const children = childMap.get(nodeId);
+    if (children) {
+      children.forEach((childId) => {
+        const bounds = getSubtreeBounds(childId, nodeMap, childMap, childEdgesMap, visited, options);
+        minX = Math.min(minX, bounds.minX);
+        maxX = Math.max(maxX, bounds.maxX);
+      });
+    }
   }
 
   return { minX, maxX };
@@ -298,7 +318,7 @@ function alignItemSetChildren(
   let cursor = Number.NEGATIVE_INFINITY;
 
   childEntries.forEach((entry) => {
-    let bounds = getSubtreeBounds(entry.targetId, nodeMap, childMap, new Set());
+    let bounds = getSubtreeBounds(entry.targetId, nodeMap, childMap, childEdgesMap, new Set());
     if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
       adjustedBounds.push({ id: entry.targetId, minX: bounds.minX, maxX: bounds.maxX });
       return;
@@ -309,7 +329,7 @@ function alignItemSetChildren(
       if (bounds.minX < desiredMin) {
         const delta = desiredMin - bounds.minX;
         shiftSubtree(entry.targetId, delta, 0, nodeMap, childMap, new Set());
-        bounds = getSubtreeBounds(entry.targetId, nodeMap, childMap, new Set());
+        bounds = getSubtreeBounds(entry.targetId, nodeMap, childMap, childEdgesMap, new Set());
       }
     }
 
@@ -879,7 +899,9 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
 
     sortedEdges.forEach(({ edge }) => {
       const targetId = edge.target;
-      let bounds = getSubtreeBounds(targetId, nodeMap, childMap, new Set());
+      let bounds = getSubtreeBounds(targetId, nodeMap, childMap, childEdgesMap, new Set(), {
+        excludeItemSetChains: true,
+      });
       if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
         return;
       }
@@ -888,7 +910,9 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
       const delta = desiredMin - bounds.minX;
       if (Math.abs(delta) > 0.5) {
         shiftSubtree(targetId, delta, 0, nodeMap, childMap, new Set());
-        bounds = getSubtreeBounds(targetId, nodeMap, childMap, new Set());
+        bounds = getSubtreeBounds(targetId, nodeMap, childMap, childEdgesMap, new Set(), {
+          excludeItemSetChains: true,
+        });
         if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
           return;
         }
@@ -927,7 +951,9 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
     let maxAnchorX = Number.NEGATIVE_INFINITY;
 
     itemSetChildren.forEach((childId) => {
-      const bounds = getSubtreeBounds(childId, nodeMap, childMap, new Set());
+      const bounds = getSubtreeBounds(childId, nodeMap, childMap, childEdgesMap, new Set(), {
+        excludeItemSetChains: true,
+      });
       if (Number.isFinite(bounds.minX)) {
         minSubtreeX = Math.min(minSubtreeX, bounds.minX);
       }

@@ -27,6 +27,6 @@ public class ItemModifierGroupMapping
     public string ModifiedBy { get; set; } = string.Empty;
 
     [MaxLength(50)]
-    public string ModifierLinkType { get; set; }
+    public string? ModifierLinkType { get; set; }
 
 }
