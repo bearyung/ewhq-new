@@ -67,7 +67,6 @@ const CONTEXT_OPTIONS: Array<{ value: 'inStore' | 'online'; label: string }> = [
 
 const REACT_FLOW_NODE_WIDTH = 230;
 const REACT_FLOW_NODE_HEIGHT = 130;
-
 const ITEM_SET_EDGE_STYLE = { stroke: '#12b886', strokeWidth: 3 } as const;
 const MODIFIER_EDGE_STYLE = { stroke: '#845ef7', strokeWidth: 3 } as const;
 
@@ -122,6 +121,13 @@ interface GroupSelectionState {
   context: 'inStore' | 'online';
   itemId: number;
   insertAfterGroupHeaderId: number | null;
+}
+
+interface PendingFocusRequest {
+  kind: 'modifier' | 'item-set';
+  itemId: number;
+  groupHeaderId: number;
+  context: 'inStore' | 'online';
 }
 
 const cloneModifier = (modifier: ItemRelationshipModifier): ItemRelationshipModifier => ({
@@ -911,31 +917,58 @@ function layoutGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node[
       return;
     }
 
-    let minX = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
+    let minSubtreeX = Number.POSITIVE_INFINITY;
+    let maxSubtreeX = Number.NEGATIVE_INFINITY;
+    let minAnchorX = Number.POSITIVE_INFINITY;
+    let maxAnchorX = Number.NEGATIVE_INFINITY;
 
     itemSetChildren.forEach((childId) => {
       const bounds = getSubtreeBounds(childId, nodeMap, childMap, new Set());
       if (Number.isFinite(bounds.minX)) {
-        minX = Math.min(minX, bounds.minX);
+        minSubtreeX = Math.min(minSubtreeX, bounds.minX);
       }
       if (Number.isFinite(bounds.maxX)) {
-        maxX = Math.max(maxX, bounds.maxX);
+        maxSubtreeX = Math.max(maxSubtreeX, bounds.maxX);
+      }
+
+      const childNode = nodeMap.get(childId);
+      if (childNode) {
+        minAnchorX = Math.min(minAnchorX, childNode.position.x);
+        maxAnchorX = Math.max(maxAnchorX, childNode.position.x + REACT_FLOW_NODE_WIDTH);
       }
     });
 
-    if (!Number.isFinite(minX) || !Number.isFinite(maxX) || minX > maxX) {
+    if (
+      !Number.isFinite(minSubtreeX) ||
+      !Number.isFinite(maxSubtreeX) ||
+      !Number.isFinite(minAnchorX) ||
+      !Number.isFinite(maxAnchorX)
+    ) {
       return;
     }
 
-    const desiredCenter = (minX + maxX) / 2;
-    const maxAllowedCenter = minX - (ITEM_SET_HORIZONTAL_OFFSET + REACT_FLOW_NODE_WIDTH / 2);
-    const targetCenter = Math.min(desiredCenter, maxAllowedCenter);
+    const effectiveMin = Math.max(minSubtreeX, minAnchorX);
+    const effectiveMax = Math.max(maxSubtreeX, maxAnchorX);
+    if (effectiveMin > effectiveMax) {
+      return;
+    }
 
-    root.position = {
-      ...root.position,
-      x: targetCenter - REACT_FLOW_NODE_WIDTH / 2,
-    };
+    const desiredCenter = (effectiveMin + effectiveMax) / 2;
+    const maxAllowedCenter = effectiveMin - (ITEM_SET_HORIZONTAL_OFFSET + REACT_FLOW_NODE_WIDTH / 2);
+    const targetCenter = Math.min(desiredCenter, maxAllowedCenter);
+    const targetX = targetCenter - REACT_FLOW_NODE_WIDTH / 2;
+    const deltaX = targetX - root.position.x;
+
+    if (Math.abs(deltaX) > 0.5) {
+      root.position = {
+        ...root.position,
+        x: root.position.x + deltaX,
+      };
+
+      itemSetChildren.forEach((childId) => {
+        shiftSubtree(childId, deltaX, 0, nodeMap, childMap, new Set());
+      });
+    }
   });
 
   return { nodes: positionedNodes, edges };
@@ -1182,6 +1215,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
   const [shouldFitView, setShouldFitView] = useState(false);
   const [propertiesDrawer, setPropertiesDrawer] = useState<NodePropertiesDrawerState | null>(null);
   const [groupLookups, setGroupLookups] = useState<ModifierGroupHeader[]>(modifierGroups ?? []);
+  const [pendingFocus, setPendingFocus] = useState<PendingFocusRequest | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1492,7 +1526,14 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
         resyncModifierSequences(ctx);
         added = true;
       });
-
+      if (added) {
+        setPendingFocus({
+          kind: 'modifier',
+          itemId,
+          groupHeaderId: group.groupHeaderId,
+          context,
+        });
+      }
       return added;
     },
     [updateNode],
@@ -1582,7 +1623,14 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
           resyncItemSetSequences(ctx);
           added = true;
         });
-
+        if (added) {
+          setPendingFocus({
+            kind: 'item-set',
+            itemId,
+            groupHeaderId: group.groupHeaderId,
+            context,
+          });
+        }
         return added;
       } catch (err) {
         console.error('Failed to add item set', err);
@@ -1730,11 +1778,96 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
   ]);
 
   useEffect(() => {
-    if (shouldFitView && reactFlowInstance && nodes.length > 0) {
+    if (!reactFlowInstance || nodes.length === 0) {
+      return;
+    }
+
+    if (pendingFocus) {
+      const targetNode = nodes.find((node) => {
+        if (!node.data) {
+          return false;
+        }
+        if (pendingFocus.kind === 'modifier') {
+          return (
+            node.data.kind === 'modifier' &&
+            node.data.context === pendingFocus.context &&
+            node.data.parentItemId === pendingFocus.itemId &&
+            node.data.modifier?.groupHeaderId === pendingFocus.groupHeaderId
+          );
+        }
+
+        return (
+          node.data.kind === 'set' &&
+          node.data.context === pendingFocus.context &&
+          node.data.parentItemId === pendingFocus.itemId &&
+          node.data.itemSet?.groupHeaderId === pendingFocus.groupHeaderId
+        );
+      });
+
+      if (!targetNode) {
+        return;
+      }
+
+      const width =
+        typeof targetNode.width === 'number' && Number.isFinite(targetNode.width)
+          ? targetNode.width
+          : REACT_FLOW_NODE_WIDTH;
+      const height =
+        typeof targetNode.height === 'number' && Number.isFinite(targetNode.height)
+          ? targetNode.height
+          : REACT_FLOW_NODE_HEIGHT;
+
+      const containerEl = flowContainerRef.current;
+      if (containerEl) {
+        const { width: containerWidth, height: containerHeight } = containerEl.getBoundingClientRect();
+        if (containerWidth > 0 && containerHeight > 0) {
+          const topLeft = reactFlowInstance.project({ x: 0, y: 0 });
+          const bottomRight = reactFlowInstance.project({ x: containerWidth, y: containerHeight });
+
+          const visibleMinX = Math.min(topLeft.x, bottomRight.x);
+          const visibleMaxX = Math.max(topLeft.x, bottomRight.x);
+          const visibleMinY = Math.min(topLeft.y, bottomRight.y);
+          const visibleMaxY = Math.max(topLeft.y, bottomRight.y);
+
+          const nodeMinX = targetNode.position.x;
+          const nodeMaxX = targetNode.position.x + width;
+          const nodeMinY = targetNode.position.y;
+          const nodeMaxY = targetNode.position.y + height;
+
+          if (
+            nodeMinX >= visibleMinX &&
+            nodeMaxX <= visibleMaxX &&
+            nodeMinY >= visibleMinY &&
+            nodeMaxY <= visibleMaxY
+          ) {
+            setPendingFocus(null);
+            if (shouldFitView) {
+              setShouldFitView(false);
+            }
+            return;
+          }
+        }
+      }
+
+      const centerX = targetNode.position.x + width / 2;
+      const centerY = targetNode.position.y + height / 2;
+
+      reactFlowInstance.setCenter(centerX, centerY, {
+        duration: 260,
+        zoom: reactFlowInstance.getZoom(),
+      });
+      setPendingFocus(null);
+      if (shouldFitView) {
+        setShouldFitView(false);
+      }
+      return;
+    }
+
+    if (shouldFitView) {
       reactFlowInstance.fitView({ padding: 0.8, duration: 200 });
       setShouldFitView(false);
     }
-  }, [reactFlowInstance, nodes, shouldFitView]);
+  }, [nodes, pendingFocus, reactFlowInstance, shouldFitView]);
 
   const handleSave = useCallback(async () => {
     if (!relationship || !brandId || !item) {
