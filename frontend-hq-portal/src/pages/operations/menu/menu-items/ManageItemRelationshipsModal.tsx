@@ -1242,6 +1242,20 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
 
   const availableGroups = groupLookups;
 
+  const visibleNodeCount = useMemo(
+    () => nodes.filter((node) => !node.hidden).length,
+    [nodes],
+  );
+
+  const fitViewPadding = visibleNodeCount <= 1 ? 1.6 : 0.8;
+  const fitViewOptions = useMemo(
+    () => ({
+      padding: fitViewPadding,
+      duration: 200,
+    }),
+    [fitViewPadding],
+  );
+
   const loadRelationships = useCallback(async () => {
     if (!brandId || !item) {
       return;
@@ -1868,10 +1882,10 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
     }
 
     if (shouldFitView) {
-      reactFlowInstance.fitView({ padding: 0.8, duration: 200 });
+      reactFlowInstance.fitView(fitViewOptions);
       setShouldFitView(false);
     }
-  }, [nodes, pendingFocus, reactFlowInstance, shouldFitView]);
+  }, [fitViewOptions, nodes, pendingFocus, reactFlowInstance, shouldFitView]);
 
   const handleSave = useCallback(async () => {
     if (!relationship || !brandId || !item) {
@@ -2110,6 +2124,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
                 nodeTypes={nodeTypes}
                 proOptions={{ hideAttribution: true }}
                 onInit={setReactFlowInstance}
+                fitViewOptions={fitViewOptions}
                 style={{ flexGrow: 1, minHeight: 0, width: '100%', height: '100%' }}
               >
                 <Background gap={16} size={1} />
