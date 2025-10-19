@@ -130,6 +130,8 @@ interface PendingFocusRequest {
   context: 'inStore' | 'online';
 }
 
+type PendingViewportAction = 'fit-view' | 'center-root';
+
 const cloneModifier = (modifier: ItemRelationshipModifier): ItemRelationshipModifier => ({
   ...modifier,
   group: { ...modifier.group },
@@ -1242,7 +1244,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
   const [groupSelection, setGroupSelection] = useState<GroupSelectionState | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [shouldFitView, setShouldFitView] = useState(false);
+  const [pendingViewportAction, setPendingViewportAction] = useState<PendingViewportAction | null>(null);
   const [propertiesDrawer, setPropertiesDrawer] = useState<NodePropertiesDrawerState | null>(null);
   const [groupLookups, setGroupLookups] = useState<ModifierGroupHeader[]>(modifierGroups ?? []);
   const [pendingFocus, setPendingFocus] = useState<PendingFocusRequest | null>(null);
@@ -1310,7 +1312,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
       setPropertiesDrawer(null);
       childRelationshipCache.current.clear();
       setIsMaximized(false);
-      setShouldFitView(false);
+      setPendingViewportAction(null);
     }
   }, [opened, loadRelationships]);
 
@@ -1799,7 +1801,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
     }
     setNodes(layouted.nodes);
     setEdges(layouted.edges);
-    setShouldFitView(true);
+    setPendingViewportAction('center-root');
   }, [
     relationship,
     activeContext,
@@ -1885,8 +1887,8 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
             nodeMaxY <= visibleMaxY
           ) {
             setPendingFocus(null);
-            if (shouldFitView) {
-              setShouldFitView(false);
+            if (pendingViewportAction) {
+              setPendingViewportAction(null);
             }
             return;
           }
@@ -1901,17 +1903,46 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
         zoom: reactFlowInstance.getZoom(),
       });
       setPendingFocus(null);
-      if (shouldFitView) {
-        setShouldFitView(false);
+      if (pendingViewportAction) {
+        setPendingViewportAction(null);
       }
       return;
     }
 
-    if (shouldFitView) {
-      reactFlowInstance.fitView(fitViewOptions);
-      setShouldFitView(false);
+    if (pendingViewportAction === 'center-root') {
+      const rootNodeId = `${activeContext}-item-root`;
+      const rootNode = nodes.find((node) => node.id === rootNodeId);
+
+      if (rootNode) {
+        const width =
+          typeof rootNode.width === 'number' && Number.isFinite(rootNode.width)
+            ? rootNode.width
+            : REACT_FLOW_NODE_WIDTH;
+        const height =
+          typeof rootNode.height === 'number' && Number.isFinite(rootNode.height)
+            ? rootNode.height
+            : REACT_FLOW_NODE_HEIGHT;
+
+        const centerX = rootNode.position.x + width / 2;
+        const centerY = rootNode.position.y + height / 2;
+
+        reactFlowInstance.setCenter(centerX, centerY, {
+          duration: 260,
+          zoom: reactFlowInstance.getZoom(),
+        });
+      } else {
+        reactFlowInstance.fitView(fitViewOptions);
+      }
+
+      setPendingViewportAction(null);
+      return;
     }
-  }, [fitViewOptions, nodes, pendingFocus, reactFlowInstance, shouldFitView]);
+
+    if (pendingViewportAction === 'fit-view') {
+      reactFlowInstance.fitView(fitViewOptions);
+      setPendingViewportAction(null);
+    }
+  }, [activeContext, fitViewOptions, nodes, pendingFocus, pendingViewportAction, reactFlowInstance]);
 
   const handleSave = useCallback(async () => {
     if (!relationship || !brandId || !item) {
@@ -1961,7 +1992,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
       const tree = await menuItemService.getItemRelationships(brandId, item.itemId);
       childRelationshipCache.current.clear();
       setRelationship(tree);
-      setShouldFitView(true);
+      setPendingViewportAction('center-root');
     } catch (err) {
       console.error('Failed to refresh item relationships', err);
       notifications.show({
@@ -1978,7 +2009,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
   const handleToggleMaximize = useCallback(() => {
     if (!reactFlowInstance || !flowContainerRef.current) {
       setIsMaximized((prev) => !prev);
-      setShouldFitView(true);
+      setPendingViewportAction('center-root');
       return;
     }
 
