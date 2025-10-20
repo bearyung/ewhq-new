@@ -1,5 +1,5 @@
-import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FC } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, FC } from 'react';
 import {
   ActionIcon,
   Alert,
@@ -1794,7 +1794,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
     });
 
     const layouted = layoutGraph(graph.nodes, graph.edges);
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       // expose latest graph for debugging when running locally
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__menuItemRelationshipGraph = { nodes: layouted.nodes, edges: layouted.edges };
@@ -2029,7 +2029,7 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
       const nextRect = containerEl.getBoundingClientRect();
       const nextX = -(currentCenterX * zoom - nextRect.width / 2);
       const nextY = -(currentCenterY * zoom - nextRect.height / 2);
-      reactFlowInstance.setViewport({ x: nextX, y: nextY, zoom, duration: 200 });
+      reactFlowInstance.setViewport({ x: nextX, y: nextY, zoom });
     };
 
     requestAnimationFrame(() => {

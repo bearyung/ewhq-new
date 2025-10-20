@@ -54,6 +54,8 @@ import type {
   MenuItemUpsertPayload,
   MenuItemDetail,
   CategoryItemCount,
+  MenuItemPrice,
+  MenuItemShopAvailability,
 } from '../../../types/menuItem';
 import { CenterLoader } from './menu-items/CenterLoader';
 import { MenuItemDrawer } from './menu-items/MenuItemDrawer';
@@ -111,12 +113,21 @@ const MenuItemsPage: FC = () => {
   const [selectedDetail, setSelectedDetail] = useState<MenuItemDetail | null>(null);
   const [priceEdits, setPriceEdits] = useState<Record<number, { price: number | null; enabled: boolean }>>({});
   const [availabilityEdits, setAvailabilityEdits] = useState<Record<number, { enabled: boolean | null; isOutOfStock: boolean | null; isLimitedItem: boolean | null }>>({});
+  const [printerEdits, setPrinterEdits] = useState<Record<
+    number,
+    {
+      shopPrinter1: number | null;
+      shopPrinter2: number | null;
+      shopPrinter3: number | null;
+      shopPrinter4: number | null;
+      shopPrinter5: number | null;
+      isGroupPrintByPrinter: boolean | null;
+    }
+  >>({});
   const [formData, setFormData] = useState<MenuItemUpsertPayload | null>(null);
   const [activeTab, setActiveTab] = useState<string>('basics');
   const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [priceSavingShopId, setPriceSavingShopId] = useState<number | null>(null);
-  const [availabilitySavingShopId, setAvailabilitySavingShopId] = useState<number | null>(null);
 
   // Table virtualization setup
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -247,6 +258,7 @@ const MenuItemsPage: FC = () => {
     setSelectedDetail(null);
     setPriceEdits({});
     setAvailabilityEdits({});
+    setPrinterEdits({});
     setDetailLoading(false);
     setActiveTab('basics');
   }, []);
@@ -272,10 +284,11 @@ const MenuItemsPage: FC = () => {
 
     setFormData(createBasePayload(defaultCategoryId, defaultDepartmentId));
     setDrawerMode('create');
-    setEditingItemId(null);
-    setSelectedDetail(null);
-    setPriceEdits({});
-    setAvailabilityEdits({});
+   setEditingItemId(null);
+   setSelectedDetail(null);
+   setPriceEdits({});
+   setAvailabilityEdits({});
+    setPrinterEdits({});
     setActiveTab('basics');
     setDrawerOpen(true);
   }, [lookups, selectedCategoryId]);
@@ -290,6 +303,7 @@ const MenuItemsPage: FC = () => {
     setSelectedDetail(null);
     setPriceEdits({});
     setAvailabilityEdits({});
+    setPrinterEdits({});
     setDetailLoading(true);
     try {
       const detail = await menuItemService.getMenuItem(brandId, item.itemId);
@@ -741,13 +755,14 @@ const MenuItemsPage: FC = () => {
   }, [updateActionShadow, rows.length, totalTableWidth, isDesktopLayout]);
 
   const updatePriceEdit = (shopId: number, changes: Partial<{ price: number | null; enabled: boolean }>) => {
+    const base = selectedDetail?.prices.find((price) => price.shopId === shopId);
     setPriceEdits((prev) => {
-      const previous = prev[shopId] ?? { price: null, enabled: false };
+      const previous = prev[shopId] ?? { price: base?.price ?? null, enabled: base?.enabled ?? false };
       return {
         ...prev,
         [shopId]: {
           price: Object.prototype.hasOwnProperty.call(changes, 'price') ? changes.price ?? null : previous.price,
-          enabled: changes.enabled ?? previous.enabled,
+          enabled: Object.prototype.hasOwnProperty.call(changes, 'enabled') ? changes.enabled ?? false : previous.enabled,
         },
       };
     });
@@ -757,8 +772,15 @@ const MenuItemsPage: FC = () => {
     shopId: number,
     changes: Partial<{ enabled: boolean | null; isOutOfStock: boolean | null; isLimitedItem: boolean | null }>,
   ) => {
+    const base = selectedDetail?.shopAvailability.find((record) => record.shopId === shopId);
     setAvailabilityEdits((prev) => {
-      const previous = prev[shopId] ?? { enabled: false, isOutOfStock: false, isLimitedItem: false };
+      const previous =
+        prev[shopId] ??
+        {
+          enabled: base?.enabled ?? false,
+          isOutOfStock: base?.isOutOfStock ?? false,
+          isLimitedItem: base?.isLimitedItem ?? false,
+        };
       return {
         ...prev,
         [shopId]: {
@@ -774,149 +796,272 @@ const MenuItemsPage: FC = () => {
     });
   };
 
-  const handleSavePrice = async (shopId: number) => {
-    if (!brandId || !selectedDetail) return;
-    const edit = priceEdits[shopId];
-    if (!edit || edit.price === null || Number.isNaN(edit.price)) {
-      notifications.show({
-        title: 'Validation error',
-        message: 'Please provide a valid price before saving.',
-        color: 'orange',
-        icon: <IconAlertCircle size={16} />,
-      });
-      return;
-    }
-
-    setPriceSavingShopId(shopId);
-    try {
-      const updated = await menuItemService.updateMenuItemPrice(brandId, selectedDetail.itemId, shopId, {
-        price: edit.price,
-        enabled: edit.enabled,
-      });
-
-      setSelectedDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              prices: prev.prices.map((price) => (price.shopId === shopId ? updated : price)),
-            }
-          : prev,
-      );
-
-      notifications.show({
-        title: 'Pricing updated',
-        message: `Price saved for ${updated.shopName}.`,
-        color: 'green',
-        icon: <IconCheck size={16} />,
-      });
-    } catch (error) {
-      console.error('Failed to update price', error);
-      notifications.show({
-        title: 'Save failed',
-        message: 'Unable to update price. Please try again.',
-        color: 'red',
-        icon: <IconAlertCircle size={16} />,
-      });
-    } finally {
-      setPriceSavingShopId(null);
-    }
-  };
-
-  const handleSaveAvailability = async (shopId: number) => {
-    if (!brandId || !selectedDetail) return;
-    const edit = availabilityEdits[shopId];
-    if (!edit) return;
-
-    setAvailabilitySavingShopId(shopId);
-    try {
-      const updated = await menuItemService.updateMenuItemAvailability(brandId, selectedDetail.itemId, shopId, {
-        enabled: edit.enabled,
-        isOutOfStock: edit.isOutOfStock,
-        isLimitedItem: edit.isLimitedItem,
-      });
-
-      setSelectedDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              shopAvailability: prev.shopAvailability.map((record) =>
-                record.shopId === shopId ? updated : record,
-              ),
-            }
-          : prev,
-      );
-
-      notifications.show({
-        title: 'Availability updated',
-        message: `Availability saved for ${updated.shopName}.`,
-        color: 'green',
-        icon: <IconCheck size={16} />,
-      });
-    } catch (error) {
-      console.error('Failed to update availability', error);
-      notifications.show({
-        title: 'Save failed',
-        message: 'Unable to update availability. Please try again.',
-        color: 'red',
-        icon: <IconAlertCircle size={16} />,
-      });
-    } finally {
-      setAvailabilitySavingShopId(null);
-    }
+  const updatePrinterEdit = (
+    shopId: number,
+    changes: Partial<{
+      shopPrinter1: number | null;
+      shopPrinter2: number | null;
+      shopPrinter3: number | null;
+      shopPrinter4: number | null;
+      shopPrinter5: number | null;
+      isGroupPrintByPrinter: boolean | null;
+    }>,
+  ) => {
+    const base = selectedDetail?.shopAvailability.find((record) => record.shopId === shopId);
+    setPrinterEdits((prev) => {
+      const previous =
+        prev[shopId] ??
+        {
+          shopPrinter1: base?.shopPrinter1 ?? null,
+          shopPrinter2: base?.shopPrinter2 ?? null,
+          shopPrinter3: base?.shopPrinter3 ?? null,
+          shopPrinter4: base?.shopPrinter4 ?? null,
+          shopPrinter5: base?.shopPrinter5 ?? null,
+          isGroupPrintByPrinter: base?.isGroupPrintByPrinter ?? false,
+        };
+      return {
+        ...prev,
+        [shopId]: {
+          shopPrinter1: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter1')
+            ? changes.shopPrinter1 ?? null
+            : previous.shopPrinter1,
+          shopPrinter2: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter2')
+            ? changes.shopPrinter2 ?? null
+            : previous.shopPrinter2,
+          shopPrinter3: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter3')
+            ? changes.shopPrinter3 ?? null
+            : previous.shopPrinter3,
+          shopPrinter4: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter4')
+            ? changes.shopPrinter4 ?? null
+            : previous.shopPrinter4,
+          shopPrinter5: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter5')
+            ? changes.shopPrinter5 ?? null
+            : previous.shopPrinter5,
+          isGroupPrintByPrinter: Object.prototype.hasOwnProperty.call(changes, 'isGroupPrintByPrinter')
+            ? Boolean(changes.isGroupPrintByPrinter)
+            : Boolean(previous.isGroupPrintByPrinter),
+        },
+      };
+    });
   };
 
   const updateForm = <K extends keyof MenuItemUpsertPayload>(key: K, value: MenuItemUpsertPayload[K]) => {
     setFormData((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
-  const handleSubmit = async () => {
-    if (!formData || !brandId) return;
+const handleSubmit = async () => {
+  if (!formData || !brandId) return;
 
-    if (!formData.itemCode.trim()) {
+  if (!formData.itemCode.trim()) {
+    notifications.show({
+      title: 'Validation error',
+      message: 'Item code is required.',
+      color: 'orange',
+      icon: <IconAlertCircle size={16} />,
+    });
+    setActiveTab('basics');
+    return;
+  }
+
+  type PriceUpdate = { shopId: number; payload: { price: number; enabled: boolean } };
+  type AvailabilityUpdate = {
+    shopId: number;
+    payload: {
+      enabled: boolean;
+      isOutOfStock: boolean;
+      isLimitedItem: boolean;
+      shopPrinter1: number | null;
+      shopPrinter2: number | null;
+      shopPrinter3: number | null;
+      shopPrinter4: number | null;
+      shopPrinter5: number | null;
+      isGroupPrintByPrinter: boolean;
+    };
+  };
+
+  let priceValidationFailed = false;
+  const priceUpdates: PriceUpdate[] = [];
+  const availabilityUpdates: AvailabilityUpdate[] = [];
+
+  if (drawerMode === 'edit' && selectedDetail) {
+    const shops = selectedDetail.shopAvailability;
+    for (const record of shops) {
+      const shopId = record.shopId;
+      const price = selectedDetail.prices.find((entry) => entry.shopId === shopId);
+      const priceState = priceEdits[shopId] ?? {
+        price: price?.price ?? null,
+        enabled: price?.enabled ?? false,
+      };
+      const availabilityEdit = availabilityEdits[shopId];
+      const printerEdit = printerEdits[shopId];
+
+      const normalisePrice = (value: number | null) =>
+        value === null || Number.isNaN(value) ? null : Math.round(value * 100) / 100;
+
+      const finalPrice = normalisePrice(priceState.price ?? price?.price ?? null);
+      const originalPrice = normalisePrice(price?.price ?? null);
+      const finalPriceEnabled = priceState.enabled ?? (price?.enabled ?? false);
+      const originalPriceEnabled = price?.enabled ?? false;
+
+      const priceChanged = finalPrice !== originalPrice || finalPriceEnabled !== originalPriceEnabled;
+      if (priceChanged) {
+        if (finalPrice === null) {
+          priceValidationFailed = true;
+        } else {
+          priceUpdates.push({
+            shopId,
+            payload: {
+              price: finalPrice,
+              enabled: finalPriceEnabled,
+            },
+          });
+        }
+      }
+
+      const finalAvailabilityEnabled = Boolean(availabilityEdit?.enabled ?? record.enabled ?? false);
+      const finalOutOfStock = Boolean(availabilityEdit?.isOutOfStock ?? record.isOutOfStock ?? false);
+      const finalLimited = Boolean(availabilityEdit?.isLimitedItem ?? record.isLimitedItem ?? false);
+
+      const originalAvailabilityEnabled = Boolean(record.enabled);
+      const originalOutOfStock = Boolean(record.isOutOfStock);
+      const originalLimited = Boolean(record.isLimitedItem);
+
+      const finalPrinter1 = printerEdit?.shopPrinter1 ?? record.shopPrinter1 ?? null;
+      const finalPrinter2 = printerEdit?.shopPrinter2 ?? record.shopPrinter2 ?? null;
+      const finalPrinter3 = printerEdit?.shopPrinter3 ?? record.shopPrinter3 ?? null;
+      const finalPrinter4 = printerEdit?.shopPrinter4 ?? record.shopPrinter4 ?? null;
+      const finalPrinter5 = printerEdit?.shopPrinter5 ?? record.shopPrinter5 ?? null;
+      const finalGroupPrint = Boolean(printerEdit?.isGroupPrintByPrinter ?? record.isGroupPrintByPrinter ?? false);
+
+      const availabilityChanged =
+        finalAvailabilityEnabled !== originalAvailabilityEnabled ||
+        finalOutOfStock !== originalOutOfStock ||
+        finalLimited !== originalLimited ||
+        finalPrinter1 !== (record.shopPrinter1 ?? null) ||
+        finalPrinter2 !== (record.shopPrinter2 ?? null) ||
+        finalPrinter3 !== (record.shopPrinter3 ?? null) ||
+        finalPrinter4 !== (record.shopPrinter4 ?? null) ||
+        finalPrinter5 !== (record.shopPrinter5 ?? null) ||
+        finalGroupPrint !== Boolean(record.isGroupPrintByPrinter);
+
+      if (availabilityChanged) {
+        availabilityUpdates.push({
+          shopId,
+          payload: {
+            enabled: finalAvailabilityEnabled,
+            isOutOfStock: finalOutOfStock,
+            isLimitedItem: finalLimited,
+            shopPrinter1: finalPrinter1,
+            shopPrinter2: finalPrinter2,
+            shopPrinter3: finalPrinter3,
+            shopPrinter4: finalPrinter4,
+            shopPrinter5: finalPrinter5,
+            isGroupPrintByPrinter: finalGroupPrint,
+          },
+        });
+      }
+    }
+
+    if (priceValidationFailed) {
       notifications.show({
         title: 'Validation error',
-        message: 'Item code is required.',
+        message: 'Please provide a valid price for each updated shop before saving.',
         color: 'orange',
         icon: <IconAlertCircle size={16} />,
       });
-      setActiveTab('basics');
+      setActiveTab('availability');
       return;
     }
+  }
 
-    setSaving(true);
-    try {
-      const payload = normalizePayload(formData);
-      if (drawerMode === 'create') {
-        await menuItemService.createMenuItem(brandId, payload);
-        notifications.show({
-          title: 'Item created',
-          message: 'The menu item has been created successfully.',
-          color: 'green',
-          icon: <IconCheck size={16} />,
-        });
-        setPage(1);
-      } else if (drawerMode === 'edit' && editingItemId) {
-        await menuItemService.updateMenuItem(brandId, editingItemId, payload);
-        notifications.show({
-          title: 'Item updated',
-          message: 'Changes have been saved.',
-          color: 'green',
-          icon: <IconCheck size={16} />,
-        });
+  setSaving(true);
+  try {
+    const payload = normalizePayload(formData);
+    let overridesApplied = false;
+
+    if (drawerMode === 'create') {
+      await menuItemService.createMenuItem(brandId, payload);
+      notifications.show({
+        title: 'Item created',
+        message: 'The menu item has been created successfully.',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+      setPage(1);
+    } else if (drawerMode === 'edit' && editingItemId) {
+      await menuItemService.updateMenuItem(brandId, editingItemId, payload);
+
+      if (selectedDetail && (priceUpdates.length > 0 || availabilityUpdates.length > 0)) {
+        const updatedPrices: MenuItemPrice[] = [];
+        for (const update of priceUpdates) {
+          const result = await menuItemService.updateMenuItemPrice(
+            brandId,
+            selectedDetail.itemId,
+            update.shopId,
+            update.payload,
+          );
+          updatedPrices.push(result);
+        }
+
+        const updatedAvailability: MenuItemShopAvailability[] = [];
+        for (const update of availabilityUpdates) {
+          const result = await menuItemService.updateMenuItemAvailability(
+            brandId,
+            selectedDetail.itemId,
+            update.shopId,
+            update.payload,
+          );
+          updatedAvailability.push(result);
+        }
+
+        if (updatedPrices.length > 0 || updatedAvailability.length > 0) {
+          overridesApplied = true;
+          setSelectedDetail((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              prices:
+                updatedPrices.length > 0
+                  ? prev.prices.map((entry) => {
+                      const match = updatedPrices.find((item) => item.shopId === entry.shopId);
+                      return match ?? entry;
+                    })
+                  : prev.prices,
+              shopAvailability:
+                updatedAvailability.length > 0
+                  ? prev.shopAvailability.map((entry) => {
+                      const match = updatedAvailability.find((item) => item.shopId === entry.shopId);
+                      return match ?? entry;
+                    })
+                  : prev.shopAvailability,
+            };
+          });
+        }
+
+        setPriceEdits({});
+        setAvailabilityEdits({});
+        setPrinterEdits({});
       }
 
-      resetDrawerState();
-      // Refresh list
-      const response = await menuItemService.getMenuItems(brandId, {
-        categoryId: selectedCategoryId ?? undefined,
-        search: debouncedSearch || undefined,
-        includeDisabled,
-        sortBy,
-        sortDirection,
-        page,
-        pageSize: PAGE_SIZE,
+      notifications.show({
+        title: 'Item updated',
+        message: overridesApplied ? 'Item details and shop overrides have been saved.' : 'Changes have been saved.',
+        color: 'green',
+        icon: <IconCheck size={16} />,
       });
-      setItemsResponse(response);
+    }
+
+    resetDrawerState();
+    const response = await menuItemService.getMenuItems(brandId, {
+      categoryId: selectedCategoryId ?? undefined,
+      search: debouncedSearch || undefined,
+      includeDisabled,
+      sortBy,
+      sortDirection,
+      page,
+      pageSize: PAGE_SIZE,
+    });
+    setItemsResponse(response);
     } catch (error) {
       console.error('Failed to save menu item', error);
       notifications.show({
@@ -925,6 +1070,9 @@ const MenuItemsPage: FC = () => {
         color: 'red',
         icon: <IconAlertCircle size={16} />,
       });
+      if (drawerMode === 'edit' && (priceUpdates.length > 0 || availabilityUpdates.length > 0)) {
+        setActiveTab('availability');
+      }
     } finally {
       setSaving(false);
     }
@@ -1659,15 +1807,13 @@ const MenuItemsPage: FC = () => {
         availabilityEdits={availabilityEdits}
         updatePriceEdit={updatePriceEdit}
         updateAvailabilityEdit={updateAvailabilityEdit}
-        handleSavePrice={handleSavePrice}
-        handleSaveAvailability={handleSaveAvailability}
-        priceSavingShopId={priceSavingShopId}
-      availabilitySavingShopId={availabilitySavingShopId}
-      onSubmit={handleSubmit}
-      onManageModifiers={
-        drawerMode === 'edit' && selectedDetail ? () => handleOpenModifiers(selectedDetail) : undefined
-      }
-    />
+        printerEdits={printerEdits}
+        updatePrinterEdit={updatePrinterEdit}
+        onSubmit={handleSubmit}
+        onManageModifiers={
+          drawerMode === 'edit' && selectedDetail ? () => handleOpenModifiers(selectedDetail) : undefined
+        }
+      />
     <ManageItemRelationshipsModal
       opened={Boolean(modifierModalItem)}
       onClose={handleCloseModifiers}

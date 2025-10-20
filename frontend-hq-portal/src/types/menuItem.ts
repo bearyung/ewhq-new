@@ -187,6 +187,11 @@ export interface MenuItemPrice {
   hasPrice: boolean;
 }
 
+export interface ShopPrinterOption {
+  shopPrinterMasterId: number;
+  printerName: string;
+}
+
 export interface MenuItemShopAvailability {
   shopId: number;
   shopName: string;
@@ -195,6 +200,13 @@ export interface MenuItemShopAvailability {
   isLimitedItem: boolean | null;
   lastUpdated: string | null;
   updatedBy: string | null;
+  shopPrinter1: number | null;
+  shopPrinter2: number | null;
+  shopPrinter3: number | null;
+  shopPrinter4: number | null;
+  shopPrinter5: number | null;
+  isGroupPrintByPrinter: boolean | null;
+  printerOptions: ShopPrinterOption[];
 }
 
 export interface UpdateMenuItemPricePayload {
@@ -206,6 +218,12 @@ export interface UpdateMenuItemAvailabilityPayload {
   enabled?: boolean | null;
   isOutOfStock?: boolean | null;
   isLimitedItem?: boolean | null;
+  shopPrinter1?: number | null;
+  shopPrinter2?: number | null;
+  shopPrinter3?: number | null;
+  shopPrinter4?: number | null;
+  shopPrinter5?: number | null;
+  isGroupPrintByPrinter?: boolean | null;
 }
 
 export interface ItemModifierMapping {

@@ -201,6 +201,12 @@ public class MenuItemPriceDto
     public bool HasPrice => Price.HasValue;
 }
 
+public class ShopPrinterOptionDto
+{
+    public int ShopPrinterMasterId { get; set; }
+    public string PrinterName { get; set; } = string.Empty;
+}
+
 public class MenuItemShopAvailabilityDto
 {
     public int ShopId { get; set; }
@@ -210,6 +216,13 @@ public class MenuItemShopAvailabilityDto
     public bool? IsLimitedItem { get; set; }
     public DateTime? LastUpdated { get; set; }
     public string? UpdatedBy { get; set; }
+    public int? ShopPrinter1 { get; set; }
+    public int? ShopPrinter2 { get; set; }
+    public int? ShopPrinter3 { get; set; }
+    public int? ShopPrinter4 { get; set; }
+    public int? ShopPrinter5 { get; set; }
+    public bool? IsGroupPrintByPrinter { get; set; }
+    public IReadOnlyList<ShopPrinterOptionDto> PrinterOptions { get; set; } = Array.Empty<ShopPrinterOptionDto>();
 }
 
 public class UpdateMenuItemPriceDto
@@ -225,6 +238,12 @@ public class UpdateMenuItemAvailabilityDto
     public bool? Enabled { get; set; }
     public bool? IsOutOfStock { get; set; }
     public bool? IsLimitedItem { get; set; }
+    public int? ShopPrinter1 { get; set; }
+    public int? ShopPrinter2 { get; set; }
+    public int? ShopPrinter3 { get; set; }
+    public int? ShopPrinter4 { get; set; }
+    public int? ShopPrinter5 { get; set; }
+    public bool? IsGroupPrintByPrinter { get; set; }
 }
 
 public class ItemModifierMappingDto

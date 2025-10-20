@@ -33,6 +33,20 @@ public class MenuItemsController : ControllerBase
         _logger = logger;
     }
 
+    private string GetCurrentUserIdentifier()
+    {
+        const int maxLength = 50;
+        var identifier = User?.FindFirst(ClaimTypes.Email)?.Value;
+
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return "System";
+        }
+
+        identifier = identifier.Trim();
+        return identifier.Length <= maxLength ? identifier : identifier.Substring(0, maxLength);
+    }
+
     [HttpGet("brand/{brandId}/{itemId}/modifiers")]
     [RequireBrandView]
     public async Task<ActionResult<ItemModifierMappingsDto>> GetItemModifierMappings(int brandId, int itemId)
@@ -124,7 +138,7 @@ public class MenuItemsController : ControllerBase
                 return NotFound(new { message = "Menu item not found" });
             }
 
-            var currentUser = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
+            var currentUser = GetCurrentUserIdentifier();
             var now = DateTime.UtcNow;
 
             try
@@ -179,7 +193,7 @@ public class MenuItemsController : ControllerBase
         {
             var (context, accountId) = await _posContextService.GetContextAndAccountIdForBrandAsync(brandId);
 
-            var currentUser = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
+            var currentUser = GetCurrentUserIdentifier();
             var now = DateTime.UtcNow;
             var processedItems = new HashSet<int>();
 
@@ -1066,7 +1080,7 @@ public class MenuItemsController : ControllerBase
                 return Conflict(new { message = "Item code already exists" });
             }
 
-            var currentUser = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
+            var currentUser = GetCurrentUserIdentifier();
             var now = DateTime.UtcNow;
 
             var newItem = new ItemMaster
@@ -1148,7 +1162,7 @@ public class MenuItemsController : ControllerBase
             ApplyUpsertDtoToEntity(item, updateDto, normalizedItemCode);
 
             item.ModifiedDate = DateTime.UtcNow;
-            item.ModifiedBy = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
+            item.ModifiedBy = GetCurrentUserIdentifier();
 
             await context.SaveChangesAsync();
 
@@ -1311,7 +1325,7 @@ public class MenuItemsController : ControllerBase
 
             var price = await context.ItemPrices.FirstOrDefaultAsync(p => p.AccountId == accountId && p.ItemId == itemId && p.ShopId == shopId);
             var now = DateTime.UtcNow;
-            var currentUser = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
+            var currentUser = GetCurrentUserIdentifier();
 
             if (price == null)
             {
@@ -1384,7 +1398,7 @@ public class MenuItemsController : ControllerBase
 
             var detail = await context.ItemShopDetails.FirstOrDefaultAsync(d => d.AccountId == accountId && d.ItemId == itemId && d.ShopId == shopId);
             var now = DateTime.UtcNow;
-            var currentUser = User.FindFirst(ClaimTypes.Email)?.Value ?? "System";
+            var currentUser = GetCurrentUserIdentifier();
 
             if (detail == null)
             {
@@ -1410,7 +1424,13 @@ public class MenuItemsController : ControllerBase
                     Enabled = updateDto.Enabled,
                     IsPublicDisplay = null,
                     IsLimitedItemAutoReset = null,
-                    OriginalPrice = null
+                    OriginalPrice = null,
+                    ShopPrinter1 = updateDto.ShopPrinter1,
+                    ShopPrinter2 = updateDto.ShopPrinter2,
+                    ShopPrinter3 = updateDto.ShopPrinter3,
+                    ShopPrinter4 = updateDto.ShopPrinter4,
+                    ShopPrinter5 = updateDto.ShopPrinter5,
+                    IsGroupPrintByPrinter = updateDto.IsGroupPrintByPrinter ?? false
                 };
 
                 context.ItemShopDetails.Add(detail);
@@ -1432,11 +1452,29 @@ public class MenuItemsController : ControllerBase
                     detail.IsLimitedItem = updateDto.IsLimitedItem.Value;
                 }
 
+                detail.ShopPrinter1 = updateDto.ShopPrinter1;
+                detail.ShopPrinter2 = updateDto.ShopPrinter2;
+                detail.ShopPrinter3 = updateDto.ShopPrinter3;
+                detail.ShopPrinter4 = updateDto.ShopPrinter4;
+                detail.ShopPrinter5 = updateDto.ShopPrinter5;
+                detail.IsGroupPrintByPrinter = updateDto.IsGroupPrintByPrinter ?? false;
+
                 detail.ModifiedDate = now;
                 detail.ModifiedBy = currentUser;
             }
 
             await context.SaveChangesAsync();
+
+            var printerOptions = await context.ShopPrinterMasters
+                .AsNoTracking()
+                .Where(sp => sp.AccountId == accountId && sp.ShopId == shopId && sp.Enabled)
+                .OrderBy(sp => sp.PrinterName)
+                .Select(sp => new ShopPrinterOptionDto
+                {
+                    ShopPrinterMasterId = sp.ShopPrinterMasterId,
+                    PrinterName = sp.PrinterName ?? string.Empty
+                })
+                .ToListAsync();
 
             return Ok(new MenuItemShopAvailabilityDto
             {
@@ -1446,7 +1484,14 @@ public class MenuItemsController : ControllerBase
                 IsOutOfStock = detail.IsOutOfStock,
                 IsLimitedItem = detail.IsLimitedItem,
                 LastUpdated = detail.ModifiedDate,
-                UpdatedBy = detail.ModifiedBy
+                UpdatedBy = detail.ModifiedBy,
+                ShopPrinter1 = detail.ShopPrinter1,
+                ShopPrinter2 = detail.ShopPrinter2,
+                ShopPrinter3 = detail.ShopPrinter3,
+                ShopPrinter4 = detail.ShopPrinter4,
+                ShopPrinter5 = detail.ShopPrinter5,
+                IsGroupPrintByPrinter = detail.IsGroupPrintByPrinter,
+                PrinterOptions = printerOptions
             });
         }
         catch (InvalidOperationException ex)
@@ -1501,6 +1546,12 @@ public class MenuItemsController : ControllerBase
             .Where(a => a.AccountId == accountId && a.ItemId == itemId)
             .ToListAsync();
 
+        var printerEntities = await context.ShopPrinterMasters
+            .AsNoTracking()
+            .Where(sp => sp.AccountId == accountId && sp.Enabled)
+            .Select(sp => new { sp.ShopId, sp.ShopPrinterMasterId, sp.PrinterName })
+            .ToListAsync();
+
         var priceLookup = priceEntities
             .GroupBy(p => p.ShopId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.ModifiedDate).First());
@@ -1508,6 +1559,19 @@ public class MenuItemsController : ControllerBase
         var availabilityLookup = availabilityEntities
             .GroupBy(a => a.ShopId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.ModifiedDate).First());
+
+        var printerLookup = printerEntities
+            .GroupBy(p => p.ShopId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(p => p.PrinterName ?? string.Empty)
+                    .Select(p => new ShopPrinterOptionDto
+                    {
+                        ShopPrinterMasterId = p.ShopPrinterMasterId,
+                        PrinterName = p.PrinterName ?? string.Empty
+                    })
+                    .ToList()
+            );
 
         var prices = shops
             .Select(shop =>
@@ -1529,6 +1593,7 @@ public class MenuItemsController : ControllerBase
             .Select(shop =>
             {
                 availabilityLookup.TryGetValue(shop.ShopId, out var detail);
+                printerLookup.TryGetValue(shop.ShopId, out var printers);
                 return new MenuItemShopAvailabilityDto
                 {
                     ShopId = shop.ShopId,
@@ -1537,7 +1602,14 @@ public class MenuItemsController : ControllerBase
                     IsOutOfStock = detail?.IsOutOfStock,
                     IsLimitedItem = detail?.IsLimitedItem,
                     LastUpdated = detail?.ModifiedDate,
-                    UpdatedBy = detail?.ModifiedBy
+                    UpdatedBy = detail?.ModifiedBy,
+                    ShopPrinter1 = detail?.ShopPrinter1,
+                    ShopPrinter2 = detail?.ShopPrinter2,
+                    ShopPrinter3 = detail?.ShopPrinter3,
+                    ShopPrinter4 = detail?.ShopPrinter4,
+                    ShopPrinter5 = detail?.ShopPrinter5,
+                    IsGroupPrintByPrinter = detail?.IsGroupPrintByPrinter,
+                    PrinterOptions = printers ?? new List<ShopPrinterOptionDto>()
                 };
             })
             .ToList();
