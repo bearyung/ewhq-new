@@ -11,6 +11,8 @@ export interface MenuItemSummary {
   itemCode: string;
   itemName?: string;
   itemNameAlt?: string;
+  itemPosName?: string;
+  itemPosNameAlt?: string;
   enabled: boolean;
   isItemShow: boolean;
   isPriceShow: boolean;
@@ -19,8 +21,17 @@ export interface MenuItemSummary {
   isPromoItem: boolean;
   isManualPrice: boolean;
   isManualName: boolean;
+  isNonDiscountItem: boolean;
+  isNonServiceChargeItem: boolean;
+  isPointPaidItem?: boolean | null;
+  isNoPointEarnItem?: boolean | null;
+  isNonTaxableItem?: boolean | null;
+  isComboRequired?: boolean | null;
+  buttonStyleId?: number | null;
   displayIndex: number;
   itemPublicDisplayName?: string;
+  itemPublicDisplayNameAlt?: string;
+  itemPublicPrintedName?: string;
   imageFileName?: string;
   modifiedDate?: string;
 }
@@ -28,16 +39,11 @@ export interface MenuItemSummary {
 export interface MenuItemDetail extends MenuItemSummary {
   modifierGroupHeaderId?: number | null;
   autoRedirectToModifier: boolean;
-  buttonStyleId?: number | null;
-  itemPosName?: string;
-  itemPosNameAlt?: string;
   itemNameAlt2?: string;
   itemNameAlt3?: string;
   itemNameAlt4?: string;
   remark?: string;
   remarkAlt?: string;
-  itemPublicDisplayNameAlt?: string;
-  itemPublicPrintedName?: string;
   itemPublicPrintedNameAlt?: string;
   imageFileName2?: string;
   tableOrderingImageFileName?: string;
@@ -46,15 +52,10 @@ export interface MenuItemDetail extends MenuItemSummary {
   isFollowSetDynamic: boolean;
   isFollowSetStandard: boolean;
   isModifierConcatToParent: boolean;
-  isNonDiscountItem: boolean;
-  isNonServiceChargeItem: boolean;
   isGroupRightItem: boolean;
   isPrintLabel: boolean;
   isPrintLabelTakeaway: boolean;
   isPriceInPercentage: boolean;
-  isPointPaidItem?: boolean | null;
-  isNoPointEarnItem?: boolean | null;
-  isNonTaxableItem?: boolean | null;
   isItemShowInKitchenChecklist?: boolean | null;
   isSoldoutAutoLock?: boolean | null;
   isPrepaidRechargeItem?: boolean | null;
@@ -71,7 +72,6 @@ export interface MenuItemDetail extends MenuItemSummary {
   isNonSalesItem?: boolean | null;
   productionSeconds?: number | null;
   parentItemId?: number | null;
-  isComboRequired?: boolean | null;
   createdDate?: string;
   createdBy?: string;
   modifiedBy?: string;

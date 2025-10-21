@@ -47,6 +47,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../contexts/BrandContext';
 import menuItemService from '../../../services/menuItemService';
+import type { ButtonStyle } from '../../../types/buttonStyle';
 import type {
   MenuItemListResponse,
   MenuItemSummary,
@@ -102,7 +103,23 @@ const MenuItemsPage: FC = () => {
   const [sortPopoverOpened, setSortPopoverOpened] = useState(false);
   const [columnMenuOpened, setColumnMenuOpened] = useState(false);
   const [columnSearch, setColumnSearch] = useState('');
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => ({
+    isManualPrice: false,
+    isManualName: false,
+    isNonDiscountItem: false,
+    isNonServiceChargeItem: false,
+    isPointPaidItem: false,
+    isNoPointEarnItem: false,
+    isNonTaxableItem: false,
+    isComboRequired: false,
+    itemPosName: false,
+    itemPublicDisplayName: false,
+    itemPosNameAlt: false,
+    itemPublicDisplayNameAlt: false,
+    itemPublicPrintedName: false,
+    showItemOnReceipt: false,
+    showPriceOnReceipt: false,
+  }));
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [hoveredResizeColumnId, setHoveredResizeColumnId] = useState<string | null>(null);
   const [modifierModalItem, setModifierModalItem] = useState<MenuItemSummary | null>(null);
@@ -251,6 +268,31 @@ const MenuItemsPage: FC = () => {
     return lookups.departments.find((dep) => dep.departmentId === departmentId)?.departmentName ?? '—';
   }, [lookups]);
 
+  const getButtonStyleById = useCallback((buttonStyleId?: number | null): ButtonStyle | null => {
+    if (!buttonStyleId || !lookups) return null;
+    return lookups.buttonStyles.find((style) => style.buttonStyleId === buttonStyleId) ?? null;
+  }, [lookups]);
+
+  const getButtonStyleColor = useCallback((style: ButtonStyle | null) => {
+    if (!style) return '#E0E0E0';
+    const candidates = [
+      style.backgroundColorTop,
+      style.backgroundColorMiddle,
+      style.backgroundColorBottom,
+    ].filter((color): color is string => Boolean(color && color.trim().length > 0));
+
+    if (candidates.length === 0) {
+      return '#E0E0E0';
+    }
+
+    let color = candidates[0]!;
+    if (color.startsWith('#') && color.length === 9) {
+      color = `#${color.slice(3)}`;
+    }
+
+    return color;
+  }, []);
+
   const resetDrawerState = useCallback(() => {
     setDrawerOpen(false);
     setFormData(null);
@@ -323,124 +365,259 @@ const MenuItemsPage: FC = () => {
     }
   }, [brandId, resetDrawerState]);
 
-  const columns = useMemo<ColumnDef<MenuItemSummary>[]>(() => [
-    {
-      accessorKey: 'itemCode',
-      header: 'Code',
-      size: 100,
-      enableHiding: false,
-      cell: ({ row }) => (
-        <Text size="sm" fw={500} truncate="end">{row.original.itemCode}</Text>
-      ),
-    },
-    {
-      accessorKey: 'itemName',
-      header: 'Item Name',
-      size: 180,
-      enableHiding: false,
-      cell: ({ row }) => (
-        <Text size="sm" truncate="end">{row.original.itemName || '—'}</Text>
-      ),
-    },
-    {
-      accessorKey: 'categoryId',
-      header: 'Category',
-      size: 140,
-      cell: ({ row }) => (
-        <Text size="sm" truncate="end">{getCategoryLabel(row.original.categoryId)}</Text>
-      ),
-    },
-    {
-      accessorKey: 'departmentId',
-      header: 'Department',
-      size: 110,
-      cell: ({ row }) => (
-        <Text size="sm" truncate="end">{getDepartmentName(row.original.departmentId)}</Text>
-      ),
-    },
-    {
-      accessorKey: 'enabled',
-      header: 'Enabled',
-      size: 80,
-      cell: ({ row }) => (
-        <Badge variant="light" color={row.original.enabled ? 'green' : 'gray'} size="sm">
-          {row.original.enabled ? 'Yes' : 'No'}
+  const columns = useMemo<ColumnDef<MenuItemSummary>[]>(() => {
+    const renderBoolean = (value: boolean | null | undefined, trueColor: string) => {
+      if (value === null || value === undefined) {
+        return <Text size="sm" c="dimmed">—</Text>;
+      }
+
+      if (value) {
+        return (
+          <Badge variant="light" color={trueColor} size="sm">
+            Yes
+          </Badge>
+        );
+      }
+
+      return (
+        <Badge variant="light" color="gray" size="sm">
+          No
         </Badge>
-      ),
-    },
-    {
-      accessorKey: 'isItemShow',
-      header: 'Visible',
-      size: 80,
-      cell: ({ row }) => (
-        <Badge variant="light" color={row.original.isItemShow ? 'blue' : 'gray'} size="sm">
-          {row.original.isItemShow ? 'Yes' : 'No'}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'hasModifier',
-      header: 'Modifiers',
-      size: 85,
-      cell: ({ row }) => row.original.hasModifier ? (
-        <Badge variant="light" color="violet" size="sm">Yes</Badge>
-      ) : (
-        <Text size="sm" c="dimmed">—</Text>
-      ),
-    },
-    {
-      accessorKey: 'isPromoItem',
-      header: 'Promo',
-      size: 70,
-      cell: ({ row }) => row.original.isPromoItem ? (
-        <Badge variant="light" color="orange" size="sm">Yes</Badge>
-      ) : (
-        <Text size="sm" c="dimmed">—</Text>
-      ),
-    },
-    {
-      accessorKey: 'isManualPrice',
-      header: 'Manual',
-      size: 75,
-      cell: ({ row }) => row.original.isManualPrice ? (
-        <Badge variant="light" color="red" size="sm">Yes</Badge>
-      ) : (
-        <Text size="sm" c="dimmed">—</Text>
-      ),
-    },
-    {
-      accessorKey: 'modifiedDate',
-      header: 'Last updated',
-      size: 140,
-      cell: ({ row }) => (
-        <Text size="sm" truncate="end">{formatDateTime(row.original.modifiedDate)}</Text>
-      ),
-    },
-    {
-      id: 'actions',
-      header: '',
-      size: 100,
-      enableHiding: false,
-      enableResizing: false,
-      cell: ({ row }) => (
-        <Group gap="xs" justify="flex-end" wrap="nowrap">
-          <Tooltip label="Manage modifiers" withArrow>
-            <ActionIcon
-              variant="subtle"
-              color={row.original.hasModifier ? 'violet' : 'gray'}
-              size="sm"
-              onClick={() => handleOpenModifiers(row.original)}
-            >
-              <IconAdjustments size={16} />
+      );
+    };
+
+    const renderText = (value?: string | null) => (
+      <Text size="sm" truncate="end">{value && value.trim().length > 0 ? value : '—'}</Text>
+    );
+
+    return [
+      {
+        accessorKey: 'itemId',
+        header: 'Item Id',
+        size: 90,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Text size="sm" fw={600}>{row.original.itemId}</Text>
+        ),
+      },
+      {
+        accessorKey: 'itemCode',
+        header: 'Code',
+        size: 100,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Text size="sm" fw={500} truncate="end">{row.original.itemCode}</Text>
+        ),
+      },
+      {
+        accessorKey: 'itemName',
+        header: 'Item Name',
+        size: 200,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{row.original.itemName || '—'}</Text>
+        ),
+      },
+      {
+        id: 'buttonStyle',
+        header: 'Button Style',
+        size: 200,
+        cell: ({ row }) => {
+          const style = getButtonStyleById(row.original.buttonStyleId);
+          if (!style) {
+            return <Text size="sm" c="dimmed">—</Text>;
+          }
+
+          const color = getButtonStyleColor(style);
+          return (
+            <Group gap="xs" wrap="nowrap">
+              <Box
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: 4,
+                  border: '1px solid var(--mantine-color-gray-3, #dee2e6)',
+                  backgroundColor: color,
+                  flexShrink: 0,
+                }}
+              />
+              <Text size="sm" truncate="end">{style.styleName}</Text>
+            </Group>
+          );
+        },
+      },
+      {
+        accessorKey: 'categoryId',
+        header: 'Category',
+        size: 140,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{getCategoryLabel(row.original.categoryId)}</Text>
+        ),
+      },
+      {
+        accessorKey: 'departmentId',
+        header: 'Department',
+        size: 120,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{getDepartmentName(row.original.departmentId)}</Text>
+        ),
+      },
+      {
+        accessorKey: 'enabled',
+        header: 'Enabled',
+        size: 90,
+        cell: ({ row }) => (
+          <Badge variant="light" color={row.original.enabled ? 'green' : 'gray'} size="sm">
+            {row.original.enabled ? 'Yes' : 'No'}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: 'hasModifier',
+        header: 'Modifiers',
+        size: 95,
+        cell: ({ row }) => row.original.hasModifier ? (
+          <Badge variant="light" color="violet" size="sm">Yes</Badge>
+        ) : (
+          <Text size="sm" c="dimmed">—</Text>
+        ),
+      },
+      {
+        accessorKey: 'isPromoItem',
+        header: 'Promo',
+        size: 80,
+        cell: ({ row }) => row.original.isPromoItem ? (
+          <Badge variant="light" color="orange" size="sm">Yes</Badge>
+        ) : (
+          <Text size="sm" c="dimmed">—</Text>
+        ),
+      },
+      {
+        accessorKey: 'isManualPrice',
+        header: 'Manual Price',
+        size: 120,
+        cell: ({ row }) => renderBoolean(row.original.isManualPrice, 'red'),
+      },
+      {
+        accessorKey: 'isManualName',
+        header: 'Manual Name',
+        size: 120,
+        cell: ({ row }) => renderBoolean(row.original.isManualName, 'red'),
+      },
+      {
+        accessorKey: 'isNonDiscountItem',
+        header: 'Non discountable',
+        size: 150,
+        cell: ({ row }) => renderBoolean(row.original.isNonDiscountItem, 'blue'),
+      },
+      {
+        accessorKey: 'isNonServiceChargeItem',
+        header: 'Non service charge',
+        size: 170,
+        cell: ({ row }) => renderBoolean(row.original.isNonServiceChargeItem, 'blue'),
+      },
+      {
+        accessorKey: 'isPointPaidItem',
+        header: 'Allow points payment',
+        size: 190,
+        cell: ({ row }) => renderBoolean(row.original.isPointPaidItem, 'green'),
+      },
+      {
+        accessorKey: 'isNoPointEarnItem',
+        header: 'No point earning',
+        size: 170,
+        cell: ({ row }) => renderBoolean(row.original.isNoPointEarnItem, 'green'),
+      },
+      {
+        accessorKey: 'isNonTaxableItem',
+        header: 'Non taxable',
+        size: 140,
+        cell: ({ row }) => renderBoolean(row.original.isNonTaxableItem, 'teal'),
+      },
+      {
+        accessorKey: 'isComboRequired',
+        header: 'Combo required',
+        size: 150,
+        cell: ({ row }) => renderBoolean(row.original.isComboRequired, 'purple'),
+      },
+      {
+        accessorKey: 'itemPosName',
+        header: 'POS display name',
+        size: 200,
+        cell: ({ row }) => renderText(row.original.itemPosName),
+      },
+      {
+        accessorKey: 'itemPublicDisplayName',
+        header: 'Public display name',
+        size: 200,
+        cell: ({ row }) => renderText(row.original.itemPublicDisplayName),
+      },
+      {
+        accessorKey: 'itemPosNameAlt',
+        header: 'POS display name (alt)',
+        size: 220,
+        cell: ({ row }) => renderText(row.original.itemPosNameAlt),
+      },
+      {
+        accessorKey: 'itemPublicDisplayNameAlt',
+        header: 'Public display name (alt)',
+        size: 220,
+        cell: ({ row }) => renderText(row.original.itemPublicDisplayNameAlt),
+      },
+      {
+        accessorKey: 'itemPublicPrintedName',
+        header: 'POS printed name',
+        size: 200,
+        cell: ({ row }) => renderText(row.original.itemPublicPrintedName),
+      },
+      {
+        id: 'showItemOnReceipt',
+        header: 'Show item on receipt',
+        size: 170,
+        accessorFn: (row) => row.isItemShow,
+        cell: ({ row }) => renderBoolean(row.original.isItemShow, 'blue'),
+      },
+      {
+        id: 'showPriceOnReceipt',
+        header: 'Show price on receipt',
+        size: 180,
+        accessorFn: (row) => row.isPriceShow,
+        cell: ({ row }) => renderBoolean(row.original.isPriceShow, 'blue'),
+      },
+      {
+        accessorKey: 'modifiedDate',
+        header: 'Last updated',
+        size: 160,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{formatDateTime(row.original.modifiedDate)}</Text>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        size: 100,
+        enableHiding: false,
+        enableResizing: false,
+        cell: ({ row }) => (
+          <Group gap="xs" justify="flex-end" wrap="nowrap">
+            <Tooltip label="Manage modifiers" withArrow>
+              <ActionIcon
+                variant="subtle"
+                color={row.original.hasModifier ? 'violet' : 'gray'}
+                size="sm"
+                onClick={() => handleOpenModifiers(row.original)}
+              >
+                <IconAdjustments size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => handleEdit(row.original)}>
+              <IconPencil size={16} />
             </ActionIcon>
-          </Tooltip>
-          <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => handleEdit(row.original)}>
-            <IconPencil size={16} />
-          </ActionIcon>
-        </Group>
-      ),
-    },
-  ], [getCategoryLabel, getDepartmentName, handleEdit, handleOpenModifiers]);
+          </Group>
+        ),
+      },
+    ];
+  }, [getButtonStyleById, getButtonStyleColor, getCategoryLabel, getDepartmentName, handleEdit, handleOpenModifiers]);
 
   const table = useReactTable({
     data: itemsResponse?.items ?? [],

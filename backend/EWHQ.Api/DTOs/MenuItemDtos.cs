@@ -11,6 +11,8 @@ public class MenuItemSummaryDto
     public string ItemCode { get; set; } = string.Empty;
     public string? ItemName { get; set; }
     public string? ItemNameAlt { get; set; }
+    public string? ItemPosName { get; set; }
+    public string? ItemPosNameAlt { get; set; }
     public bool Enabled { get; set; }
     public bool IsItemShow { get; set; }
     public bool IsPriceShow { get; set; }
@@ -19,8 +21,17 @@ public class MenuItemSummaryDto
     public bool IsPromoItem { get; set; }
     public bool IsManualPrice { get; set; }
     public bool IsManualName { get; set; }
+    public bool IsNonDiscountItem { get; set; }
+    public bool IsNonServiceChargeItem { get; set; }
+    public bool? IsPointPaidItem { get; set; }
+    public bool? IsNoPointEarnItem { get; set; }
+    public bool? IsNonTaxableItem { get; set; }
+    public bool? IsComboRequired { get; set; }
+    public int? ButtonStyleId { get; set; }
     public int DisplayIndex { get; set; }
     public string? ItemPublicDisplayName { get; set; }
+    public string? ItemPublicDisplayNameAlt { get; set; }
+    public string? ItemPublicPrintedName { get; set; }
     public string? ImageFileName { get; set; }
     public DateTime? ModifiedDate { get; set; }
 }
@@ -29,16 +40,11 @@ public class MenuItemDetailDto : MenuItemSummaryDto
 {
     public int? ModifierGroupHeaderId { get; set; }
     public bool AutoRedirectToModifier { get; set; }
-    public int? ButtonStyleId { get; set; }
-    public string? ItemPosName { get; set; }
-    public string? ItemPosNameAlt { get; set; }
     public string? ItemNameAlt2 { get; set; }
     public string? ItemNameAlt3 { get; set; }
     public string? ItemNameAlt4 { get; set; }
     public string? Remark { get; set; }
     public string? RemarkAlt { get; set; }
-    public string? ItemPublicDisplayNameAlt { get; set; }
-    public string? ItemPublicPrintedName { get; set; }
     public string? ItemPublicPrintedNameAlt { get; set; }
     public string? ImageFileName2 { get; set; }
     public string? TableOrderingImageFileName { get; set; }
@@ -47,15 +53,10 @@ public class MenuItemDetailDto : MenuItemSummaryDto
     public bool IsFollowSetDynamic { get; set; }
     public bool IsFollowSetStandard { get; set; }
     public bool IsModifierConcatToParent { get; set; }
-    public bool IsNonDiscountItem { get; set; }
-    public bool IsNonServiceChargeItem { get; set; }
     public bool IsGroupRightItem { get; set; }
     public bool IsPrintLabel { get; set; }
     public bool IsPrintLabelTakeaway { get; set; }
     public bool IsPriceInPercentage { get; set; }
-    public bool? IsPointPaidItem { get; set; }
-    public bool? IsNoPointEarnItem { get; set; }
-    public bool? IsNonTaxableItem { get; set; }
     public bool? IsItemShowInKitchenChecklist { get; set; }
     public bool? IsSoldoutAutoLock { get; set; }
     public bool? IsPrepaidRechargeItem { get; set; }
@@ -72,7 +73,6 @@ public class MenuItemDetailDto : MenuItemSummaryDto
     public bool? IsNonSalesItem { get; set; }
     public int? ProductionSeconds { get; set; }
     public int? ParentItemId { get; set; }
-    public bool? IsComboRequired { get; set; }
     public DateTime? CreatedDate { get; set; }
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
