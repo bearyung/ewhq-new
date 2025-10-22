@@ -410,6 +410,15 @@ const MenuItemsPage: FC = () => {
         ),
       },
       {
+        accessorKey: 'displayIndex',
+        header: 'Display Index',
+        size: 120,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Text size="sm">{row.original.displayIndex}</Text>
+        ),
+      },
+      {
         accessorKey: 'itemName',
         header: 'Item Name',
         size: 200,
