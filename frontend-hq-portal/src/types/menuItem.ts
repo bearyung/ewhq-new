@@ -209,6 +209,15 @@ export interface MenuItemShopAvailability {
   printerOptions: ShopPrinterOption[];
 }
 
+export interface MenuItemReorderEntry {
+  itemId: number;
+  displayIndex: number;
+}
+
+export interface MenuItemReorderPayload {
+  items: MenuItemReorderEntry[];
+}
+
 export interface UpdateMenuItemPricePayload {
   price: number;
   enabled: boolean;

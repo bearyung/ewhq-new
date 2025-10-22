@@ -9,6 +9,7 @@ import type {
   MenuItemShopAvailability,
   UpdateMenuItemPricePayload,
   UpdateMenuItemAvailabilityPayload,
+  MenuItemReorderPayload,
   ItemModifierMappings,
   UpdateItemModifierMappingsPayload,
   ItemRelationshipTree,
@@ -127,6 +128,10 @@ class MenuItemService {
   ): Promise<ItemRelationshipTree> {
     const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/relationships`, payload);
     return response.data;
+  }
+
+  async reorderMenuItems(brandId: number, payload: MenuItemReorderPayload): Promise<void> {
+    await api.put(`/menu-items/brand/${brandId}/reorder`, payload);
   }
 }
 

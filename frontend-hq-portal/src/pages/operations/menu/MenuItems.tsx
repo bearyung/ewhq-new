@@ -30,6 +30,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconColumns,
+  IconGripVertical,
   IconPencil,
   IconPlus,
   IconSearch,
@@ -63,6 +64,7 @@ import { MenuItemDrawer } from './menu-items/MenuItemDrawer';
 import { MenuItemsCategorySidebar } from './menu-items/MenuItemsCategorySidebar';
 import { VirtualTableRow } from './menu-items/VirtualTableRow';
 import { ManageItemRelationshipsModal } from './menu-items/ManageItemRelationshipsModal';
+import { MenuItemsReorderModal } from './menu-items/MenuItemsReorderModal';
 import {
   PAGE_SIZE,
   PANEL_BORDER_COLOR,
@@ -123,6 +125,11 @@ const MenuItemsPage: FC = () => {
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [hoveredResizeColumnId, setHoveredResizeColumnId] = useState<string | null>(null);
   const [modifierModalItem, setModifierModalItem] = useState<MenuItemSummary | null>(null);
+  const [reorderModalOpen, setReorderModalOpen] = useState(false);
+  const [reorderItems, setReorderItems] = useState<MenuItemSummary[]>([]);
+  const [reorderLoading, setReorderLoading] = useState(false);
+  const [reorderSaving, setReorderSaving] = useState(false);
+  const [reorderCategoryId, setReorderCategoryId] = useState<number | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
@@ -293,6 +300,15 @@ const MenuItemsPage: FC = () => {
     return color;
   }, []);
 
+  const reorderCategoryName = useMemo(() => {
+    if (reorderCategoryId === null) {
+      return 'Selected category';
+    }
+
+    const label = getCategoryLabel(reorderCategoryId);
+    return label === '—' ? 'Selected category' : label;
+  }, [getCategoryLabel, reorderCategoryId]);
+
   const resetDrawerState = useCallback(() => {
     setDrawerOpen(false);
     setFormData(null);
@@ -364,6 +380,105 @@ const MenuItemsPage: FC = () => {
       setDetailLoading(false);
     }
   }, [brandId, resetDrawerState]);
+
+  const handleOpenReorderModal = useCallback(async () => {
+    if (!brandId) {
+      notifications.show({
+        title: 'Brand required',
+        message: 'Select a brand before reordering items.',
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />,
+      });
+      return;
+    }
+
+    if (selectedCategoryId === null) {
+      notifications.show({
+        title: 'Category required',
+        message: 'Select a category to reorder its items.',
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />,
+      });
+      return;
+    }
+
+    setReorderCategoryId(selectedCategoryId);
+    setReorderModalOpen(true);
+    setReorderLoading(true);
+    setReorderItems([]);
+
+    try {
+      const response = await menuItemService.getMenuItems(brandId, {
+        categoryId: selectedCategoryId,
+        includeDisabled: true,
+        sortBy: 'displayIndex',
+        sortDirection: 'asc',
+        page: 1,
+        pageSize: 1000,
+      });
+      setReorderItems(response.items);
+    } catch (error) {
+      console.error('Failed to load items for reorder', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Unable to load items for reordering.',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+      setReorderModalOpen(false);
+      setReorderCategoryId(null);
+    } finally {
+      setReorderLoading(false);
+    }
+  }, [brandId, selectedCategoryId]);
+
+  const handleCloseReorderModal = useCallback(() => {
+    if (reorderSaving) return;
+    setReorderModalOpen(false);
+    setReorderCategoryId(null);
+    setReorderItems([]);
+  }, [reorderSaving]);
+
+  const handleSaveReorder = useCallback(async (ordered: MenuItemSummary[]) => {
+    if (!brandId || reorderCategoryId === null) {
+      return;
+    }
+
+    setReorderSaving(true);
+    try {
+      await menuItemService.reorderMenuItems(brandId, {
+        items: ordered.map((item, index) => ({
+          itemId: item.itemId,
+          displayIndex: index + 1,
+        })),
+      });
+
+      notifications.show({
+        title: 'Order saved',
+        message: 'Menu item display order updated.',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+
+      setReorderModalOpen(false);
+      setReorderCategoryId(null);
+      setReorderItems([]);
+      setReloadToken((prev) => prev + 1);
+      setSortBy('displayIndex');
+      setSortDirection('asc');
+      setPage(1);
+    } catch (error) {
+      console.error('Failed to reorder items', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Unable to save the new order.',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setReorderSaving(false);
+    }
+  }, [brandId, reorderCategoryId, setReloadToken, setSortBy, setSortDirection]);
 
   const columns = useMemo<ColumnDef<MenuItemSummary>[]>(() => {
     const renderBoolean = (value: boolean | null | undefined, trueColor: string) => {
@@ -1712,6 +1827,15 @@ const handleSubmit = async () => {
                         </ActionIcon>
                       </Tooltip>
                       <Button
+                        variant="outline"
+                        leftSection={<IconGripVertical size={16} />}
+                        onClick={handleOpenReorderModal}
+                        disabled={!brandId || selectedCategoryId === null || reorderLoading || reorderSaving}
+                        size="sm"
+                      >
+                        Reorder items
+                      </Button>
+                      <Button
                         leftSection={<IconPlus size={16} />}
                         onClick={handleCreate}
                         disabled={!brandId}
@@ -2011,6 +2135,15 @@ const handleSubmit = async () => {
           handleModifiersSaved(modifierModalItem.itemId, hasModifier);
         }
       }}
+    />
+    <MenuItemsReorderModal
+      opened={reorderModalOpen}
+      onClose={handleCloseReorderModal}
+      categoryName={reorderCategoryName}
+      items={reorderItems}
+      loading={reorderLoading}
+      saving={reorderSaving}
+      onSave={handleSaveReorder}
     />
   </Box>
 );

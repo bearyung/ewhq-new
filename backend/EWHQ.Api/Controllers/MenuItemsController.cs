@@ -1143,6 +1143,74 @@ public class MenuItemsController : ControllerBase
         }
     }
 
+    [HttpPut("brand/{brandId}/reorder")]
+    [RequireBrandModify]
+    public async Task<ActionResult> ReorderMenuItems(int brandId, MenuItemReorderRequestDto request)
+    {
+        if (request.Items == null || request.Items.Count == 0)
+        {
+            return BadRequest(new { message = "At least one item is required to reorder." });
+        }
+
+        if (request.Items.Select(i => i.ItemId).Distinct().Count() != request.Items.Count)
+        {
+            return BadRequest(new { message = "Duplicate item identifiers are not allowed." });
+        }
+
+        try
+        {
+            var (context, accountId) = await _posContextService.GetContextAndAccountIdForBrandAsync(brandId);
+
+            var itemIds = request.Items.Select(i => i.ItemId).ToArray();
+
+            var items = await context.ItemMasters
+                .Where(i => i.AccountId == accountId && itemIds.Contains(i.ItemId))
+                .ToListAsync();
+
+            if (items.Count != request.Items.Count)
+            {
+                var foundIds = items.Select(i => i.ItemId).ToHashSet();
+                var missing = itemIds.First(id => !foundIds.Contains(id));
+                return NotFound(new { message = $"Menu item {missing} was not found." });
+            }
+
+            if (items.Select(i => i.CategoryId).Distinct().Count() > 1)
+            {
+                return BadRequest(new { message = "Items must belong to the same category to reorder." });
+            }
+
+            var now = DateTime.UtcNow;
+            var currentUser = GetCurrentUserIdentifier();
+            var mapping = request.Items.ToDictionary(i => i.ItemId, i => i.DisplayIndex);
+
+            foreach (var item in items)
+            {
+                if (!mapping.TryGetValue(item.ItemId, out var displayIndex))
+                {
+                    continue;
+                }
+
+                item.DisplayIndex = displayIndex;
+                item.ModifiedDate = now;
+                item.ModifiedBy = currentUser;
+            }
+
+            await context.SaveChangesAsync();
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Brand not found: {BrandId}", brandId);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reordering menu items for brand {BrandId}", brandId);
+            return StatusCode(500, new { message = "An error occurred while reordering menu items" });
+        }
+    }
+
     [HttpPut("brand/{brandId}/{itemId}")]
     [RequireBrandModify]
     public async Task<ActionResult> UpdateMenuItem(int brandId, int itemId, MenuItemUpsertDto updateDto)

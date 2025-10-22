@@ -190,6 +190,21 @@ public class MenuItemLookupsDto
     public IReadOnlyList<ModifierGroupHeaderDto> ModifierGroups { get; set; } = Array.Empty<ModifierGroupHeaderDto>();
 }
 
+public class MenuItemReorderEntryDto
+{
+    [Required]
+    public int ItemId { get; set; }
+
+    [Required]
+    public int DisplayIndex { get; set; }
+}
+
+public class MenuItemReorderRequestDto
+{
+    [MinLength(1)]
+    public IReadOnlyList<MenuItemReorderEntryDto> Items { get; set; } = Array.Empty<MenuItemReorderEntryDto>();
+}
+
 public class MenuItemPriceDto
 {
     public int ShopId { get; set; }
