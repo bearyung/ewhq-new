@@ -1,4 +1,5 @@
-import { Box, Group, TextInput, ActionIcon, Burger } from '@mantine/core'
+import { useState } from 'react'
+import { Box, Group, TextInput, ActionIcon, Burger, Tooltip } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../components/Sidebar'
@@ -8,10 +9,13 @@ import {
   IconHelp,
   IconBell,
   IconSettings,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
 } from '@tabler/icons-react'
 
 export function DashboardLayout() {
   const [opened, { toggle }] = useDisclosure()
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   return (
     <Box style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -19,16 +23,20 @@ export function DashboardLayout() {
       <Box
         visibleFrom="sm"
         style={{
-          width: 260,
+          width: isSidebarCollapsed ? 0 : 260,
           flexShrink: 0,
-          borderRight: '1px solid #E3E8EE',
+          borderRight: isSidebarCollapsed ? 'none' : '1px solid #E3E8EE',
           backgroundColor: 'white',
           overflow: 'hidden',
+          transition: 'width 160ms ease',
         }}
+        aria-hidden={isSidebarCollapsed}
       >
-        <Box style={{ width: 260, height: '100%' }} p="md">
-          <Sidebar />
-        </Box>
+        {!isSidebarCollapsed && (
+          <Box style={{ width: 260, height: '100%' }} p="md">
+            <Sidebar />
+          </Box>
+        )}
       </Box>
 
       {/* Mobile Sidebar Overlay */}
@@ -84,6 +92,27 @@ export function DashboardLayout() {
             >
               <IconSearch size={20} />
             </ActionIcon>
+
+            <Tooltip
+              label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              withArrow
+            >
+              <ActionIcon
+                visibleFrom="sm"
+                variant={isSidebarCollapsed ? 'filled' : 'light'}
+                color={isSidebarCollapsed ? 'indigo' : 'gray'}
+                size="lg"
+                aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-pressed={isSidebarCollapsed}
+                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+              >
+                {isSidebarCollapsed ? (
+                  <IconLayoutSidebarLeftExpand size={18} />
+                ) : (
+                  <IconLayoutSidebarLeftCollapse size={18} />
+                )}
+              </ActionIcon>
+            </Tooltip>
 
             {/* Search - Desktop (flexible width) */}
             <Box visibleFrom="sm" style={{ flex: 1 }}>

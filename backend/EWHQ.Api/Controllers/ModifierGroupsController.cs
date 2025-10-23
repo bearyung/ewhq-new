@@ -275,7 +275,8 @@ public class ModifierGroupsController : ControllerBase
                 DisplayIndex = i.DisplayIndex,
                 ItemPublicDisplayName = i.ItemPublicDisplayName,
                 ImageFileName = i.ImageFileName,
-                ModifiedDate = i.ModifiedDate
+                ModifiedDate = i.ModifiedDate,
+                ModifiedBy = i.ModifiedBy
             })
             .FirstOrDefaultAsync(cancellationToken);
 

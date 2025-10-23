@@ -34,6 +34,7 @@ public class MenuItemSummaryDto
     public string? ItemPublicPrintedName { get; set; }
     public string? ImageFileName { get; set; }
     public DateTime? ModifiedDate { get; set; }
+    public string? ModifiedBy { get; set; }
 }
 
 public class MenuItemDetailDto : MenuItemSummaryDto
@@ -75,7 +76,6 @@ public class MenuItemDetailDto : MenuItemSummaryDto
     public int? ParentItemId { get; set; }
     public DateTime? CreatedDate { get; set; }
     public string? CreatedBy { get; set; }
-    public string? ModifiedBy { get; set; }
     public IReadOnlyList<MenuItemPriceDto> Prices { get; set; } = Array.Empty<MenuItemPriceDto>();
     public IReadOnlyList<MenuItemShopAvailabilityDto> ShopAvailability { get; set; } = Array.Empty<MenuItemShopAvailabilityDto>();
 }

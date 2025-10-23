@@ -489,7 +489,8 @@ public class MenuItemsController : ControllerBase
                 ItemPublicDisplayNameAlt = i.ItemPublicDisplayNameAlt,
                 ItemPublicPrintedName = i.ItemPublicPrintedName,
                 ImageFileName = i.ImageFileName,
-                ModifiedDate = i.ModifiedDate
+                ModifiedDate = i.ModifiedDate,
+                ModifiedBy = i.ModifiedBy
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -983,34 +984,35 @@ public class MenuItemsController : ControllerBase
                     ItemId = i.ItemId,
                     AccountId = i.AccountId,
                     CategoryId = i.CategoryId,
-                DepartmentId = i.DepartmentId,
-                ItemCode = i.ItemCode,
-                ItemName = i.ItemName,
-                ItemNameAlt = i.ItemNameAlt,
-                ItemPosName = i.ItemPosName,
-                ItemPosNameAlt = i.ItemPosNameAlt,
-                Enabled = i.Enabled,
-                IsItemShow = i.IsItemShow,
-                IsPriceShow = i.IsPriceShow,
-                HasModifier = i.HasModifier,
-                IsModifier = i.IsModifier,
-                IsPromoItem = i.IsPromoItem,
-                IsManualPrice = i.IsManualPrice,
-                IsManualName = i.IsManualName,
-                IsNonDiscountItem = i.IsNonDiscountItem,
-                IsNonServiceChargeItem = i.IsNonServiceChargeItem,
-                IsPointPaidItem = i.IsPointPaidItem,
-                IsNoPointEarnItem = i.IsNoPointEarnItem,
-                IsNonTaxableItem = i.IsNonTaxableItem,
-                IsComboRequired = i.IsComboRequired,
-                ButtonStyleId = i.ButtonStyleId,
-                DisplayIndex = i.DisplayIndex,
-                ItemPublicDisplayName = i.ItemPublicDisplayName,
-                ItemPublicDisplayNameAlt = i.ItemPublicDisplayNameAlt,
-                ItemPublicPrintedName = i.ItemPublicPrintedName,
-                ImageFileName = i.ImageFileName,
-                ModifiedDate = i.ModifiedDate
-            })
+                    DepartmentId = i.DepartmentId,
+                    ItemCode = i.ItemCode,
+                    ItemName = i.ItemName,
+                    ItemNameAlt = i.ItemNameAlt,
+                    ItemPosName = i.ItemPosName,
+                    ItemPosNameAlt = i.ItemPosNameAlt,
+                    Enabled = i.Enabled,
+                    IsItemShow = i.IsItemShow,
+                    IsPriceShow = i.IsPriceShow,
+                    HasModifier = i.HasModifier,
+                    IsModifier = i.IsModifier,
+                    IsPromoItem = i.IsPromoItem,
+                    IsManualPrice = i.IsManualPrice,
+                    IsManualName = i.IsManualName,
+                    IsNonDiscountItem = i.IsNonDiscountItem,
+                    IsNonServiceChargeItem = i.IsNonServiceChargeItem,
+                    IsPointPaidItem = i.IsPointPaidItem,
+                    IsNoPointEarnItem = i.IsNoPointEarnItem,
+                    IsNonTaxableItem = i.IsNonTaxableItem,
+                    IsComboRequired = i.IsComboRequired,
+                    ButtonStyleId = i.ButtonStyleId,
+                    DisplayIndex = i.DisplayIndex,
+                    ItemPublicDisplayName = i.ItemPublicDisplayName,
+                    ItemPublicDisplayNameAlt = i.ItemPublicDisplayNameAlt,
+                    ItemPublicPrintedName = i.ItemPublicPrintedName,
+                    ImageFileName = i.ImageFileName,
+                    ModifiedDate = i.ModifiedDate,
+                    ModifiedBy = i.ModifiedBy
+                })
                 .ToListAsync();
 
             var response = new MenuItemListResponse

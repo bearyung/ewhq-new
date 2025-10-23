@@ -31,14 +31,14 @@ import {
   IconChevronRight,
   IconColumns,
   IconGripVertical,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
   IconPencil,
   IconPlus,
   IconSearch,
   IconSparkles,
   IconSortAscending,
   IconSortDescending,
-  IconEye,
-  IconEyeOff,
   IconList,
   IconX,
 } from '@tabler/icons-react';
@@ -76,6 +76,15 @@ import {
   type CategoryNode,
 } from './menu-items/menuItemsUtils';
 
+const SORT_OPTIONS: Array<{
+  label: string;
+  value: 'displayIndex' | 'itemId' | 'itemCode' | 'name';
+}> = [
+  { label: 'Display order', value: 'displayIndex' },
+  { label: 'Item ID', value: 'itemId' },
+  { label: 'Item code', value: 'itemCode' },
+  { label: 'Name', value: 'name' },
+];
 
 const MenuItemsPage: FC = () => {
   const { selectedBrand } = useBrands();
@@ -96,14 +105,14 @@ const MenuItemsPage: FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebouncedValue(search, 800);
-  const [includeDisabled, setIncludeDisabled] = useState(false);
-  const [sortBy, setSortBy] = useState<'displayIndex' | 'name' | 'modified'>('displayIndex');
+  const [sortBy, setSortBy] = useState<'displayIndex' | 'itemId' | 'itemCode' | 'name'>('displayIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
   const [searchPopoverOpened, setSearchPopoverOpened] = useState(false);
   const isSearchActive = searchPopoverOpened || Boolean(search);
   const [sortPopoverOpened, setSortPopoverOpened] = useState(false);
   const [columnMenuOpened, setColumnMenuOpened] = useState(false);
+  const [isCategorySidebarCollapsed, setIsCategorySidebarCollapsed] = useState(false);
   const [columnSearch, setColumnSearch] = useState('');
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => ({
     isManualPrice: false,
@@ -717,6 +726,14 @@ const MenuItemsPage: FC = () => {
         ),
       },
       {
+        accessorKey: 'modifiedBy',
+        header: 'Last updated by',
+        size: 200,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{row.original.modifiedBy || '—'}</Text>
+        ),
+      },
+      {
         id: 'actions',
         header: '',
         size: 100,
@@ -724,7 +741,7 @@ const MenuItemsPage: FC = () => {
         enableResizing: false,
         cell: ({ row }) => (
           <Group gap="xs" justify="flex-end" wrap="nowrap">
-            <Tooltip label="Manage modifiers" withArrow>
+            <Tooltip label="Manage item relationships" withArrow>
               <ActionIcon
                 variant="subtle"
                 color={row.original.hasModifier ? 'violet' : 'gray'}
@@ -734,9 +751,11 @@ const MenuItemsPage: FC = () => {
                 <IconAdjustments size={16} />
               </ActionIcon>
             </Tooltip>
-            <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => handleEdit(row.original)}>
-              <IconPencil size={16} />
-            </ActionIcon>
+            <Tooltip label="Edit item" withArrow>
+              <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => handleEdit(row.original)}>
+                <IconPencil size={16} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
         ),
       },
@@ -762,7 +781,7 @@ const MenuItemsPage: FC = () => {
     () =>
       Array.from({ length: totalPages }, (_, index) => ({
         value: String(index + 1),
-        label: `Page ${index + 1}`,
+        label: String(index + 1),
       })),
     [totalPages],
   );
@@ -924,7 +943,6 @@ const MenuItemsPage: FC = () => {
         const response = await menuItemService.getMenuItems(brandId, {
           categoryId: selectedCategoryId ?? undefined,
           search: debouncedSearch || undefined,
-          includeDisabled,
           sortBy,
           sortDirection,
           page,
@@ -940,7 +958,7 @@ const MenuItemsPage: FC = () => {
     };
 
     loadItems();
-  }, [brandId, filtersReady, selectedCategoryId, debouncedSearch, includeDisabled, sortBy, sortDirection, page, reloadToken]);
+  }, [brandId, filtersReady, selectedCategoryId, debouncedSearch, sortBy, sortDirection, page, reloadToken]);
 
   const categoryTree = useMemo(() => buildCategoryTree(lookups?.categories ?? []), [lookups?.categories]);
 
@@ -1356,7 +1374,6 @@ const handleSubmit = async () => {
     const response = await menuItemService.getMenuItems(brandId, {
       categoryId: selectedCategoryId ?? undefined,
       search: debouncedSearch || undefined,
-      includeDisabled,
       sortBy,
       sortDirection,
       page,
@@ -1532,51 +1549,53 @@ const handleSubmit = async () => {
                 paddingInline: isDesktopLayout ? 0 : 'var(--mantine-spacing-md)',
               }}
             >
-              <Box
-                style={{
-                  ...(isDesktopLayout
-                    ? {
-                        width: 320,
-                        flexShrink: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        minHeight: 0,
-                      }
-                    : { paddingBottom: 'var(--mantine-spacing-lg)' }),
-                }}
-              >
-                <Paper
-                  shadow="none"
-                  p="md"
+              {!isCategorySidebarCollapsed && (
+                <Box
                   style={{
-                    borderRight: isDesktopLayout ? `1px solid ${PANEL_BORDER_COLOR}` : 'none',
                     ...(isDesktopLayout
                       ? {
-                          flex: 1,
+                          width: 320,
+                          flexShrink: 0,
                           display: 'flex',
                           flexDirection: 'column',
-                          overflow: 'hidden',
                           minHeight: 0,
                         }
-                      : {}),
+                      : { paddingBottom: 'var(--mantine-spacing-lg)' }),
                   }}
                 >
-                  <MenuItemsCategorySidebar
-                    isDesktopLayout={isDesktopLayout}
-                    categorySearch={categorySearch}
-                    onCategorySearchChange={(value) => setCategorySearch(value)}
-                    selectedCategoryId={selectedCategoryId}
-                    totalCategoryItems={totalCategoryItems}
-                    lookupsLoading={lookupsLoading}
-                    filteredCategories={filteredCategories}
-                    renderCategoryNodes={renderCategoryNodes}
-                    onAllItems={() => {
-                      setSelectedCategoryId(null);
-                      setPage(1);
+                  <Paper
+                    shadow="none"
+                    p="md"
+                    style={{
+                      borderRight: isDesktopLayout ? `1px solid ${PANEL_BORDER_COLOR}` : 'none',
+                      ...(isDesktopLayout
+                        ? {
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            minHeight: 0,
+                          }
+                        : {}),
                     }}
-                  />
-                </Paper>
-              </Box>
+                  >
+                    <MenuItemsCategorySidebar
+                      isDesktopLayout={isDesktopLayout}
+                      categorySearch={categorySearch}
+                      onCategorySearchChange={(value) => setCategorySearch(value)}
+                      selectedCategoryId={selectedCategoryId}
+                      totalCategoryItems={totalCategoryItems}
+                      lookupsLoading={lookupsLoading}
+                      filteredCategories={filteredCategories}
+                      renderCategoryNodes={renderCategoryNodes}
+                      onAllItems={() => {
+                        setSelectedCategoryId(null);
+                        setPage(1);
+                      }}
+                    />
+                  </Paper>
+                </Box>
+              )}
 
               <Box
                 style={{
@@ -1610,6 +1629,25 @@ const handleSubmit = async () => {
                 >
                   <Group justify="space-between" align="center" gap="md" wrap="wrap">
                     <Group gap="xs" wrap="wrap">
+                      <Tooltip
+                        label={isCategorySidebarCollapsed ? 'Expand categories panel' : 'Collapse categories panel'}
+                        withArrow
+                      >
+                        <ActionIcon
+                          variant={isCategorySidebarCollapsed ? 'filled' : 'light'}
+                          color={isCategorySidebarCollapsed ? 'indigo' : 'gray'}
+                          size="lg"
+                          aria-label={isCategorySidebarCollapsed ? 'Expand categories panel' : 'Collapse categories panel'}
+                          aria-pressed={isCategorySidebarCollapsed}
+                          onClick={() => setIsCategorySidebarCollapsed((prev) => !prev)}
+                        >
+                          {isCategorySidebarCollapsed ? (
+                            <IconLayoutSidebarLeftExpand size={18} />
+                          ) : (
+                            <IconLayoutSidebarLeftCollapse size={18} />
+                          )}
+                        </ActionIcon>
+                      </Tooltip>
                       <Popover
                         opened={searchPopoverOpened}
                         onChange={setSearchPopoverOpened}
@@ -1664,19 +1702,6 @@ const handleSubmit = async () => {
                           />
                         </Popover.Dropdown>
                       </Popover>
-                      <Tooltip label={includeDisabled ? 'Showing all items' : 'Showing enabled only'} withArrow>
-                        <ActionIcon
-                          variant={includeDisabled ? 'filled' : 'light'}
-                          color={includeDisabled ? 'indigo' : 'gray'}
-                          size="lg"
-                          onClick={() => {
-                            setIncludeDisabled((prev) => !prev);
-                            setPage(1);
-                          }}
-                        >
-                          {includeDisabled ? <IconEye size={18} /> : <IconEyeOff size={18} />}
-                        </ActionIcon>
-                      </Tooltip>
                       <Popover
                         opened={sortPopoverOpened}
                         onChange={setSortPopoverOpened}
@@ -1698,25 +1723,32 @@ const handleSubmit = async () => {
                             </ActionIcon>
                           </Tooltip>
                         </Popover.Target>
-                        <Popover.Dropdown p="xs" w={200}>
+                        <Popover.Dropdown p="xs" w={220}>
                           <Stack gap="xs">
                             <Text size="xs" fw={600} c="dimmed">
                               Sort by
                             </Text>
-                            <Select
-                              data={[
-                                { label: 'Display order', value: 'displayIndex' },
-                                { label: 'Name', value: 'name' },
-                                { label: 'Last updated', value: 'modified' },
-                              ]}
-                              value={sortBy}
-                              onChange={(value) => {
-                                if (!value) return;
-                                setSortBy(value as typeof sortBy);
-                                setPage(1);
-                                setSortPopoverOpened(false);
-                              }}
-                            />
+                            <Stack gap={6}>
+                              {SORT_OPTIONS.map((option) => (
+                                <Button
+                                  key={option.value}
+                                  variant={sortBy === option.value ? 'filled' : 'subtle'}
+                                  color={sortBy === option.value ? 'indigo' : 'gray'}
+                                  size="xs"
+                                  radius="md"
+                                  rightSection={sortBy === option.value ? <IconCheck size={14} /> : undefined}
+                                  onClick={() => {
+                                    if (sortBy !== option.value) {
+                                      setSortBy(option.value);
+                                      setPage(1);
+                                    }
+                                    setSortPopoverOpened(false);
+                                  }}
+                                >
+                                  {option.label}
+                                </Button>
+                              ))}
+                            </Stack>
                           </Stack>
                         </Popover.Dropdown>
                       </Popover>
@@ -1862,7 +1894,7 @@ const handleSubmit = async () => {
                           value={String(page)}
                           onChange={handlePageSelect}
                           data={pageOptions}
-                          w={120}
+                          w={80}
                           disabled={itemsLoading || totalPages <= 1}
                         />
                         <ActionIcon

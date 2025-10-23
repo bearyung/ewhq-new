@@ -34,6 +34,7 @@ export interface MenuItemSummary {
   itemPublicPrintedName?: string;
   imageFileName?: string;
   modifiedDate?: string;
+  modifiedBy?: string | null;
 }
 
 export interface MenuItemDetail extends MenuItemSummary {
@@ -150,7 +151,7 @@ export interface MenuItemListQuery {
   includeDisabled?: boolean;
   hasModifier?: boolean;
   isPromoItem?: boolean;
-  sortBy?: 'displayIndex' | 'name' | 'modified';
+  sortBy?: 'displayIndex' | 'itemId' | 'itemCode' | 'name';
   sortDirection?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
