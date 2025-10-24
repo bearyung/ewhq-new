@@ -46,7 +46,7 @@ const menuSections = [
     color: 'teal',
     description: 'Create dynamic categories based on rules',
     stats: '5 smart categories',
-    path: '/menus/virtual-categories',
+    path: '/menus/smart-categories',
   },
   {
     id: 'items',

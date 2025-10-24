@@ -15,11 +15,10 @@ public class SmartCategory
     public int SmartCategoryId { get; set; }
 
     [MaxLength(100)]
-    [Required]
-    public string Name { get; set; } = string.Empty;
+    public string? Name { get; set; }
 
     [MaxLength(100)]
-    public string NameAlt { get; set; }
+    public string? NameAlt { get; set; }
 
     public int DisplayIndex { get; set; }
 
@@ -46,31 +45,31 @@ public class SmartCategory
     public string ModifiedBy { get; set; } = string.Empty;
 
     [MaxLength(100)]
-    public string Description { get; set; }
+    public string? Description { get; set; }
 
     [MaxLength(200)]
-    public string DescriptionAlt { get; set; }
+    public string? DescriptionAlt { get; set; }
 
     [MaxLength(200)]
-    public string ImageFileName { get; set; }
+    public string? ImageFileName { get; set; }
 
     [MaxLength(200)]
-    public string ImageFileName2 { get; set; }
+    public string? ImageFileName2 { get; set; }
 
     [MaxLength(200)]
-    public string ImageFileName3 { get; set; }
+    public string? ImageFileName3 { get; set; }
 
     public bool? IsSelfOrderingDisplay { get; set; }
 
     [MaxLength(4000)]
-    public string Remark { get; set; }
+    public string? Remark { get; set; }
 
     public bool? IsOnlineStoreDisplay { get; set; }
 
     public int? OnlineStoreRefCategoryId { get; set; }
 
     [MaxLength(4000)]
-    public string RemarkAlt { get; set; }
+    public string? RemarkAlt { get; set; }
 
     public bool? IsOdoDisplay { get; set; }
 
