@@ -11,6 +11,8 @@ export interface MenuItemSummary {
   itemCode: string;
   itemName?: string;
   itemNameAlt?: string;
+  itemPosName?: string;
+  itemPosNameAlt?: string;
   enabled: boolean;
   isItemShow: boolean;
   isPriceShow: boolean;
@@ -19,25 +21,30 @@ export interface MenuItemSummary {
   isPromoItem: boolean;
   isManualPrice: boolean;
   isManualName: boolean;
+  isNonDiscountItem: boolean;
+  isNonServiceChargeItem: boolean;
+  isPointPaidItem?: boolean | null;
+  isNoPointEarnItem?: boolean | null;
+  isNonTaxableItem?: boolean | null;
+  isComboRequired?: boolean | null;
+  buttonStyleId?: number | null;
   displayIndex: number;
   itemPublicDisplayName?: string;
+  itemPublicDisplayNameAlt?: string;
+  itemPublicPrintedName?: string;
   imageFileName?: string;
   modifiedDate?: string;
+  modifiedBy?: string | null;
 }
 
 export interface MenuItemDetail extends MenuItemSummary {
   modifierGroupHeaderId?: number | null;
   autoRedirectToModifier: boolean;
-  buttonStyleId?: number | null;
-  itemPosName?: string;
-  itemPosNameAlt?: string;
   itemNameAlt2?: string;
   itemNameAlt3?: string;
   itemNameAlt4?: string;
   remark?: string;
   remarkAlt?: string;
-  itemPublicDisplayNameAlt?: string;
-  itemPublicPrintedName?: string;
   itemPublicPrintedNameAlt?: string;
   imageFileName2?: string;
   tableOrderingImageFileName?: string;
@@ -46,15 +53,10 @@ export interface MenuItemDetail extends MenuItemSummary {
   isFollowSetDynamic: boolean;
   isFollowSetStandard: boolean;
   isModifierConcatToParent: boolean;
-  isNonDiscountItem: boolean;
-  isNonServiceChargeItem: boolean;
   isGroupRightItem: boolean;
   isPrintLabel: boolean;
   isPrintLabelTakeaway: boolean;
   isPriceInPercentage: boolean;
-  isPointPaidItem?: boolean | null;
-  isNoPointEarnItem?: boolean | null;
-  isNonTaxableItem?: boolean | null;
   isItemShowInKitchenChecklist?: boolean | null;
   isSoldoutAutoLock?: boolean | null;
   isPrepaidRechargeItem?: boolean | null;
@@ -71,7 +73,6 @@ export interface MenuItemDetail extends MenuItemSummary {
   isNonSalesItem?: boolean | null;
   productionSeconds?: number | null;
   parentItemId?: number | null;
-  isComboRequired?: boolean | null;
   createdDate?: string;
   createdBy?: string;
   modifiedBy?: string;
@@ -150,7 +151,7 @@ export interface MenuItemListQuery {
   includeDisabled?: boolean;
   hasModifier?: boolean;
   isPromoItem?: boolean;
-  sortBy?: 'displayIndex' | 'name' | 'modified';
+  sortBy?: 'displayIndex' | 'itemId' | 'itemCode' | 'name';
   sortDirection?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
@@ -187,6 +188,11 @@ export interface MenuItemPrice {
   hasPrice: boolean;
 }
 
+export interface ShopPrinterOption {
+  shopPrinterMasterId: number;
+  printerName: string;
+}
+
 export interface MenuItemShopAvailability {
   shopId: number;
   shopName: string;
@@ -195,6 +201,22 @@ export interface MenuItemShopAvailability {
   isLimitedItem: boolean | null;
   lastUpdated: string | null;
   updatedBy: string | null;
+  shopPrinter1: number | null;
+  shopPrinter2: number | null;
+  shopPrinter3: number | null;
+  shopPrinter4: number | null;
+  shopPrinter5: number | null;
+  isGroupPrintByPrinter: boolean | null;
+  printerOptions: ShopPrinterOption[];
+}
+
+export interface MenuItemReorderEntry {
+  itemId: number;
+  displayIndex: number;
+}
+
+export interface MenuItemReorderPayload {
+  items: MenuItemReorderEntry[];
 }
 
 export interface UpdateMenuItemPricePayload {
@@ -206,4 +228,84 @@ export interface UpdateMenuItemAvailabilityPayload {
   enabled?: boolean | null;
   isOutOfStock?: boolean | null;
   isLimitedItem?: boolean | null;
+  shopPrinter1?: number | null;
+  shopPrinter2?: number | null;
+  shopPrinter3?: number | null;
+  shopPrinter4?: number | null;
+  shopPrinter5?: number | null;
+  isGroupPrintByPrinter?: boolean | null;
+}
+
+export interface ItemModifierMapping {
+  groupHeaderId: number;
+  sequence: number;
+  modifierLinkType: string | null;
+}
+
+export interface ItemModifierMappings {
+  inStore: ItemModifierMapping[];
+  online: ItemModifierMapping[];
+}
+
+export interface ItemModifierMappingUpsert {
+  groupHeaderId: number;
+  sequence: number;
+}
+
+export interface UpdateItemModifierMappingsPayload {
+  inStore: ItemModifierMappingUpsert[];
+  online: ItemModifierMappingUpsert[];
+}
+
+export interface ItemRelationshipTree {
+  root: ItemRelationshipNode;
+}
+
+export interface ItemRelationshipNode {
+  item: MenuItemSummary;
+  inStore: ItemRelationshipContext;
+  online: ItemRelationshipContext;
+}
+
+export interface ItemRelationshipContext {
+  modifiers: ItemRelationshipModifier[];
+  itemSets: ItemRelationshipItemSet[];
+}
+
+export interface ItemRelationshipModifier {
+  groupHeaderId: number;
+  sequence: number;
+  linkType: string | null;
+  group: ModifierGroupHeader;
+}
+
+export interface ItemRelationshipItemSet {
+  itemSetId: number | null;
+  groupHeaderId: number;
+  sequence: number;
+  linkType: string | null;
+  group: ModifierGroupHeader;
+  children: ItemRelationshipNode[];
+}
+
+export interface UpdateItemRelationshipTreePayload {
+  root: UpdateItemRelationshipNodePayload;
+}
+
+export interface UpdateItemRelationshipNodePayload {
+  itemId: number;
+  inStore: UpdateItemRelationshipContextPayload;
+  online: UpdateItemRelationshipContextPayload;
+}
+
+export interface UpdateItemRelationshipContextPayload {
+  modifiers: ItemModifierMappingUpsert[];
+  itemSets: UpdateItemRelationshipSetPayload[];
+}
+
+export interface UpdateItemRelationshipSetPayload {
+  itemSetId?: number | null;
+  groupHeaderId: number;
+  sequence: number;
+  children: UpdateItemRelationshipNodePayload[];
 }

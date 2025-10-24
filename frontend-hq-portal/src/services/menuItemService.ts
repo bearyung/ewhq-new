@@ -9,7 +9,13 @@ import type {
   MenuItemShopAvailability,
   UpdateMenuItemPricePayload,
   UpdateMenuItemAvailabilityPayload,
+  MenuItemReorderPayload,
+  ItemModifierMappings,
+  UpdateItemModifierMappingsPayload,
+  ItemRelationshipTree,
+  UpdateItemRelationshipTreePayload,
 } from '../types/menuItem';
+import type { ModifierGroupPreview } from '../types/modifierGroup';
 
 const buildQueryString = (query: MenuItemListQuery): string => {
   const params = new URLSearchParams();
@@ -89,6 +95,43 @@ class MenuItemService {
   ): Promise<MenuItemShopAvailability> {
     const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/availability/${shopId}`, payload);
     return response.data;
+  }
+
+  async getItemModifierMappings(brandId: number, itemId: number): Promise<ItemModifierMappings> {
+    const response = await api.get(`/menu-items/brand/${brandId}/${itemId}/modifiers`);
+    return response.data;
+  }
+
+  async getModifierGroupPreview(brandId: number, groupHeaderId: number): Promise<ModifierGroupPreview> {
+    const response = await api.get(`/menu-items/brand/${brandId}/modifier-groups/${groupHeaderId}/preview`);
+    return response.data;
+  }
+
+  async updateItemModifierMappings(
+    brandId: number,
+    itemId: number,
+    payload: UpdateItemModifierMappingsPayload,
+  ): Promise<ItemModifierMappings> {
+    const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/modifiers`, payload);
+    return response.data;
+  }
+
+  async getItemRelationships(brandId: number, itemId: number): Promise<ItemRelationshipTree> {
+    const response = await api.get(`/menu-items/brand/${brandId}/${itemId}/relationships`);
+    return response.data;
+  }
+
+  async updateItemRelationships(
+    brandId: number,
+    itemId: number,
+    payload: UpdateItemRelationshipTreePayload,
+  ): Promise<ItemRelationshipTree> {
+    const response = await api.put(`/menu-items/brand/${brandId}/${itemId}/relationships`, payload);
+    return response.data;
+  }
+
+  async reorderMenuItems(brandId: number, payload: MenuItemReorderPayload): Promise<void> {
+    await api.put(`/menu-items/brand/${brandId}/reorder`, payload);
   }
 }
 

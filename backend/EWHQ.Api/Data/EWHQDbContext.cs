@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using EWHQ.Api.Models.Entities;
 using EWHQ.Api.Data.Attributes;
 using System.Reflection;
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
+using System;
 
 namespace EWHQ.Api.Data;
 
@@ -231,6 +234,11 @@ public class EWHQDbContext : DbContext
 
         // Configure composite keys and special entity configurations
         ConfigureEntityKeys(modelBuilder);
+
+        if (Database.IsSqlServer())
+        {
+            ConfigureSqlServerTriggers(modelBuilder);
+        }
 
         // Apply database-specific configurations
         ApplyDatabaseSpecificConfigurations(modelBuilder);
@@ -733,7 +741,178 @@ public class EWHQDbContext : DbContext
         modelBuilder.Entity<Shop>()
             .Property(s => s.ShopId)
             .ValueGeneratedOnAdd();
+    }
 
+    private static readonly IReadOnlyDictionary<string, string[]> SqlServerTableTriggers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["AccountMaster"] = new[] { "AccountMaster_delete_trigger", "AccountMaster_insert_trigger", "AccountMaster_update_trigger" },
+        ["Address"] = new[] { "Address_delete_trigger", "Address_insert_trigger", "Address_update_trigger" },
+        ["AddressBook"] = new[] { "AddressBook_delete_trigger", "AddressBook_insert_trigger", "AddressBook_update_trigger" },
+        ["AddressDeliveryMapping"] = new[] { "AddressDeliveryMapping_delete_trigger", "AddressDeliveryMapping_insert_trigger", "AddressDeliveryMapping_update_trigger" },
+        ["AddressGroup"] = new[] { "AddressGroup_delete_trigger", "AddressGroup_insert_trigger", "AddressGroup_update_trigger" },
+        ["AddressMasterArea"] = new[] { "AddressMasterArea_delete_trigger", "AddressMasterArea_insert_trigger", "AddressMasterArea_update_trigger" },
+        ["AddressMasterBuilding"] = new[] { "AddressMasterBuilding_delete_trigger", "AddressMasterBuilding_insert_trigger", "AddressMasterBuilding_update_trigger" },
+        ["AddressMasterDistrict"] = new[] { "AddressMasterDistrict_delete_trigger", "AddressMasterDistrict_insert_trigger", "AddressMasterDistrict_update_trigger" },
+        ["AddressMasterEstate"] = new[] { "AddressMasterEstate_delete_trigger", "AddressMasterEstate_insert_trigger", "AddressMasterEstate_update_trigger" },
+        ["AddressMasterShop"] = new[] { "AddressMasterShop_delete_trigger", "AddressMasterShop_insert_trigger", "AddressMasterShop_update_trigger" },
+        ["AddressMasterStreet"] = new[] { "AddressMasterStreet_delete_trigger", "AddressMasterStreet_insert_trigger", "AddressMasterStreet_update_trigger" },
+        ["AuditTrailLog"] = new[] { "AuditTrailLog_delete_trigger", "AuditTrailLog_insert_trigger", "AuditTrailLog_update_trigger" },
+        ["BundlePromoOverview"] = new[] { "BundlePromoOverview_delete_trigger", "BundlePromoOverview_insert_trigger", "BundlePromoOverview_update_trigger" },
+        ["ButtonStyleMaster"] = new[] { "ButtonStyleMaster_delete_trigger", "ButtonStyleMaster_insert_trigger", "ButtonStyleMaster_update_trigger" },
+        ["CashDrawerDetail"] = new[] { "CashDrawerDetail_delete_trigger", "CashDrawerDetail_insert_trigger", "CashDrawerDetail_update_trigger" },
+        ["CashDrawerHeader"] = new[] { "CashDrawerHeader_delete_trigger", "CashDrawerHeader_insert_trigger", "CashDrawerHeader_update_trigger" },
+        ["Coupon"] = new[] { "Coupon_delete_trigger", "Coupon_insert_trigger", "Coupon_update_trigger" },
+        ["CouponCampaign"] = new[] { "CouponCampaign_delete_trigger", "CouponCampaign_insert_trigger", "CouponCampaign_update_trigger" },
+        ["CouponCampaignDistShopMapping"] = new[] { "CouponCampaignDistShopMapping_delete_trigger", "CouponCampaignDistShopMapping_insert_trigger", "CouponCampaignDistShopMapping_update_trigger" },
+        ["CouponCampaignMemberMapping"] = new[] { "CouponCampaignMemberMapping_delete_trigger", "CouponCampaignMemberMapping_insert_trigger", "CouponCampaignMemberMapping_update_trigger" },
+        ["CouponCampaignMemberTypeMapping"] = new[] { "CouponCampaignMemberTypeMapping_delete_trigger", "CouponCampaignMemberTypeMapping_insert_trigger", "CouponCampaignMemberTypeMapping_update_trigger" },
+        ["CouponCampaignMemberUsedCount"] = new[] { "CouponCampaignMemberUsedCount_delete_trigger", "CouponCampaignMemberUsedCount_insert_trigger", "CouponCampaignMemberUsedCount_update_trigger" },
+        ["CouponDistributionLog"] = new[] { "CouponDistributionLog_delete_trigger", "CouponDistributionLog_insert_trigger", "CouponDistributionLog_update_trigger" },
+        ["CouponMemberWallet"] = new[] { "CouponMemberWallet_delete_trigger", "CouponMemberWallet_insert_trigger", "CouponMemberWallet_update_trigger" },
+        ["CouponRedeemLog"] = new[] { "CouponRedeemLog_delete_trigger", "CouponRedeemLog_insert_trigger", "CouponRedeemLog_update_trigger" },
+        ["DbMasterTableTranslation"] = new[] { "DbMasterTableTranslation_delete_trigger", "DbMasterTableTranslation_insert_trigger", "DbMasterTableTranslation_update_trigger" },
+        ["Department"] = new[] { "Department_delete_trigger", "Department_insert_trigger", "Department_update_trigger" },
+        ["DeviceTerminal"] = new[] { "DeviceTerminal_delete_trigger", "DeviceTerminal_insert_trigger", "DeviceTerminal_update_trigger" },
+        ["DeviceTerminalModel"] = new[] { "DeviceTerminalModel_delete_trigger", "DeviceTerminalModel_insert_trigger", "DeviceTerminalModel_update_trigger" },
+        ["Discount"] = new[] { "Discount_delete_trigger", "Discount_insert_trigger", "Discount_update_trigger" },
+        ["DiscountShopDetail"] = new[] { "DiscountShopDetail_delete_trigger", "DiscountShopDetail_insert_trigger", "DiscountShopDetail_update_trigger" },
+        ["ItemCategory"] = new[] { "ItemCategory_delete_trigger", "ItemCategory_insert_trigger", "ItemCategory_update_trigger" },
+        ["ItemCategoryShopDetail"] = new[] { "ItemCategoryShopDetail_delete_trigger", "ItemCategoryShopDetail_insert_trigger", "ItemCategoryShopDetail_update_trigger" },
+        ["ItemMaster"] = new[] { "ItemMaster_delete_trigger", "ItemMaster_insert_trigger", "ItemMaster_update_trigger" },
+        ["ItemMasterGroupRight"] = new[] { "ItemMasterGroupRight_delete_trigger", "ItemMasterGroupRight_insert_trigger", "ItemMasterGroupRight_update_trigger" },
+        ["ItemMasterMetaOnline"] = new[] { "ItemMasterMetaOnline_delete_trigger", "ItemMasterMetaOnline_insert_trigger", "ItemMasterMetaOnline_update_trigger" },
+        ["ItemModifierGroupMapping"] = new[] { "ItemModifierGroupMapping_delete_trigger", "ItemModifierGroupMapping_insert_trigger", "ItemModifierGroupMapping_update_trigger" },
+        ["ItemOrderChannelMapping"] = new[] { "ItemOrderChannelMapping_delete_trigger", "ItemOrderChannelMapping_insert_trigger", "ItemOrderChannelMapping_update_trigger" },
+        ["ItemPrice"] = new[] { "ItemPrice_delete_trigger", "ItemPrice_insert_trigger", "ItemPrice_update_trigger" },
+        ["ItemPriceRuleGroupMapping"] = new[] { "ItemPriceRuleGroupMapping_delete_trigger", "ItemPriceRuleGroupMapping_insert_trigger", "ItemPriceRuleGroupMapping_update_trigger" },
+        ["ItemSOP"] = new[] { "ItemSOP_delete_trigger", "ItemSOP_insert_trigger", "ItemSOP_update_trigger" },
+        ["ItemSet"] = new[] { "ItemSet_delete_trigger", "ItemSet_insert_trigger", "ItemSet_update_trigger" },
+        ["ItemShopDetail"] = new[] { "ItemShopDetail_delete_trigger", "ItemShopDetail_insert_trigger", "ItemShopDetail_update_trigger" },
+        ["ItemShopDetailOnlineMetaData"] = new[] { "ItemShopDetailOnlineMetaData_delete_trigger", "ItemShopDetailOnlineMetaData_insert_trigger", "ItemShopDetailOnlineMetaData_update_trigger" },
+        ["ItemSoldOutHistory"] = new[] { "ItemSoldOutHistory_delete_trigger", "ItemSoldOutHistory_insert_trigger", "ItemSoldOutHistory_update_trigger" },
+        ["ItemSOPDetail"] = new[] { "ItemSOPDetail_delete_trigger", "ItemSOPDetail_insert_trigger", "ItemSOPDetail_update_trigger" },
+        ["KdsTxDetail"] = new[] { "KdsTxDetail_delete_trigger", "KdsTxDetail_insert_trigger", "KdsTxDetail_update_trigger" },
+        ["KdsTxHeader"] = new[] { "KdsTxHeader_delete_trigger", "KdsTxHeader_insert_trigger", "KdsTxHeader_update_trigger" },
+        ["KdsTxLog"] = new[] { "KdsTxLog_delete_trigger", "KdsTxLog_insert_trigger", "KdsTxLog_update_trigger" },
+        ["LoyaltyHeader"] = new[] { "LoyaltyHeader_delete_trigger", "LoyaltyHeader_insert_trigger", "LoyaltyHeader_update_trigger" },
+        ["MemberDetail"] = new[] { "MemberDetail_delete_trigger", "MemberDetail_insert_trigger", "MemberDetail_update_trigger" },
+        ["MemberHeader"] = new[] { "MemberHeader_delete_trigger", "MemberHeader_insert_trigger", "MemberHeader_update_trigger" },
+        ["MemberOnlineDetail"] = new[] { "MemberOnlineDetail_delete_trigger", "MemberOnlineDetail_insert_trigger", "MemberOnlineDetail_update_trigger" },
+        ["MenuDetail"] = new[] { "MenuDetail_delete_trigger", "MenuDetail_insert_trigger", "MenuDetail_update_trigger" },
+        ["MenuHeader"] = new[] { "MenuHeader_delete_trigger", "MenuHeader_insert_trigger", "MenuHeader_update_trigger" },
+        ["MenuHeaderMetaOnline"] = new[] { "MenuHeaderMetaOnline_delete_trigger", "MenuHeaderMetaOnline_insert_trigger", "MenuHeaderMetaOnline_update_trigger" },
+        ["MenuShopDetail"] = new[] { "MenuShopDetail_delete_trigger", "MenuShopDetail_insert_trigger", "MenuShopDetail_update_trigger" },
+        ["ModifierGroupDetail"] = new[] { "ModifierGroupDetail_delete_trigger", "ModifierGroupDetail_insert_trigger", "ModifierGroupDetail_update_trigger" },
+        ["ModifierGroupHeader"] = new[] { "ModifierGroupHeader_delete_trigger", "ModifierGroupHeader_insert_trigger", "ModifierGroupHeader_update_trigger" },
+        ["ModifierGroupOnlineDetail"] = new[] { "ModifierGroupOnlineDetail_delete_trigger", "ModifierGroupOnlineDetail_insert_trigger", "ModifierGroupOnlineDetail_update_trigger" },
+        ["ModifierGroupShopDetail"] = new[] { "ModifierGroupShopDetail_delete_trigger", "ModifierGroupShopDetail_insert_trigger", "ModifierGroupShopDetail_update_trigger" },
+        ["OclClientXFileUpload"] = new[] { "OclClientXFileUpload_delete_trigger", "OclClientXFileUpload_insert_trigger", "OclClientXFileUpload_update_trigger" },
+        ["OclServerFileDownload"] = new[] { "OclServerFileDownload_delete_trigger", "OclServerFileDownload_insert_trigger", "OclServerFileDownload_update_trigger" },
+        ["PayInOut"] = new[] { "PayInOut_delete_trigger", "PayInOut_insert_trigger", "PayInOut_update_trigger" },
+        ["PaymentMethod"] = new[] { "PaymentMethod_delete_trigger", "PaymentMethod_insert_trigger", "PaymentMethod_update_trigger" },
+        ["PaymentMethodShopDetail"] = new[] { "PaymentMethodShopDetail_delete_trigger", "PaymentMethodShopDetail_insert_trigger", "PaymentMethodShopDetail_update_trigger" },
+        ["PriceRule"] = new[] { "PriceRule_delete_trigger", "PriceRule_insert_trigger", "PriceRule_update_trigger" },
+        ["PriceRuleGroup"] = new[] { "PriceRuleGroup_delete_trigger", "PriceRuleGroup_insert_trigger", "PriceRuleGroup_update_trigger" },
+        ["PrintDepartmentSlipLog"] = new[] { "PrintDepartmentSlipLog_delete_trigger", "PrintDepartmentSlipLog_insert_trigger", "PrintDepartmentSlipLog_update_trigger" },
+        ["PromoDetail"] = new[] { "PromoDetail_delete_trigger", "PromoDetail_insert_trigger", "PromoDetail_update_trigger" },
+        ["PromoDetail_tracking"] = new[] { "PromoDetail_tracking_delete_trigger", "PromoDetail_tracking_insert_trigger", "PromoDetail_tracking_update_trigger" },
+        ["PromoHeader"] = new[] { "PromoHeader_delete_trigger", "PromoHeader_insert_trigger", "PromoHeader_update_trigger" },
+        ["PromoShopDetail"] = new[] { "PromoShopDetail_delete_trigger", "PromoShopDetail_insert_trigger", "PromoShopDetail_update_trigger" },
+        ["Reason"] = new[] { "Reason_delete_trigger", "Reason_insert_trigger", "Reason_update_trigger" },
+        ["ReasonGroup"] = new[] { "ReasonGroup_delete_trigger", "ReasonGroup_insert_trigger", "ReasonGroup_update_trigger" },
+        ["ReportTurnoverDetail"] = new[] { "ReportTurnoverDetail_delete_trigger", "ReportTurnoverDetail_insert_trigger", "ReportTurnoverDetail_update_trigger" },
+        ["ReportTurnoverHeader"] = new[] { "ReportTurnoverHeader_delete_trigger", "ReportTurnoverHeader_insert_trigger", "ReportTurnoverHeader_update_trigger" },
+        ["RevenueCenterMaster"] = new[] { "RevenueCenterMaster_delete_trigger", "RevenueCenterMaster_insert_trigger", "RevenueCenterMaster_update_trigger" },
+        ["Roster"] = new[] { "Roster_delete_trigger", "Roster_insert_trigger", "Roster_update_trigger" },
+        ["SelfOrderingMediaMaster"] = new[] { "SelfOrderingMediaMaster_delete_trigger", "SelfOrderingMediaMaster_insert_trigger", "SelfOrderingMediaMaster_update_trigger" },
+        ["SelfOrderingMediaShopDetail"] = new[] { "SelfOrderingMediaShopDetail_delete_trigger", "SelfOrderingMediaShopDetail_insert_trigger", "SelfOrderingMediaShopDetail_update_trigger" },
+        ["ServiceCharge"] = new[] { "ServiceCharge_delete_trigger", "ServiceCharge_insert_trigger", "ServiceCharge_update_trigger" },
+        ["ServiceChargeShopDetail"] = new[] { "ServiceChargeShopDetail_delete_trigger", "ServiceChargeShopDetail_insert_trigger", "ServiceChargeShopDetail_update_trigger" },
+        ["Shop"] = new[] { "Shop_delete_trigger", "Shop_insert_trigger", "Shop_update_trigger" },
+        ["ShopCodeSettingOnline"] = new[] { "ShopCodeSettingOnline_delete_trigger", "ShopCodeSettingOnline_insert_trigger", "ShopCodeSettingOnline_update_trigger" },
+        ["ShopGroupSettingHeader"] = new[] { "ShopGroupSettingHeader_delete_trigger", "ShopGroupSettingHeader_insert_trigger", "ShopGroupSettingHeader_update_trigger" },
+        ["ShopPriceRuleMapping"] = new[] { "ShopPriceRuleMapping_delete_trigger", "ShopPriceRuleMapping_insert_trigger", "ShopPriceRuleMapping_update_trigger" },
+        ["ShopPrinterMaster"] = new[] { "ShopPrinterMaster_delete_trigger", "ShopPrinterMaster_insert_trigger", "ShopPrinterMaster_update_trigger" },
+        ["ShopServiceAreaSetting"] = new[] { "ShopServiceAreaSetting_delete_trigger", "ShopServiceAreaSetting_insert_trigger", "ShopServiceAreaSetting_update_trigger" },
+        ["ShopSystemParameter"] = new[] { "ShopSystemParameter_delete_trigger", "ShopSystemParameter_insert_trigger", "ShopSystemParameter_update_trigger" },
+        ["ShopTimeSlotDetailOnline"] = new[] { "ShopTimeSlotDetailOnline_delete_trigger", "ShopTimeSlotDetailOnline_insert_trigger", "ShopTimeSlotDetailOnline_update_trigger" },
+        ["ShopTimeSlotHeaderOnline"] = new[] { "ShopTimeSlotHeaderOnline_delete_trigger", "ShopTimeSlotHeaderOnline_insert_trigger", "ShopTimeSlotHeaderOnline_update_trigger" },
+        ["ShopType"] = new[] { "ShopType_delete_trigger", "ShopType_insert_trigger", "ShopType_update_trigger" },
+        ["ShopWorkdayDetail"] = new[] { "ShopWorkdayDetail_delete_trigger", "ShopWorkdayDetail_insert_trigger", "ShopWorkdayDetail_update_trigger" },
+        ["ShopWorkdayHeader"] = new[] { "ShopWorkdayHeader_delete_trigger", "ShopWorkdayHeader_insert_trigger", "ShopWorkdayHeader_update_trigger" },
+        ["ShopWorkdayHoliday"] = new[] { "ShopWorkdayHoliday_delete_trigger", "ShopWorkdayHoliday_insert_trigger", "ShopWorkdayHoliday_update_trigger" },
+        ["ShopWorkdayPeriod"] = new[] { "ShopWorkdayPeriod_delete_trigger", "ShopWorkdayPeriod_insert_trigger", "ShopWorkdayPeriod_update_trigger" },
+        ["ShopWorkdayPeriodDetail"] = new[] { "ShopWorkdayPeriodDetail_delete_trigger", "ShopWorkdayPeriodDetail_insert_trigger", "ShopWorkdayPeriodDetail_update_trigger" },
+        ["SmartCategory"] = new[] { "SmartCategory_delete_trigger", "SmartCategory_insert_trigger", "SmartCategory_update_trigger" },
+        ["SmartCategoryItemDetail"] = new[] { "SmartCategoryItemDetail_delete_trigger", "SmartCategoryItemDetail_insert_trigger", "SmartCategoryItemDetail_update_trigger" },
+        ["SmartCategoryOrderChannelMapping"] = new[] { "SmartCategoryOrderChannelMapping_delete_trigger", "SmartCategoryOrderChannelMapping_insert_trigger", "SmartCategoryOrderChannelMapping_update_trigger" },
+        ["SmartCategoryShopDetail"] = new[] { "SmartCategoryShopDetail_delete_trigger", "SmartCategoryShopDetail_insert_trigger", "SmartCategoryShopDetail_update_trigger" },
+        ["StaffAttendanceDetailOnline"] = new[] { "StaffAttendanceDetailOnline_delete_trigger", "StaffAttendanceDetailOnline_insert_trigger", "StaffAttendanceDetailOnline_update_trigger" },
+        ["StaffAttendanceHeaderOnline"] = new[] { "StaffAttendanceHeaderOnline_delete_trigger", "StaffAttendanceHeaderOnline_insert_trigger", "StaffAttendanceHeaderOnline_update_trigger" },
+        ["SystemParameter"] = new[] { "SystemParameter_delete_trigger", "SystemParameter_insert_trigger", "SystemParameter_update_trigger" },
+        ["TableMaster"] = new[] { "TableMaster_delete_trigger", "TableMaster_insert_trigger", "TableMaster_update_trigger" },
+        ["TableOrderTokenMapping"] = new[] { "TableOrderTokenMapping_delete_trigger", "TableOrderTokenMapping_insert_trigger", "TableOrderTokenMapping_update_trigger" },
+        ["TableSection"] = new[] { "TableSection_delete_trigger", "TableSection_insert_trigger", "TableSection_update_trigger" },
+        ["TableSectionShopDetail"] = new[] { "TableSectionShopDetail_delete_trigger", "TableSectionShopDetail_insert_trigger", "TableSectionShopDetail_update_trigger" },
+        ["TableStatus"] = new[] { "TableStatus_delete_trigger", "TableStatus_insert_trigger", "TableStatus_update_trigger" },
+        ["TableType"] = new[] { "TableType_delete_trigger", "TableType_insert_trigger", "TableType_update_trigger" },
+        ["Taxation"] = new[] { "Taxation_delete_trigger", "Taxation_insert_trigger", "Taxation_update_trigger" },
+        ["TaxationShopDetail"] = new[] { "TaxationShopDetail_delete_trigger", "TaxationShopDetail_insert_trigger", "TaxationShopDetail_update_trigger" },
+        ["ThirdPartyMenuItemMappingOnline"] = new[] { "ThirdPartyMenuItemMappingOnline_delete_trigger", "ThirdPartyMenuItemMappingOnline_insert_trigger", "ThirdPartyMenuItemMappingOnline_update_trigger" },
+        ["ThirdPartyReservation"] = new[] { "ThirdPartyReservation_delete_trigger", "ThirdPartyReservation_insert_trigger", "ThirdPartyReservation_update_trigger" },
+        ["TxPayment"] = new[] { "TxPayment_delete_trigger", "TxPayment_insert_trigger", "TxPayment_update_trigger" },
+        ["TxReceiptReprintLog"] = new[] { "TxReceiptReprintLog_delete_trigger", "TxReceiptReprintLog_insert_trigger", "TxReceiptReprintLog_update_trigger" },
+        ["TxSalesAction"] = new[] { "TxSalesAction_delete_trigger", "TxSalesAction_insert_trigger", "TxSalesAction_update_trigger" },
+        ["TxSalesDeliveryDetail"] = new[] { "TxSalesDeliveryDetail_delete_trigger", "TxSalesDeliveryDetail_insert_trigger", "TxSalesDeliveryDetail_update_trigger" },
+        ["TxSalesDeliveryHeader"] = new[] { "TxSalesDeliveryHeader_delete_trigger", "TxSalesDeliveryHeader_insert_trigger", "TxSalesDeliveryHeader_update_trigger" },
+        ["TxSalesDeliveryService"] = new[] { "TxSalesDeliveryService_delete_trigger", "TxSalesDeliveryService_insert_trigger", "TxSalesDeliveryService_update_trigger" },
+        ["TxSalesDetail"] = new[] { "TxSalesDetail_delete_trigger", "TxSalesDetail_insert_trigger", "TxSalesDetail_update_trigger" },
+        ["TxSalesDetailLog"] = new[] { "TxSalesDetailLog_delete_trigger", "TxSalesDetailLog_insert_trigger", "TxSalesDetailLog_update_trigger" },
+        ["TxSalesDetailVariance"] = new[] { "TxSalesDetailVariance_delete_trigger", "TxSalesDetailVariance_insert_trigger", "TxSalesDetailVariance_update_trigger" },
+        ["TxSalesHeader"] = new[] { "TxSalesHeader_delete_trigger", "TxSalesHeader_insert_trigger", "TxSalesHeader_update_trigger" },
+        ["TxSalesHeaderAddress"] = new[] { "TxSalesHeaderAddress_delete_trigger", "TxSalesHeaderAddress_insert_trigger", "TxSalesHeaderAddress_update_trigger" },
+        ["TxSalesHeaderLog"] = new[] { "TxSalesHeaderLog_delete_trigger", "TxSalesHeaderLog_insert_trigger", "TxSalesHeaderLog_update_trigger" },
+        ["TxSalesHeaderRevokeLog"] = new[] { "TxSalesHeaderRevokeLog_delete_trigger", "TxSalesHeaderRevokeLog_insert_trigger", "TxSalesHeaderRevokeLog_update_trigger" },
+        ["TxSalesParam"] = new[] { "TxSalesParam_delete_trigger", "TxSalesParam_insert_trigger", "TxSalesParam_update_trigger" },
+        ["User"] = new[] { "User_delete_trigger", "User_insert_trigger", "User_update_trigger" },
+        ["UserGroupDetail"] = new[] { "UserGroupDetail_delete_trigger", "UserGroupDetail_insert_trigger", "UserGroupDetail_update_trigger" },
+        ["UserGroupDetailOnline"] = new[] { "UserGroupDetailOnline_delete_trigger", "UserGroupDetailOnline_insert_trigger", "UserGroupDetailOnline_update_trigger" },
+        ["UserGroupHeader"] = new[] { "UserGroupHeader_delete_trigger", "UserGroupHeader_insert_trigger", "UserGroupHeader_update_trigger" },
+        ["UserGroupRight"] = new[] { "UserGroupRight_delete_trigger", "UserGroupRight_insert_trigger", "UserGroupRight_update_trigger" },
+        ["UserGroupRightCode"] = new[] { "UserGroupRightCode_delete_trigger", "UserGroupRightCode_insert_trigger", "UserGroupRightCode_update_trigger" },
+        ["UserOnlineMeta"] = new[] { "UserOnlineMeta_delete_trigger", "UserOnlineMeta_insert_trigger", "UserOnlineMeta_update_trigger" },
+        ["WorkdayPeriodMaster"] = new[] { "WorkdayPeriodMaster_delete_trigger", "WorkdayPeriodMaster_insert_trigger", "WorkdayPeriodMaster_update_trigger" },
+    };
+
+    private static void ConfigureSqlServerTriggers(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            var clrType = entityType.ClrType;
+            if (clrType == null)
+            {
+                continue;
+            }
+
+            var tableName = entityType.GetTableName();
+            if (string.IsNullOrWhiteSpace(tableName))
+            {
+                continue;
+            }
+
+            if (!SqlServerTableTriggers.TryGetValue(tableName, out var triggerNames))
+            {
+                continue;
+            }
+
+            modelBuilder.Entity(clrType).ToTable(tb =>
+            {
+                foreach (var trigger in triggerNames)
+                {
+                    tb.HasTrigger(trigger);
+                }
+            });
+        }
     }
 
     private void ApplyDatabaseSpecificConfigurations(ModelBuilder modelBuilder)

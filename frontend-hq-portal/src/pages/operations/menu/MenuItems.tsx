@@ -30,24 +30,25 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconColumns,
+  IconGripVertical,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
   IconPencil,
   IconPlus,
   IconSearch,
   IconSparkles,
   IconSortAscending,
   IconSortDescending,
-  IconEye,
-  IconEyeOff,
   IconList,
   IconX,
 } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table';
 import type { ColumnDef, ColumnSizingState, VisibilityState } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../contexts/BrandContext';
 import menuItemService from '../../../services/menuItemService';
+import type { ButtonStyle } from '../../../types/buttonStyle';
 import type {
   MenuItemListResponse,
   MenuItemSummary,
@@ -55,11 +56,15 @@ import type {
   MenuItemUpsertPayload,
   MenuItemDetail,
   CategoryItemCount,
+  MenuItemPrice,
+  MenuItemShopAvailability,
 } from '../../../types/menuItem';
 import { CenterLoader } from './menu-items/CenterLoader';
 import { MenuItemDrawer } from './menu-items/MenuItemDrawer';
 import { MenuItemsCategorySidebar } from './menu-items/MenuItemsCategorySidebar';
 import { VirtualTableRow } from './menu-items/VirtualTableRow';
+import { ManageItemRelationshipsModal } from './menu-items/ManageItemRelationshipsModal';
+import { MenuItemsReorderModal } from './menu-items/MenuItemsReorderModal';
 import {
   PAGE_SIZE,
   PANEL_BORDER_COLOR,
@@ -67,79 +72,23 @@ import {
   createBasePayload,
   formatDateTime,
   normalizePayload,
+  mapDetailToPayload,
   type CategoryNode,
 } from './menu-items/menuItemsUtils';
 
-const mapDetailToPayload = (detail: MenuItemDetail): MenuItemUpsertPayload => ({
-  itemCode: detail.itemCode,
-  itemName: detail.itemName ?? '',
-  itemNameAlt: detail.itemNameAlt ?? '',
-  itemNameAlt2: detail.itemNameAlt2 ?? '',
-  itemNameAlt3: detail.itemNameAlt3 ?? '',
-  itemNameAlt4: detail.itemNameAlt4 ?? '',
-  itemPosName: detail.itemPosName ?? '',
-  itemPosNameAlt: detail.itemPosNameAlt ?? '',
-  itemPublicDisplayName: detail.itemPublicDisplayName ?? '',
-  itemPublicDisplayNameAlt: detail.itemPublicDisplayNameAlt ?? '',
-  itemPublicPrintedName: detail.itemPublicPrintedName ?? '',
-  itemPublicPrintedNameAlt: detail.itemPublicPrintedNameAlt ?? '',
-  remark: detail.remark ?? '',
-  remarkAlt: detail.remarkAlt ?? '',
-  imageFileName: detail.imageFileName ?? '',
-  imageFileName2: detail.imageFileName2 ?? '',
-  tableOrderingImageFileName: detail.tableOrderingImageFileName ?? '',
-  categoryId: detail.categoryId,
-  departmentId: detail.departmentId,
-  subDepartmentId: detail.subDepartmentId ?? null,
-  displayIndex: detail.displayIndex,
-  enabled: detail.enabled,
-  isItemShow: detail.isItemShow,
-  isPriceShow: detail.isPriceShow,
-  hasModifier: detail.hasModifier,
-  autoRedirectToModifier: detail.autoRedirectToModifier,
-  isModifier: detail.isModifier,
-  modifierGroupHeaderId: detail.modifierGroupHeaderId ?? null,
-  buttonStyleId: detail.buttonStyleId ?? null,
-  isManualPrice: detail.isManualPrice,
-  isManualName: detail.isManualName,
-  isPromoItem: detail.isPromoItem,
-  isModifierConcatToParent: detail.isModifierConcatToParent,
-  isFollowSet: detail.isFollowSet,
-  isFollowSetDynamic: detail.isFollowSetDynamic,
-  isFollowSetStandard: detail.isFollowSetStandard,
-  isNonDiscountItem: detail.isNonDiscountItem,
-  isNonServiceChargeItem: detail.isNonServiceChargeItem,
-  isStandaloneAndSetItem: detail.isStandaloneAndSetItem ?? null,
-  isGroupRightItem: detail.isGroupRightItem,
-  isPrintLabel: detail.isPrintLabel,
-  isPrintLabelTakeaway: detail.isPrintLabelTakeaway,
-  isPriceInPercentage: detail.isPriceInPercentage,
-  isPointPaidItem: detail.isPointPaidItem ?? null,
-  isNoPointEarnItem: detail.isNoPointEarnItem ?? null,
-  isNonTaxableItem: detail.isNonTaxableItem ?? null,
-  isItemShowInKitchenChecklist: detail.isItemShowInKitchenChecklist ?? null,
-  isSoldoutAutoLock: detail.isSoldoutAutoLock ?? null,
-  isPrepaidRechargeItem: detail.isPrepaidRechargeItem ?? null,
-  isAutoLinkWithRawMaterial: detail.isAutoLinkWithRawMaterial ?? null,
-  isDinein: detail.isDinein,
-  isTakeaway: detail.isTakeaway,
-  isDelivery: detail.isDelivery,
-  isKitchenPrintInRedColor: detail.isKitchenPrintInRedColor ?? null,
-  isManualPriceGroup: detail.isManualPriceGroup ?? null,
-  isExcludeLabelCount: detail.isExcludeLabelCount ?? null,
-  servingSize: detail.servingSize ?? null,
-  systemRemark: detail.systemRemark ?? '',
-  isNonSalesItem: detail.isNonSalesItem ?? null,
-  productionSeconds: detail.productionSeconds ?? null,
-  parentItemId: detail.parentItemId ?? null,
-  isComboRequired: detail.isComboRequired ?? null,
-});
-
+const SORT_OPTIONS: Array<{
+  label: string;
+  value: 'displayIndex' | 'itemId' | 'itemCode' | 'name';
+}> = [
+  { label: 'Display order', value: 'displayIndex' },
+  { label: 'Item ID', value: 'itemId' },
+  { label: 'Item code', value: 'itemCode' },
+  { label: 'Name', value: 'name' },
+];
 
 const MenuItemsPage: FC = () => {
   const { selectedBrand } = useBrands();
   const brandId = selectedBrand ? parseInt(selectedBrand, 10) : null;
-  const navigate = useNavigate();
   const isDesktopLayout = useMediaQuery('(min-width: 62em)');
 
   const [lookups, setLookups] = useState<MenuItemLookups | null>(null);
@@ -156,18 +105,40 @@ const MenuItemsPage: FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebouncedValue(search, 800);
-  const [includeDisabled, setIncludeDisabled] = useState(false);
-  const [sortBy, setSortBy] = useState<'displayIndex' | 'name' | 'modified'>('displayIndex');
+  const [sortBy, setSortBy] = useState<'displayIndex' | 'itemId' | 'itemCode' | 'name'>('displayIndex');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
   const [searchPopoverOpened, setSearchPopoverOpened] = useState(false);
   const isSearchActive = searchPopoverOpened || Boolean(search);
   const [sortPopoverOpened, setSortPopoverOpened] = useState(false);
   const [columnMenuOpened, setColumnMenuOpened] = useState(false);
+  const [isCategorySidebarCollapsed, setIsCategorySidebarCollapsed] = useState(false);
   const [columnSearch, setColumnSearch] = useState('');
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => ({
+    isManualPrice: false,
+    isManualName: false,
+    isNonDiscountItem: false,
+    isNonServiceChargeItem: false,
+    isPointPaidItem: false,
+    isNoPointEarnItem: false,
+    isNonTaxableItem: false,
+    isComboRequired: false,
+    itemPosName: false,
+    itemPublicDisplayName: false,
+    itemPosNameAlt: false,
+    itemPublicDisplayNameAlt: false,
+    itemPublicPrintedName: false,
+    showItemOnReceipt: false,
+    showPriceOnReceipt: false,
+  }));
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [hoveredResizeColumnId, setHoveredResizeColumnId] = useState<string | null>(null);
+  const [modifierModalItem, setModifierModalItem] = useState<MenuItemSummary | null>(null);
+  const [reorderModalOpen, setReorderModalOpen] = useState(false);
+  const [reorderItems, setReorderItems] = useState<MenuItemSummary[]>([]);
+  const [reorderLoading, setReorderLoading] = useState(false);
+  const [reorderSaving, setReorderSaving] = useState(false);
+  const [reorderCategoryId, setReorderCategoryId] = useState<number | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
@@ -175,12 +146,21 @@ const MenuItemsPage: FC = () => {
   const [selectedDetail, setSelectedDetail] = useState<MenuItemDetail | null>(null);
   const [priceEdits, setPriceEdits] = useState<Record<number, { price: number | null; enabled: boolean }>>({});
   const [availabilityEdits, setAvailabilityEdits] = useState<Record<number, { enabled: boolean | null; isOutOfStock: boolean | null; isLimitedItem: boolean | null }>>({});
+  const [printerEdits, setPrinterEdits] = useState<Record<
+    number,
+    {
+      shopPrinter1: number | null;
+      shopPrinter2: number | null;
+      shopPrinter3: number | null;
+      shopPrinter4: number | null;
+      shopPrinter5: number | null;
+      isGroupPrintByPrinter: boolean | null;
+    }
+  >>({});
   const [formData, setFormData] = useState<MenuItemUpsertPayload | null>(null);
   const [activeTab, setActiveTab] = useState<string>('basics');
   const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [priceSavingShopId, setPriceSavingShopId] = useState<number | null>(null);
-  const [availabilitySavingShopId, setAvailabilitySavingShopId] = useState<number | null>(null);
 
   // Table virtualization setup
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -221,6 +201,31 @@ const MenuItemsPage: FC = () => {
     if (itemsLoading) return;
     setReloadToken((token) => token + 1);
   }, [itemsLoading]);
+
+  const handleOpenModifiers = useCallback((item: MenuItemSummary) => {
+    setModifierModalItem(item);
+  }, []);
+
+  const handleCloseModifiers = useCallback(() => {
+    setModifierModalItem(null);
+  }, []);
+
+  const handleModifiersSaved = useCallback(
+    (itemId: number, hasModifier: boolean) => {
+      setItemsResponse((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((entry) => (entry.itemId === itemId ? { ...entry, hasModifier } : entry)),
+        };
+      });
+
+      setSelectedDetail((prev) => (prev && prev.itemId === itemId ? { ...prev, hasModifier } : prev));
+      setFormData((prev) => (prev && editingItemId === itemId ? { ...prev, hasModifier } : prev));
+      setReloadToken((token) => token + 1);
+    },
+    [editingItemId, setItemsResponse, setSelectedDetail, setFormData, setReloadToken],
+  );
 
   useEffect(() => {
     if (searchPopoverOpened) {
@@ -279,6 +284,40 @@ const MenuItemsPage: FC = () => {
     return lookups.departments.find((dep) => dep.departmentId === departmentId)?.departmentName ?? '—';
   }, [lookups]);
 
+  const getButtonStyleById = useCallback((buttonStyleId?: number | null): ButtonStyle | null => {
+    if (!buttonStyleId || !lookups) return null;
+    return lookups.buttonStyles.find((style) => style.buttonStyleId === buttonStyleId) ?? null;
+  }, [lookups]);
+
+  const getButtonStyleColor = useCallback((style: ButtonStyle | null) => {
+    if (!style) return '#E0E0E0';
+    const candidates = [
+      style.backgroundColorTop,
+      style.backgroundColorMiddle,
+      style.backgroundColorBottom,
+    ].filter((color): color is string => Boolean(color && color.trim().length > 0));
+
+    if (candidates.length === 0) {
+      return '#E0E0E0';
+    }
+
+    let color = candidates[0]!;
+    if (color.startsWith('#') && color.length === 9) {
+      color = `#${color.slice(3)}`;
+    }
+
+    return color;
+  }, []);
+
+  const reorderCategoryName = useMemo(() => {
+    if (reorderCategoryId === null) {
+      return 'Selected category';
+    }
+
+    const label = getCategoryLabel(reorderCategoryId);
+    return label === '—' ? 'Selected category' : label;
+  }, [getCategoryLabel, reorderCategoryId]);
+
   const resetDrawerState = useCallback(() => {
     setDrawerOpen(false);
     setFormData(null);
@@ -286,6 +325,7 @@ const MenuItemsPage: FC = () => {
     setSelectedDetail(null);
     setPriceEdits({});
     setAvailabilityEdits({});
+    setPrinterEdits({});
     setDetailLoading(false);
     setActiveTab('basics');
   }, []);
@@ -311,10 +351,11 @@ const MenuItemsPage: FC = () => {
 
     setFormData(createBasePayload(defaultCategoryId, defaultDepartmentId));
     setDrawerMode('create');
-    setEditingItemId(null);
-    setSelectedDetail(null);
-    setPriceEdits({});
-    setAvailabilityEdits({});
+   setEditingItemId(null);
+   setSelectedDetail(null);
+   setPriceEdits({});
+   setAvailabilityEdits({});
+    setPrinterEdits({});
     setActiveTab('basics');
     setDrawerOpen(true);
   }, [lookups, selectedCategoryId]);
@@ -329,6 +370,7 @@ const MenuItemsPage: FC = () => {
     setSelectedDetail(null);
     setPriceEdits({});
     setAvailabilityEdits({});
+    setPrinterEdits({});
     setDetailLoading(true);
     try {
       const detail = await menuItemService.getMenuItem(brandId, item.itemId);
@@ -348,126 +390,377 @@ const MenuItemsPage: FC = () => {
     }
   }, [brandId, resetDrawerState]);
 
-  const columns = useMemo<ColumnDef<MenuItemSummary>[]>(() => [
-    {
-      accessorKey: 'itemCode',
-      header: 'Code',
-      size: 100,
-      enableHiding: false,
-      cell: ({ row }) => (
-        <Text size="sm" fw={500} truncate="end">{row.original.itemCode}</Text>
-      ),
-    },
-    {
-      accessorKey: 'itemName',
-      header: 'Item Name',
-      size: 180,
-      enableHiding: false,
-      cell: ({ row }) => (
-        <Text size="sm" truncate="end">{row.original.itemName || '—'}</Text>
-      ),
-    },
-    {
-      accessorKey: 'categoryId',
-      header: 'Category',
-      size: 140,
-      cell: ({ row }) => (
-        <Text size="sm" truncate="end">{getCategoryLabel(row.original.categoryId)}</Text>
-      ),
-    },
-    {
-      accessorKey: 'departmentId',
-      header: 'Department',
-      size: 110,
-      cell: ({ row }) => (
-        <Text size="sm" truncate="end">{getDepartmentName(row.original.departmentId)}</Text>
-      ),
-    },
-    {
-      accessorKey: 'enabled',
-      header: 'Enabled',
-      size: 80,
-      cell: ({ row }) => (
-        <Badge variant="light" color={row.original.enabled ? 'green' : 'gray'} size="sm">
-          {row.original.enabled ? 'Yes' : 'No'}
+  const handleOpenReorderModal = useCallback(async () => {
+    if (!brandId) {
+      notifications.show({
+        title: 'Brand required',
+        message: 'Select a brand before reordering items.',
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />,
+      });
+      return;
+    }
+
+    if (selectedCategoryId === null) {
+      notifications.show({
+        title: 'Category required',
+        message: 'Select a category to reorder its items.',
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />,
+      });
+      return;
+    }
+
+    setReorderCategoryId(selectedCategoryId);
+    setReorderModalOpen(true);
+    setReorderLoading(true);
+    setReorderItems([]);
+
+    try {
+      const response = await menuItemService.getMenuItems(brandId, {
+        categoryId: selectedCategoryId,
+        includeDisabled: true,
+        sortBy: 'displayIndex',
+        sortDirection: 'asc',
+        page: 1,
+        pageSize: 1000,
+      });
+      setReorderItems(response.items);
+    } catch (error) {
+      console.error('Failed to load items for reorder', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Unable to load items for reordering.',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+      setReorderModalOpen(false);
+      setReorderCategoryId(null);
+    } finally {
+      setReorderLoading(false);
+    }
+  }, [brandId, selectedCategoryId]);
+
+  const handleCloseReorderModal = useCallback(() => {
+    if (reorderSaving) return;
+    setReorderModalOpen(false);
+    setReorderCategoryId(null);
+    setReorderItems([]);
+  }, [reorderSaving]);
+
+  const handleSaveReorder = useCallback(async (ordered: MenuItemSummary[]) => {
+    if (!brandId || reorderCategoryId === null) {
+      return;
+    }
+
+    setReorderSaving(true);
+    try {
+      await menuItemService.reorderMenuItems(brandId, {
+        items: ordered.map((item, index) => ({
+          itemId: item.itemId,
+          displayIndex: index + 1,
+        })),
+      });
+
+      notifications.show({
+        title: 'Order saved',
+        message: 'Menu item display order updated.',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+
+      setReorderModalOpen(false);
+      setReorderCategoryId(null);
+      setReorderItems([]);
+      setReloadToken((prev) => prev + 1);
+      setSortBy('displayIndex');
+      setSortDirection('asc');
+      setPage(1);
+    } catch (error) {
+      console.error('Failed to reorder items', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Unable to save the new order.',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+    } finally {
+      setReorderSaving(false);
+    }
+  }, [brandId, reorderCategoryId, setReloadToken, setSortBy, setSortDirection]);
+
+  const columns = useMemo<ColumnDef<MenuItemSummary>[]>(() => {
+    const renderBoolean = (value: boolean | null | undefined, trueColor: string) => {
+      if (value === null || value === undefined) {
+        return <Text size="sm" c="dimmed">—</Text>;
+      }
+
+      if (value) {
+        return (
+          <Badge variant="light" color={trueColor} size="sm">
+            Yes
+          </Badge>
+        );
+      }
+
+      return (
+        <Badge variant="light" color="gray" size="sm">
+          No
         </Badge>
-      ),
-    },
-    {
-      accessorKey: 'isItemShow',
-      header: 'Visible',
-      size: 80,
-      cell: ({ row }) => (
-        <Badge variant="light" color={row.original.isItemShow ? 'blue' : 'gray'} size="sm">
-          {row.original.isItemShow ? 'Yes' : 'No'}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'hasModifier',
-      header: 'Modifiers',
-      size: 85,
-      cell: ({ row }) => row.original.hasModifier ? (
-        <Badge variant="light" color="violet" size="sm">Yes</Badge>
-      ) : (
-        <Text size="sm" c="dimmed">—</Text>
-      ),
-    },
-    {
-      accessorKey: 'isPromoItem',
-      header: 'Promo',
-      size: 70,
-      cell: ({ row }) => row.original.isPromoItem ? (
-        <Badge variant="light" color="orange" size="sm">Yes</Badge>
-      ) : (
-        <Text size="sm" c="dimmed">—</Text>
-      ),
-    },
-    {
-      accessorKey: 'isManualPrice',
-      header: 'Manual',
-      size: 75,
-      cell: ({ row }) => row.original.isManualPrice ? (
-        <Badge variant="light" color="red" size="sm">Yes</Badge>
-      ) : (
-        <Text size="sm" c="dimmed">—</Text>
-      ),
-    },
-    {
-      accessorKey: 'modifiedDate',
-      header: 'Last updated',
-      size: 140,
-      cell: ({ row }) => (
-        <Text size="sm" truncate="end">{formatDateTime(row.original.modifiedDate)}</Text>
-      ),
-    },
-    {
-      id: 'actions',
-      header: '',
-      size: 100,
-      enableHiding: false,
-      enableResizing: false,
-      cell: ({ row }) => (
-        <Group gap="xs" justify="flex-end" wrap="nowrap">
-          {row.original.hasModifier && (
-            <Tooltip label="Manage modifiers" withArrow>
+      );
+    };
+
+    const renderText = (value?: string | null) => (
+      <Text size="sm" truncate="end">{value && value.trim().length > 0 ? value : '—'}</Text>
+    );
+
+    return [
+      {
+        accessorKey: 'itemId',
+        header: 'Item Id',
+        size: 90,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Text size="sm" fw={600}>{row.original.itemId}</Text>
+        ),
+      },
+      {
+        accessorKey: 'itemCode',
+        header: 'Code',
+        size: 100,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Text size="sm" fw={500} truncate="end">{row.original.itemCode}</Text>
+        ),
+      },
+      {
+        accessorKey: 'displayIndex',
+        header: 'Display Index',
+        size: 120,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Text size="sm">{row.original.displayIndex}</Text>
+        ),
+      },
+      {
+        accessorKey: 'itemName',
+        header: 'Item Name',
+        size: 200,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{row.original.itemName || '—'}</Text>
+        ),
+      },
+      {
+        id: 'buttonStyle',
+        header: 'Button Style',
+        size: 200,
+        cell: ({ row }) => {
+          const style = getButtonStyleById(row.original.buttonStyleId);
+          if (!style) {
+            return <Text size="sm" c="dimmed">—</Text>;
+          }
+
+          const color = getButtonStyleColor(style);
+          return (
+            <Group gap="xs" wrap="nowrap">
+              <Box
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: 4,
+                  border: '1px solid var(--mantine-color-gray-3, #dee2e6)',
+                  backgroundColor: color,
+                  flexShrink: 0,
+                }}
+              />
+              <Text size="sm" truncate="end">{style.styleName}</Text>
+            </Group>
+          );
+        },
+      },
+      {
+        accessorKey: 'categoryId',
+        header: 'Category',
+        size: 140,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{getCategoryLabel(row.original.categoryId)}</Text>
+        ),
+      },
+      {
+        accessorKey: 'departmentId',
+        header: 'Department',
+        size: 120,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{getDepartmentName(row.original.departmentId)}</Text>
+        ),
+      },
+      {
+        accessorKey: 'enabled',
+        header: 'Enabled',
+        size: 90,
+        cell: ({ row }) => (
+          <Badge variant="light" color={row.original.enabled ? 'green' : 'gray'} size="sm">
+            {row.original.enabled ? 'Yes' : 'No'}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: 'hasModifier',
+        header: 'Modifiers',
+        size: 95,
+        cell: ({ row }) => row.original.hasModifier ? (
+          <Badge variant="light" color="violet" size="sm">Yes</Badge>
+        ) : (
+          <Text size="sm" c="dimmed">—</Text>
+        ),
+      },
+      {
+        accessorKey: 'isPromoItem',
+        header: 'Promo',
+        size: 80,
+        cell: ({ row }) => row.original.isPromoItem ? (
+          <Badge variant="light" color="orange" size="sm">Yes</Badge>
+        ) : (
+          <Text size="sm" c="dimmed">—</Text>
+        ),
+      },
+      {
+        accessorKey: 'isManualPrice',
+        header: 'Manual Price',
+        size: 120,
+        cell: ({ row }) => renderBoolean(row.original.isManualPrice, 'red'),
+      },
+      {
+        accessorKey: 'isManualName',
+        header: 'Manual Name',
+        size: 120,
+        cell: ({ row }) => renderBoolean(row.original.isManualName, 'red'),
+      },
+      {
+        accessorKey: 'isNonDiscountItem',
+        header: 'Non discountable',
+        size: 150,
+        cell: ({ row }) => renderBoolean(row.original.isNonDiscountItem, 'blue'),
+      },
+      {
+        accessorKey: 'isNonServiceChargeItem',
+        header: 'Non service charge',
+        size: 170,
+        cell: ({ row }) => renderBoolean(row.original.isNonServiceChargeItem, 'blue'),
+      },
+      {
+        accessorKey: 'isPointPaidItem',
+        header: 'Allow points payment',
+        size: 190,
+        cell: ({ row }) => renderBoolean(row.original.isPointPaidItem, 'green'),
+      },
+      {
+        accessorKey: 'isNoPointEarnItem',
+        header: 'No point earning',
+        size: 170,
+        cell: ({ row }) => renderBoolean(row.original.isNoPointEarnItem, 'green'),
+      },
+      {
+        accessorKey: 'isNonTaxableItem',
+        header: 'Non taxable',
+        size: 140,
+        cell: ({ row }) => renderBoolean(row.original.isNonTaxableItem, 'teal'),
+      },
+      {
+        accessorKey: 'isComboRequired',
+        header: 'Combo required',
+        size: 150,
+        cell: ({ row }) => renderBoolean(row.original.isComboRequired, 'purple'),
+      },
+      {
+        accessorKey: 'itemPosName',
+        header: 'POS display name',
+        size: 200,
+        cell: ({ row }) => renderText(row.original.itemPosName),
+      },
+      {
+        accessorKey: 'itemPublicDisplayName',
+        header: 'Public display name',
+        size: 200,
+        cell: ({ row }) => renderText(row.original.itemPublicDisplayName),
+      },
+      {
+        accessorKey: 'itemPosNameAlt',
+        header: 'POS display name (alt)',
+        size: 220,
+        cell: ({ row }) => renderText(row.original.itemPosNameAlt),
+      },
+      {
+        accessorKey: 'itemPublicDisplayNameAlt',
+        header: 'Public display name (alt)',
+        size: 220,
+        cell: ({ row }) => renderText(row.original.itemPublicDisplayNameAlt),
+      },
+      {
+        accessorKey: 'itemPublicPrintedName',
+        header: 'POS printed name',
+        size: 200,
+        cell: ({ row }) => renderText(row.original.itemPublicPrintedName),
+      },
+      {
+        id: 'showItemOnReceipt',
+        header: 'Show item on receipt',
+        size: 170,
+        accessorFn: (row) => row.isItemShow,
+        cell: ({ row }) => renderBoolean(row.original.isItemShow, 'blue'),
+      },
+      {
+        id: 'showPriceOnReceipt',
+        header: 'Show price on receipt',
+        size: 180,
+        accessorFn: (row) => row.isPriceShow,
+        cell: ({ row }) => renderBoolean(row.original.isPriceShow, 'blue'),
+      },
+      {
+        accessorKey: 'modifiedDate',
+        header: 'Last updated',
+        size: 160,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{formatDateTime(row.original.modifiedDate)}</Text>
+        ),
+      },
+      {
+        accessorKey: 'modifiedBy',
+        header: 'Last updated by',
+        size: 200,
+        cell: ({ row }) => (
+          <Text size="sm" truncate="end">{row.original.modifiedBy || '—'}</Text>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        size: 100,
+        enableHiding: false,
+        enableResizing: false,
+        cell: ({ row }) => (
+          <Group gap="xs" justify="flex-end" wrap="nowrap">
+            <Tooltip label="Manage item relationships" withArrow>
               <ActionIcon
                 variant="subtle"
-                color="violet"
+                color={row.original.hasModifier ? 'violet' : 'gray'}
                 size="sm"
-                onClick={() => navigate(`/menus/modifiers?itemId=${row.original.itemId}`)}
+                onClick={() => handleOpenModifiers(row.original)}
               >
                 <IconAdjustments size={16} />
               </ActionIcon>
             </Tooltip>
-          )}
-          <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => handleEdit(row.original)}>
-            <IconPencil size={16} />
-          </ActionIcon>
-        </Group>
-      ),
-    },
-  ], [getCategoryLabel, getDepartmentName, handleEdit, navigate]);
+            <Tooltip label="Edit item" withArrow>
+              <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => handleEdit(row.original)}>
+                <IconPencil size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        ),
+      },
+    ];
+  }, [getButtonStyleById, getButtonStyleColor, getCategoryLabel, getDepartmentName, handleEdit, handleOpenModifiers]);
 
   const table = useReactTable({
     data: itemsResponse?.items ?? [],
@@ -488,7 +781,7 @@ const MenuItemsPage: FC = () => {
     () =>
       Array.from({ length: totalPages }, (_, index) => ({
         value: String(index + 1),
-        label: `Page ${index + 1}`,
+        label: String(index + 1),
       })),
     [totalPages],
   );
@@ -567,11 +860,19 @@ const MenuItemsPage: FC = () => {
         const data = await menuItemService.getLookups(brandId);
         if (!active) return;
         setLookups(data);
+        const defaultCategoryId = (() => {
+          const roots = buildCategoryTree(data.categories);
+          if (roots.length > 0) {
+            return roots[0].categoryId;
+          }
+          return data.categories[0]?.categoryId ?? null;
+        })();
+
         setSelectedCategoryId((current) => {
           if (current && data.categories.some((cat) => cat.categoryId === current)) {
             return current;
           }
-          return data.categories[0]?.categoryId ?? null;
+          return defaultCategoryId;
         });
         setPage(1);
         setFiltersReady(true);
@@ -642,7 +943,6 @@ const MenuItemsPage: FC = () => {
         const response = await menuItemService.getMenuItems(brandId, {
           categoryId: selectedCategoryId ?? undefined,
           search: debouncedSearch || undefined,
-          includeDisabled,
           sortBy,
           sortDirection,
           page,
@@ -658,7 +958,7 @@ const MenuItemsPage: FC = () => {
     };
 
     loadItems();
-  }, [brandId, filtersReady, selectedCategoryId, debouncedSearch, includeDisabled, sortBy, sortDirection, page, reloadToken]);
+  }, [brandId, filtersReady, selectedCategoryId, debouncedSearch, sortBy, sortDirection, page, reloadToken]);
 
   const categoryTree = useMemo(() => buildCategoryTree(lookups?.categories ?? []), [lookups?.categories]);
 
@@ -774,13 +1074,14 @@ const MenuItemsPage: FC = () => {
   }, [updateActionShadow, rows.length, totalTableWidth, isDesktopLayout]);
 
   const updatePriceEdit = (shopId: number, changes: Partial<{ price: number | null; enabled: boolean }>) => {
+    const base = selectedDetail?.prices.find((price) => price.shopId === shopId);
     setPriceEdits((prev) => {
-      const previous = prev[shopId] ?? { price: null, enabled: false };
+      const previous = prev[shopId] ?? { price: base?.price ?? null, enabled: base?.enabled ?? false };
       return {
         ...prev,
         [shopId]: {
           price: Object.prototype.hasOwnProperty.call(changes, 'price') ? changes.price ?? null : previous.price,
-          enabled: changes.enabled ?? previous.enabled,
+          enabled: Object.prototype.hasOwnProperty.call(changes, 'enabled') ? changes.enabled ?? false : previous.enabled,
         },
       };
     });
@@ -790,8 +1091,15 @@ const MenuItemsPage: FC = () => {
     shopId: number,
     changes: Partial<{ enabled: boolean | null; isOutOfStock: boolean | null; isLimitedItem: boolean | null }>,
   ) => {
+    const base = selectedDetail?.shopAvailability.find((record) => record.shopId === shopId);
     setAvailabilityEdits((prev) => {
-      const previous = prev[shopId] ?? { enabled: false, isOutOfStock: false, isLimitedItem: false };
+      const previous =
+        prev[shopId] ??
+        {
+          enabled: base?.enabled ?? false,
+          isOutOfStock: base?.isOutOfStock ?? false,
+          isLimitedItem: base?.isLimitedItem ?? false,
+        };
       return {
         ...prev,
         [shopId]: {
@@ -807,149 +1115,271 @@ const MenuItemsPage: FC = () => {
     });
   };
 
-  const handleSavePrice = async (shopId: number) => {
-    if (!brandId || !selectedDetail) return;
-    const edit = priceEdits[shopId];
-    if (!edit || edit.price === null || Number.isNaN(edit.price)) {
-      notifications.show({
-        title: 'Validation error',
-        message: 'Please provide a valid price before saving.',
-        color: 'orange',
-        icon: <IconAlertCircle size={16} />,
-      });
-      return;
-    }
-
-    setPriceSavingShopId(shopId);
-    try {
-      const updated = await menuItemService.updateMenuItemPrice(brandId, selectedDetail.itemId, shopId, {
-        price: edit.price,
-        enabled: edit.enabled,
-      });
-
-      setSelectedDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              prices: prev.prices.map((price) => (price.shopId === shopId ? updated : price)),
-            }
-          : prev,
-      );
-
-      notifications.show({
-        title: 'Pricing updated',
-        message: `Price saved for ${updated.shopName}.`,
-        color: 'green',
-        icon: <IconCheck size={16} />,
-      });
-    } catch (error) {
-      console.error('Failed to update price', error);
-      notifications.show({
-        title: 'Save failed',
-        message: 'Unable to update price. Please try again.',
-        color: 'red',
-        icon: <IconAlertCircle size={16} />,
-      });
-    } finally {
-      setPriceSavingShopId(null);
-    }
-  };
-
-  const handleSaveAvailability = async (shopId: number) => {
-    if (!brandId || !selectedDetail) return;
-    const edit = availabilityEdits[shopId];
-    if (!edit) return;
-
-    setAvailabilitySavingShopId(shopId);
-    try {
-      const updated = await menuItemService.updateMenuItemAvailability(brandId, selectedDetail.itemId, shopId, {
-        enabled: edit.enabled,
-        isOutOfStock: edit.isOutOfStock,
-        isLimitedItem: edit.isLimitedItem,
-      });
-
-      setSelectedDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              shopAvailability: prev.shopAvailability.map((record) =>
-                record.shopId === shopId ? updated : record,
-              ),
-            }
-          : prev,
-      );
-
-      notifications.show({
-        title: 'Availability updated',
-        message: `Availability saved for ${updated.shopName}.`,
-        color: 'green',
-        icon: <IconCheck size={16} />,
-      });
-    } catch (error) {
-      console.error('Failed to update availability', error);
-      notifications.show({
-        title: 'Save failed',
-        message: 'Unable to update availability. Please try again.',
-        color: 'red',
-        icon: <IconAlertCircle size={16} />,
-      });
-    } finally {
-      setAvailabilitySavingShopId(null);
-    }
+  const updatePrinterEdit = (
+    shopId: number,
+    changes: Partial<{
+      shopPrinter1: number | null;
+      shopPrinter2: number | null;
+      shopPrinter3: number | null;
+      shopPrinter4: number | null;
+      shopPrinter5: number | null;
+      isGroupPrintByPrinter: boolean | null;
+    }>,
+  ) => {
+    const base = selectedDetail?.shopAvailability.find((record) => record.shopId === shopId);
+    setPrinterEdits((prev) => {
+      const previous =
+        prev[shopId] ??
+        {
+          shopPrinter1: base?.shopPrinter1 ?? null,
+          shopPrinter2: base?.shopPrinter2 ?? null,
+          shopPrinter3: base?.shopPrinter3 ?? null,
+          shopPrinter4: base?.shopPrinter4 ?? null,
+          shopPrinter5: base?.shopPrinter5 ?? null,
+          isGroupPrintByPrinter: base?.isGroupPrintByPrinter ?? false,
+        };
+      return {
+        ...prev,
+        [shopId]: {
+          shopPrinter1: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter1')
+            ? changes.shopPrinter1 ?? null
+            : previous.shopPrinter1,
+          shopPrinter2: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter2')
+            ? changes.shopPrinter2 ?? null
+            : previous.shopPrinter2,
+          shopPrinter3: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter3')
+            ? changes.shopPrinter3 ?? null
+            : previous.shopPrinter3,
+          shopPrinter4: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter4')
+            ? changes.shopPrinter4 ?? null
+            : previous.shopPrinter4,
+          shopPrinter5: Object.prototype.hasOwnProperty.call(changes, 'shopPrinter5')
+            ? changes.shopPrinter5 ?? null
+            : previous.shopPrinter5,
+          isGroupPrintByPrinter: Object.prototype.hasOwnProperty.call(changes, 'isGroupPrintByPrinter')
+            ? Boolean(changes.isGroupPrintByPrinter)
+            : Boolean(previous.isGroupPrintByPrinter),
+        },
+      };
+    });
   };
 
   const updateForm = <K extends keyof MenuItemUpsertPayload>(key: K, value: MenuItemUpsertPayload[K]) => {
     setFormData((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
-  const handleSubmit = async () => {
-    if (!formData || !brandId) return;
+const handleSubmit = async () => {
+  if (!formData || !brandId) return;
 
-    if (!formData.itemCode.trim()) {
+  if (!formData.itemCode.trim()) {
+    notifications.show({
+      title: 'Validation error',
+      message: 'Item code is required.',
+      color: 'orange',
+      icon: <IconAlertCircle size={16} />,
+    });
+    setActiveTab('basics');
+    return;
+  }
+
+  type PriceUpdate = { shopId: number; payload: { price: number; enabled: boolean } };
+  type AvailabilityUpdate = {
+    shopId: number;
+    payload: {
+      enabled: boolean;
+      isOutOfStock: boolean;
+      isLimitedItem: boolean;
+      shopPrinter1: number | null;
+      shopPrinter2: number | null;
+      shopPrinter3: number | null;
+      shopPrinter4: number | null;
+      shopPrinter5: number | null;
+      isGroupPrintByPrinter: boolean;
+    };
+  };
+
+  let priceValidationFailed = false;
+  const priceUpdates: PriceUpdate[] = [];
+  const availabilityUpdates: AvailabilityUpdate[] = [];
+
+  if (drawerMode === 'edit' && selectedDetail) {
+    const shops = selectedDetail.shopAvailability;
+    for (const record of shops) {
+      const shopId = record.shopId;
+      const price = selectedDetail.prices.find((entry) => entry.shopId === shopId);
+      const priceState = priceEdits[shopId] ?? {
+        price: price?.price ?? null,
+        enabled: price?.enabled ?? false,
+      };
+      const availabilityEdit = availabilityEdits[shopId];
+      const printerEdit = printerEdits[shopId];
+
+      const normalisePrice = (value: number | null) =>
+        value === null || Number.isNaN(value) ? null : Math.round(value * 100) / 100;
+
+      const finalPrice = normalisePrice(priceState.price ?? price?.price ?? null);
+      const originalPrice = normalisePrice(price?.price ?? null);
+      const finalPriceEnabled = priceState.enabled ?? (price?.enabled ?? false);
+      const originalPriceEnabled = price?.enabled ?? false;
+
+      const priceChanged = finalPrice !== originalPrice || finalPriceEnabled !== originalPriceEnabled;
+      if (priceChanged) {
+        if (finalPrice === null) {
+          priceValidationFailed = true;
+        } else {
+          priceUpdates.push({
+            shopId,
+            payload: {
+              price: finalPrice,
+              enabled: finalPriceEnabled,
+            },
+          });
+        }
+      }
+
+      const finalAvailabilityEnabled = Boolean(availabilityEdit?.enabled ?? record.enabled ?? false);
+      const finalOutOfStock = Boolean(availabilityEdit?.isOutOfStock ?? record.isOutOfStock ?? false);
+      const finalLimited = Boolean(availabilityEdit?.isLimitedItem ?? record.isLimitedItem ?? false);
+
+      const originalAvailabilityEnabled = Boolean(record.enabled);
+      const originalOutOfStock = Boolean(record.isOutOfStock);
+      const originalLimited = Boolean(record.isLimitedItem);
+
+      const finalPrinter1 = printerEdit?.shopPrinter1 ?? record.shopPrinter1 ?? null;
+      const finalPrinter2 = printerEdit?.shopPrinter2 ?? record.shopPrinter2 ?? null;
+      const finalPrinter3 = printerEdit?.shopPrinter3 ?? record.shopPrinter3 ?? null;
+      const finalPrinter4 = printerEdit?.shopPrinter4 ?? record.shopPrinter4 ?? null;
+      const finalPrinter5 = printerEdit?.shopPrinter5 ?? record.shopPrinter5 ?? null;
+      const finalGroupPrint = Boolean(printerEdit?.isGroupPrintByPrinter ?? record.isGroupPrintByPrinter ?? false);
+
+      const availabilityChanged =
+        finalAvailabilityEnabled !== originalAvailabilityEnabled ||
+        finalOutOfStock !== originalOutOfStock ||
+        finalLimited !== originalLimited ||
+        finalPrinter1 !== (record.shopPrinter1 ?? null) ||
+        finalPrinter2 !== (record.shopPrinter2 ?? null) ||
+        finalPrinter3 !== (record.shopPrinter3 ?? null) ||
+        finalPrinter4 !== (record.shopPrinter4 ?? null) ||
+        finalPrinter5 !== (record.shopPrinter5 ?? null) ||
+        finalGroupPrint !== Boolean(record.isGroupPrintByPrinter);
+
+      if (availabilityChanged) {
+        availabilityUpdates.push({
+          shopId,
+          payload: {
+            enabled: finalAvailabilityEnabled,
+            isOutOfStock: finalOutOfStock,
+            isLimitedItem: finalLimited,
+            shopPrinter1: finalPrinter1,
+            shopPrinter2: finalPrinter2,
+            shopPrinter3: finalPrinter3,
+            shopPrinter4: finalPrinter4,
+            shopPrinter5: finalPrinter5,
+            isGroupPrintByPrinter: finalGroupPrint,
+          },
+        });
+      }
+    }
+
+    if (priceValidationFailed) {
       notifications.show({
         title: 'Validation error',
-        message: 'Item code is required.',
+        message: 'Please provide a valid price for each updated shop before saving.',
         color: 'orange',
         icon: <IconAlertCircle size={16} />,
       });
-      setActiveTab('basics');
+      setActiveTab('availability');
       return;
     }
+  }
 
-    setSaving(true);
-    try {
-      const payload = normalizePayload(formData);
-      if (drawerMode === 'create') {
-        await menuItemService.createMenuItem(brandId, payload);
-        notifications.show({
-          title: 'Item created',
-          message: 'The menu item has been created successfully.',
-          color: 'green',
-          icon: <IconCheck size={16} />,
-        });
-        setPage(1);
-      } else if (drawerMode === 'edit' && editingItemId) {
-        await menuItemService.updateMenuItem(brandId, editingItemId, payload);
-        notifications.show({
-          title: 'Item updated',
-          message: 'Changes have been saved.',
-          color: 'green',
-          icon: <IconCheck size={16} />,
-        });
+  setSaving(true);
+  try {
+    const payload = normalizePayload(formData);
+    let overridesApplied = false;
+
+    if (drawerMode === 'create') {
+      await menuItemService.createMenuItem(brandId, payload);
+      notifications.show({
+        title: 'Item created',
+        message: 'The menu item has been created successfully.',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+      setPage(1);
+    } else if (drawerMode === 'edit' && editingItemId) {
+      await menuItemService.updateMenuItem(brandId, editingItemId, payload);
+
+      if (selectedDetail && (priceUpdates.length > 0 || availabilityUpdates.length > 0)) {
+        const updatedPrices: MenuItemPrice[] = [];
+        for (const update of priceUpdates) {
+          const result = await menuItemService.updateMenuItemPrice(
+            brandId,
+            selectedDetail.itemId,
+            update.shopId,
+            update.payload,
+          );
+          updatedPrices.push(result);
+        }
+
+        const updatedAvailability: MenuItemShopAvailability[] = [];
+        for (const update of availabilityUpdates) {
+          const result = await menuItemService.updateMenuItemAvailability(
+            brandId,
+            selectedDetail.itemId,
+            update.shopId,
+            update.payload,
+          );
+          updatedAvailability.push(result);
+        }
+
+        if (updatedPrices.length > 0 || updatedAvailability.length > 0) {
+          overridesApplied = true;
+          setSelectedDetail((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              prices:
+                updatedPrices.length > 0
+                  ? prev.prices.map((entry) => {
+                      const match = updatedPrices.find((item) => item.shopId === entry.shopId);
+                      return match ?? entry;
+                    })
+                  : prev.prices,
+              shopAvailability:
+                updatedAvailability.length > 0
+                  ? prev.shopAvailability.map((entry) => {
+                      const match = updatedAvailability.find((item) => item.shopId === entry.shopId);
+                      return match ?? entry;
+                    })
+                  : prev.shopAvailability,
+            };
+          });
+        }
+
+        setPriceEdits({});
+        setAvailabilityEdits({});
+        setPrinterEdits({});
       }
 
-      resetDrawerState();
-      // Refresh list
-      const response = await menuItemService.getMenuItems(brandId, {
-        categoryId: selectedCategoryId ?? undefined,
-        search: debouncedSearch || undefined,
-        includeDisabled,
-        sortBy,
-        sortDirection,
-        page,
-        pageSize: PAGE_SIZE,
+      notifications.show({
+        title: 'Item updated',
+        message: overridesApplied ? 'Item details and shop overrides have been saved.' : 'Changes have been saved.',
+        color: 'green',
+        icon: <IconCheck size={16} />,
       });
-      setItemsResponse(response);
+    }
+
+    resetDrawerState();
+    const response = await menuItemService.getMenuItems(brandId, {
+      categoryId: selectedCategoryId ?? undefined,
+      search: debouncedSearch || undefined,
+      sortBy,
+      sortDirection,
+      page,
+      pageSize: PAGE_SIZE,
+    });
+    setItemsResponse(response);
     } catch (error) {
       console.error('Failed to save menu item', error);
       notifications.show({
@@ -958,6 +1388,9 @@ const MenuItemsPage: FC = () => {
         color: 'red',
         icon: <IconAlertCircle size={16} />,
       });
+      if (drawerMode === 'edit' && (priceUpdates.length > 0 || availabilityUpdates.length > 0)) {
+        setActiveTab('availability');
+      }
     } finally {
       setSaving(false);
     }
@@ -1116,51 +1549,53 @@ const MenuItemsPage: FC = () => {
                 paddingInline: isDesktopLayout ? 0 : 'var(--mantine-spacing-md)',
               }}
             >
-              <Box
-                style={{
-                  ...(isDesktopLayout
-                    ? {
-                        width: 320,
-                        flexShrink: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        minHeight: 0,
-                      }
-                    : { paddingBottom: 'var(--mantine-spacing-lg)' }),
-                }}
-              >
-                <Paper
-                  shadow="none"
-                  p="md"
+              {!isCategorySidebarCollapsed && (
+                <Box
                   style={{
-                    borderRight: isDesktopLayout ? `1px solid ${PANEL_BORDER_COLOR}` : 'none',
                     ...(isDesktopLayout
                       ? {
-                          flex: 1,
+                          width: 320,
+                          flexShrink: 0,
                           display: 'flex',
                           flexDirection: 'column',
-                          overflow: 'hidden',
                           minHeight: 0,
                         }
-                      : {}),
+                      : { paddingBottom: 'var(--mantine-spacing-lg)' }),
                   }}
                 >
-                  <MenuItemsCategorySidebar
-                    isDesktopLayout={isDesktopLayout}
-                    categorySearch={categorySearch}
-                    onCategorySearchChange={(value) => setCategorySearch(value)}
-                    selectedCategoryId={selectedCategoryId}
-                    totalCategoryItems={totalCategoryItems}
-                    lookupsLoading={lookupsLoading}
-                    filteredCategories={filteredCategories}
-                    renderCategoryNodes={renderCategoryNodes}
-                    onAllItems={() => {
-                      setSelectedCategoryId(null);
-                      setPage(1);
+                  <Paper
+                    shadow="none"
+                    p="md"
+                    style={{
+                      borderRight: isDesktopLayout ? `1px solid ${PANEL_BORDER_COLOR}` : 'none',
+                      ...(isDesktopLayout
+                        ? {
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            minHeight: 0,
+                          }
+                        : {}),
                     }}
-                  />
-                </Paper>
-              </Box>
+                  >
+                    <MenuItemsCategorySidebar
+                      isDesktopLayout={isDesktopLayout}
+                      categorySearch={categorySearch}
+                      onCategorySearchChange={(value) => setCategorySearch(value)}
+                      selectedCategoryId={selectedCategoryId}
+                      totalCategoryItems={totalCategoryItems}
+                      lookupsLoading={lookupsLoading}
+                      filteredCategories={filteredCategories}
+                      renderCategoryNodes={renderCategoryNodes}
+                      onAllItems={() => {
+                        setSelectedCategoryId(null);
+                        setPage(1);
+                      }}
+                    />
+                  </Paper>
+                </Box>
+              )}
 
               <Box
                 style={{
@@ -1194,6 +1629,25 @@ const MenuItemsPage: FC = () => {
                 >
                   <Group justify="space-between" align="center" gap="md" wrap="wrap">
                     <Group gap="xs" wrap="wrap">
+                      <Tooltip
+                        label={isCategorySidebarCollapsed ? 'Expand categories panel' : 'Collapse categories panel'}
+                        withArrow
+                      >
+                        <ActionIcon
+                          variant={isCategorySidebarCollapsed ? 'filled' : 'light'}
+                          color={isCategorySidebarCollapsed ? 'indigo' : 'gray'}
+                          size="lg"
+                          aria-label={isCategorySidebarCollapsed ? 'Expand categories panel' : 'Collapse categories panel'}
+                          aria-pressed={isCategorySidebarCollapsed}
+                          onClick={() => setIsCategorySidebarCollapsed((prev) => !prev)}
+                        >
+                          {isCategorySidebarCollapsed ? (
+                            <IconLayoutSidebarLeftExpand size={18} />
+                          ) : (
+                            <IconLayoutSidebarLeftCollapse size={18} />
+                          )}
+                        </ActionIcon>
+                      </Tooltip>
                       <Popover
                         opened={searchPopoverOpened}
                         onChange={setSearchPopoverOpened}
@@ -1248,19 +1702,6 @@ const MenuItemsPage: FC = () => {
                           />
                         </Popover.Dropdown>
                       </Popover>
-                      <Tooltip label={includeDisabled ? 'Showing all items' : 'Showing enabled only'} withArrow>
-                        <ActionIcon
-                          variant={includeDisabled ? 'filled' : 'light'}
-                          color={includeDisabled ? 'indigo' : 'gray'}
-                          size="lg"
-                          onClick={() => {
-                            setIncludeDisabled((prev) => !prev);
-                            setPage(1);
-                          }}
-                        >
-                          {includeDisabled ? <IconEye size={18} /> : <IconEyeOff size={18} />}
-                        </ActionIcon>
-                      </Tooltip>
                       <Popover
                         opened={sortPopoverOpened}
                         onChange={setSortPopoverOpened}
@@ -1282,26 +1723,32 @@ const MenuItemsPage: FC = () => {
                             </ActionIcon>
                           </Tooltip>
                         </Popover.Target>
-                        <Popover.Dropdown p="xs" w={200}>
+                        <Popover.Dropdown p="xs" w={220}>
                           <Stack gap="xs">
                             <Text size="xs" fw={600} c="dimmed">
                               Sort by
                             </Text>
-                            <Select
-                              data={[
-                                { label: 'Display order', value: 'displayIndex' },
-                                { label: 'Name', value: 'name' },
-                                { label: 'Last updated', value: 'modified' },
-                              ]}
-                              value={sortBy}
-                              onChange={(value) => {
-                                if (!value) return;
-                                setSortBy(value as typeof sortBy);
-                                setPage(1);
-                                setSortPopoverOpened(false);
-                              }}
-                              withinPortal={false}
-                            />
+                            <Stack gap={6}>
+                              {SORT_OPTIONS.map((option) => (
+                                <Button
+                                  key={option.value}
+                                  variant={sortBy === option.value ? 'filled' : 'subtle'}
+                                  color={sortBy === option.value ? 'indigo' : 'gray'}
+                                  size="xs"
+                                  radius="md"
+                                  rightSection={sortBy === option.value ? <IconCheck size={14} /> : undefined}
+                                  onClick={() => {
+                                    if (sortBy !== option.value) {
+                                      setSortBy(option.value);
+                                      setPage(1);
+                                    }
+                                    setSortPopoverOpened(false);
+                                  }}
+                                >
+                                  {option.label}
+                                </Button>
+                              ))}
+                            </Stack>
                           </Stack>
                         </Popover.Dropdown>
                       </Popover>
@@ -1412,6 +1859,15 @@ const MenuItemsPage: FC = () => {
                         </ActionIcon>
                       </Tooltip>
                       <Button
+                        variant="outline"
+                        leftSection={<IconGripVertical size={16} />}
+                        onClick={handleOpenReorderModal}
+                        disabled={!brandId || selectedCategoryId === null || reorderLoading || reorderSaving}
+                        size="sm"
+                      >
+                        Reorder items
+                      </Button>
+                      <Button
                         leftSection={<IconPlus size={16} />}
                         onClick={handleCreate}
                         disabled={!brandId}
@@ -1438,7 +1894,7 @@ const MenuItemsPage: FC = () => {
                           value={String(page)}
                           onChange={handlePageSelect}
                           data={pageOptions}
-                          w={120}
+                          w={80}
                           disabled={itemsLoading || totalPages <= 1}
                         />
                         <ActionIcon
@@ -1693,14 +2149,36 @@ const MenuItemsPage: FC = () => {
         availabilityEdits={availabilityEdits}
         updatePriceEdit={updatePriceEdit}
         updateAvailabilityEdit={updateAvailabilityEdit}
-        handleSavePrice={handleSavePrice}
-        handleSaveAvailability={handleSaveAvailability}
-        priceSavingShopId={priceSavingShopId}
-        availabilitySavingShopId={availabilitySavingShopId}
+        printerEdits={printerEdits}
+        updatePrinterEdit={updatePrinterEdit}
         onSubmit={handleSubmit}
+        onManageModifiers={
+          drawerMode === 'edit' && selectedDetail ? () => handleOpenModifiers(selectedDetail) : undefined
+        }
       />
-    </Box>
-  );
+    <ManageItemRelationshipsModal
+      opened={Boolean(modifierModalItem)}
+      onClose={handleCloseModifiers}
+      brandId={brandId}
+      item={modifierModalItem}
+      modifierGroups={lookups?.modifierGroups ?? null}
+      onSaved={(hasModifier) => {
+        if (modifierModalItem) {
+          handleModifiersSaved(modifierModalItem.itemId, hasModifier);
+        }
+      }}
+    />
+    <MenuItemsReorderModal
+      opened={reorderModalOpen}
+      onClose={handleCloseReorderModal}
+      categoryName={reorderCategoryName}
+      items={reorderItems}
+      loading={reorderLoading}
+      saving={reorderSaving}
+      onSave={handleSaveReorder}
+    />
+  </Box>
+);
 };
 
 export default MenuItemsPage;

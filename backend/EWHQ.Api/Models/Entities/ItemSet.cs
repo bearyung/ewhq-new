@@ -35,6 +35,6 @@ public class ItemSet
     public string ModifiedBy { get; set; } = string.Empty;
 
     [MaxLength(50)]
-    public string LinkType { get; set; }
+    public string? LinkType { get; set; }
 
 }
