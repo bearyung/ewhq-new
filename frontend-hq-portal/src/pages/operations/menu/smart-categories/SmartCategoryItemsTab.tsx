@@ -13,6 +13,7 @@ import {
   Loader,
   Modal,
   ScrollArea,
+  Select,
   Stack,
   Text,
   TextInput,
@@ -53,6 +54,7 @@ import menuItemService from '../../../../services/menuItemService';
 import { useBrands } from '../../../../contexts/BrandContext';
 import type { SmartCategoryItemAssignment, SmartCategoryItemAssignmentEntry } from '../../../../types/smartCategory';
 import type { MenuItemSummary } from '../../../../types/menuItem';
+import type { ItemCategory } from '../../../../types/itemCategory';
 
 interface ItemsTabProps {
   smartCategoryId: number;
@@ -396,6 +398,8 @@ const AddItemsModal: FC<AddItemsModalProps> = ({
 
     const [search, setSearch] = useState('');
     const [items, setItems] = useState<MenuItemSummary[]>([]);
+    const [categories, setCategories] = useState<ItemCategory[]>([]);
+    const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [submitting, setSubmitting] = useState(false);
@@ -406,6 +410,7 @@ const AddItemsModal: FC<AddItemsModalProps> = ({
             loadItems();
             setSelectedIds(new Set()); // Reset selection on open
             setSearch('');
+            setCategoryFilter(null);
         }
     }, [opened, brandId]);
 
@@ -417,11 +422,16 @@ const AddItemsModal: FC<AddItemsModalProps> = ({
             // The existing endpoint supports search. For now, let's fetch a reasonable batch or default.
             // Since we want "Add Items" to potentially show everything, we might need a "Load More" or search-driven.
             // For now, let's fetch page 1 with a large size to see what we get.
-            const response = await menuItemService.getMenuItems(brandId, { 
-                pageSize: 1000, // Attempt to get many
-                includeDisabled: true 
-            });
-            setItems(response.items);
+            const [itemsResponse, lookupsResponse] = await Promise.all([
+              menuItemService.getMenuItems(brandId, { 
+                  pageSize: 1000, // Attempt to get many
+                  includeDisabled: true 
+              }),
+              menuItemService.getLookups(brandId)
+            ]);
+            
+            setItems(itemsResponse.items);
+            setCategories(lookupsResponse.categories);
         } catch (error) {
             console.error(error);
             notifications.show({ color: 'red', message: 'Failed to load menu items.' });
@@ -439,11 +449,14 @@ const AddItemsModal: FC<AddItemsModalProps> = ({
                 (i.itemCode || '').toLowerCase().includes(term)
             );
         }
+        if (categoryFilter) {
+            filtered = filtered.filter(i => String(i.categoryId) === categoryFilter);
+        }
         // Filter out already assigned items? Or show them disabled?
         // User requirement: "Select from existing items"
         // Usually better to hide already assigned ones to avoid confusion, or show disabled.
         return filtered.filter(i => !existingItemIds.has(i.itemId));
-    }, [items, search, existingItemIds]);
+    }, [items, search, categoryFilter, existingItemIds]);
 
     const handleToggle = (itemId: number) => {
         setSelectedIds(prev => {
@@ -492,15 +505,30 @@ const AddItemsModal: FC<AddItemsModalProps> = ({
         }
     };
 
+    const categoryOptions = useMemo(() => 
+        categories.map(c => ({ value: String(c.categoryId), label: c.categoryName })),
+        [categories]
+    );
+
     return (
         <Modal opened={opened} onClose={onClose} title="Add items to smart category" size="lg">
             <Stack gap="md" style={{ height: '60vh', display: 'flex', flexDirection: 'column' }}>
-                <TextInput
-                    placeholder="Search by name or code..."
-                    leftSection={<IconSearch size={16} />}
-                    value={search}
-                    onChange={(e) => setSearch(e.currentTarget.value)}
-                />
+                <Group grow>
+                  <TextInput
+                      placeholder="Search by name or code..."
+                      leftSection={<IconSearch size={16} />}
+                      value={search}
+                      onChange={(e) => setSearch(e.currentTarget.value)}
+                  />
+                  <Select
+                    placeholder="Filter by category"
+                    data={categoryOptions}
+                    value={categoryFilter}
+                    onChange={setCategoryFilter}
+                    searchable
+                    clearable
+                  />
+                </Group>
                 
                 <Box style={{ flex: 1, minHeight: 0, border: '1px solid var(--mantine-color-gray-3)', borderRadius: 4 }}>
                     {loading ? (
