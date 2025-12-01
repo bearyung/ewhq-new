@@ -663,7 +663,6 @@ const SmartCategoriesPage: FC = () => {
                     onCreateChild={() => openCreateModal(selectedCategoryId)}
                     onEdit={openEditModal}
                     onDelete={openDeleteConfirm}
-                    onRefresh={handleRefresh}
                   />
                 </Paper>
                 <Box
@@ -871,7 +870,6 @@ interface DetailHeaderProps {
   onCreateChild: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onRefresh: () => void;
 }
 
 const SmartCategoryDetailHeader: FC<DetailHeaderProps> = ({
@@ -880,7 +878,6 @@ const SmartCategoryDetailHeader: FC<DetailHeaderProps> = ({
   onCreateChild,
   onEdit,
   onDelete,
-  onRefresh,
 }) => {
   const actionsDisabled = detailLoading || !detail;
 
@@ -906,9 +903,6 @@ const SmartCategoryDetailHeader: FC<DetailHeaderProps> = ({
       >
         Delete
       </Button>
-      <ActionIcon variant="subtle" onClick={onRefresh} aria-label="Refresh smart categories">
-        <IconRefresh size={18} />
-      </ActionIcon>
     </Group>
   );
 };
