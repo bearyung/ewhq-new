@@ -953,6 +953,7 @@ const SmartCategoryDetailContent: FC<DetailContentProps> = ({ detail, detailLoad
       <Tabs.Panel value="items" pt="md" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <SmartCategoryItemsTab
           smartCategoryId={detail.category.smartCategoryId}
+          categoryName={detail.category.name}
           initialItems={detail.items}
           onReload={onReload}
         />

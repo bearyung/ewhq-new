@@ -22,32 +22,12 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
-  IconDeviceFloppy,
-  IconDragDrop,
   IconPlus,
   IconRefresh,
   IconSearch,
   IconTrash,
+  IconArrowsSort,
 } from '@tabler/icons-react';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
-  defaultDropAnimationSideEffects,
-} from '@dnd-kit/core';
-import type { DragEndEvent, DropAnimation } from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 import smartCategoryService from '../../../../services/smartCategoryService';
 import menuItemService from '../../../../services/menuItemService';
@@ -55,72 +35,37 @@ import { useBrands } from '../../../../contexts/BrandContext';
 import type { SmartCategoryItemAssignment, SmartCategoryItemAssignmentEntry } from '../../../../types/smartCategory';
 import type { MenuItemSummary } from '../../../../types/menuItem';
 import type { ItemCategory } from '../../../../types/itemCategory';
+import { SmartCategoryItemsReorderModal } from './SmartCategoryItemsReorderModal';
 
 interface ItemsTabProps {
   smartCategoryId: number;
+  categoryName: string;
   initialItems: SmartCategoryItemAssignment[];
   onReload: () => void;
 }
 
 const FALLBACK_ITEM_MODIFIER = 'Unknown';
 
-export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, initialItems, onReload }) => {
+export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, categoryName, initialItems, onReload }) => {
   const { selectedBrand } = useBrands();
   const brandId = selectedBrand ? parseInt(selectedBrand, 10) : null;
 
-  // Local state for items to handle reordering optimistically
   const [items, setItems] = useState<SmartCategoryItemAssignment[]>(initialItems);
-  const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync local state when initialItems changes (e.g. after reload)
   useEffect(() => {
     setItems(initialItems.slice().sort((a, b) => a.displayIndex - b.displayIndex));
-    setIsDirty(false);
   }, [initialItems]);
 
-  // DnD Sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  const [addModalOpened, { open: openAddModal, close: closeAddModal }] = useDisclosure(false);
+  const [reorderModalOpened, { open: openReorderModal, close: closeReorderModal }] = useDisclosure(false);
 
-  const [activeId, setActiveId] = useState<number | null>(null);
-
-  const handleDragStart = (event: { active: { id: number | string } }) => {
-    setActiveId(Number(event.active.id));
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (active.id !== over?.id) {
-      setItems((currentItems) => {
-        const oldIndex = currentItems.findIndex((item) => item.itemId === Number(active.id));
-        const newIndex = currentItems.findIndex((item) => item.itemId === Number(over?.id));
-        
-        const newOrder = arrayMove(currentItems, oldIndex, newIndex);
-        // Re-index immediately for UI consistency, but real save happens on "Save Order"
-        const reIndexed = newOrder.map((item, index) => ({
-            ...item,
-            displayIndex: index + 1
-        }));
-        return reIndexed;
-      });
-      setIsDirty(true);
-    }
-
-    setActiveId(null);
-  };
-
-  const handleSaveOrder = async () => {
+  const handleSaveOrder = async (orderedItems: SmartCategoryItemAssignment[]) => {
     if (!brandId) return;
     setIsSaving(true);
 
     try {
-      const payload: SmartCategoryItemAssignmentEntry[] = items.map((item, index) => ({
+      const payload: SmartCategoryItemAssignmentEntry[] = orderedItems.map((item, index) => ({
         itemId: item.itemId,
         displayIndex: index + 1,
         enabled: item.enabled,
@@ -133,7 +78,8 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, init
         title: 'Order saved',
         message: 'Item order has been updated.',
       });
-      onReload(); // Reload to get fresh data
+      closeReorderModal();
+      onReload();
     } catch (error) {
       console.error(error);
       notifications.show({
@@ -148,10 +94,6 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, init
 
   const handleRemoveItem = async (itemId: number) => {
       if (!brandId) return;
-      // Optimistic remove from UI or wait for confirm?
-      // Standard: Confirm then save.
-      // Here we can just remove from the list and require a "Save" or do it immediately.
-      // Let's do immediate save for "Remove" to be consistent with "Add".
       
       const confirm = window.confirm('Are you sure you want to remove this item from the smart category?');
       if (!confirm) return;
@@ -176,19 +118,6 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, init
       }
   };
 
-  // Add Items Modal State
-  const [addModalOpened, { open: openAddModal, close: closeAddModal }] = useDisclosure(false);
-
-  const dropAnimation: DropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({
-      styles: {
-        active: {
-          opacity: '0.5',
-        },
-      },
-    }),
-  };
-
   return (
     <Flex direction="column" gap="sm" style={{ flex: 1, minHeight: 0 }}>
       <Group justify="space-between">
@@ -196,16 +125,14 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, init
           <Button leftSection={<IconPlus size={16} />} variant="light" onClick={openAddModal} disabled={isSaving}>
             Add items
           </Button>
-          {isDirty && (
-             <Button 
-                leftSection={<IconDeviceFloppy size={16} />} 
-                color="indigo" 
-                onClick={handleSaveOrder} 
-                loading={isSaving}
-             >
-                Save Order
-             </Button>
-          )}
+          <Button 
+            leftSection={<IconArrowsSort size={16} />} 
+            variant="light" 
+            onClick={openReorderModal} 
+            disabled={isSaving || items.length === 0}
+          >
+            Reorder items
+          </Button>
         </Group>
         <Tooltip label="Refresh items">
           <ActionIcon variant="subtle" onClick={onReload} disabled={isSaving}>
@@ -225,34 +152,17 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, init
           </Stack>
         </Center>
       ) : (
-        <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-        >
-            <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-                <SortableContext 
-                    items={items.map(i => i.itemId)}
-                    strategy={verticalListSortingStrategy}
-                >
-                    <Stack component="ul" gap="xs" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                    {items.map((item) => (
-                        <SortableItem 
-                            key={item.itemId} 
-                            item={item} 
-                            onRemove={() => handleRemoveItem(item.itemId)}
-                        />
-                    ))}
-                    </Stack>
-                </SortableContext>
-            </ScrollArea>
-            <DragOverlay dropAnimation={dropAnimation}>
-                {activeId ? (
-                    <ItemRow item={items.find(i => i.itemId === activeId)!} isOverlay />
-                ) : null}
-            </DragOverlay>
-        </DndContext>
+        <ScrollArea style={{ flex: 1, minHeight: 0 }}>
+            <Stack component="ul" gap="xs" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {items.map((item) => (
+                <ItemRow 
+                    key={item.itemId} 
+                    item={item} 
+                    onRemove={() => handleRemoveItem(item.itemId)}
+                />
+            ))}
+            </Stack>
+        </ScrollArea>
       )}
 
       <AddItemsModal 
@@ -266,48 +176,26 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, init
             onReload();
         }}
       />
+
+      <SmartCategoryItemsReorderModal
+        opened={reorderModalOpened}
+        onClose={closeReorderModal}
+        categoryName={categoryName}
+        items={items}
+        loading={false}
+        saving={isSaving}
+        onSave={handleSaveOrder}
+      />
     </Flex>
   );
 };
 
-interface SortableItemProps {
-    item: SmartCategoryItemAssignment;
-    onRemove: () => void;
-}
-
-const SortableItem: FC<SortableItemProps> = ({ item, onRemove }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: item.itemId });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.3 : 1,
-        zIndex: isDragging ? 999 : 'auto',
-        position: 'relative' as const,
-    };
-
-    return (
-        <Box ref={setNodeRef} style={style} {...attributes}>
-            <ItemRow item={item} dragHandleProps={listeners} onRemove={onRemove} />
-        </Box>
-    );
-};
-
 interface ItemRowProps {
     item: SmartCategoryItemAssignment;
-    dragHandleProps?: any;
     onRemove?: () => void;
-    isOverlay?: boolean;
 }
 
-const ItemRow: FC<ItemRowProps> = ({ item, dragHandleProps, onRemove, isOverlay }) => {
+const ItemRow: FC<ItemRowProps> = ({ item, onRemove }) => {
     const modifiedByRaw = item.modifiedBy ? item.modifiedBy.trim() : '';
     const modifiedByDisplay = modifiedByRaw || FALLBACK_ITEM_MODIFIER;
     const modifiedAtDisplay = item.modifiedDate ? new Date(item.modifiedDate).toLocaleString() : '—';
@@ -320,21 +208,11 @@ const ItemRow: FC<ItemRowProps> = ({ item, dragHandleProps, onRemove, isOverlay 
             style={{
                 borderRadius: 10,
                 border: '1px solid var(--mantine-color-gray-3)',
-                backgroundColor: isOverlay ? 'var(--mantine-color-white)' : 'var(--mantine-color-gray-0)',
-                boxShadow: isOverlay ? '0px 4px 12px rgba(0,0,0,0.1)' : 'none',
-                cursor: isOverlay ? 'grabbing' : 'default',
+                backgroundColor: 'var(--mantine-color-gray-0)',
             }}
         >
             <Group justify="space-between" align="center">
                 <Group gap="sm" style={{ flex: 1 }}>
-                    <ActionIcon 
-                        variant="subtle" 
-                        color="gray" 
-                        style={{ cursor: 'grab' }}
-                        {...dragHandleProps}
-                    >
-                        <IconDragDrop size={18} />
-                    </ActionIcon>
                     <Stack gap={4}>
                         <Group gap="xs" align="center">
                             <Badge size="sm" variant="light" color="indigo">
@@ -359,7 +237,7 @@ const ItemRow: FC<ItemRowProps> = ({ item, dragHandleProps, onRemove, isOverlay 
                             {modifiedByDisplay} · {modifiedAtDisplay}
                         </Text>
                     </Stack>
-                    {!isOverlay && onRemove && (
+                    {onRemove && (
                         <ActionIcon 
                             color="red" 
                             variant="subtle" 
