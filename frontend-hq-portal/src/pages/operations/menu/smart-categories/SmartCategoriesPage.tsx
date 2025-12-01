@@ -334,6 +334,12 @@ const SmartCategoriesPage: FC = () => {
     }
   }, [fetchTree, fetchDetail, selectedCategoryId]);
 
+  const handleDetailRefresh = useCallback(() => {
+    if (selectedCategoryId) {
+      fetchDetail(selectedCategoryId);
+    }
+  }, [fetchDetail, selectedCategoryId]);
+
   const toggleNode = useCallback((categoryId: number) => {
     setExpandedNodes((prev) => {
       const next = new Set(prev);
@@ -690,7 +696,7 @@ const SmartCategoriesPage: FC = () => {
                       detail={detail}
                       detailLoading={detailLoading}
                       buttonStyles={buttonStyleOptions}
-                      onReload={handleRefresh}
+                      onReload={handleDetailRefresh}
                     />
                   </Paper>
                 </Box>
