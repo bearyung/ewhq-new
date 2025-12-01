@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
 import {
   ActionIcon,
@@ -37,9 +37,9 @@ import {
 import { AutoBreadcrumb } from '../../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../../contexts/BrandContext';
 import smartCategoryService from '../../../../services/smartCategoryService';
+import { SmartCategoryItemsTab } from './SmartCategoryItemsTab';
 import type {
   SmartCategoryDetail,
-  SmartCategoryItemAssignment,
   SmartCategoryLookups,
   SmartCategoryTreeNode,
   SmartCategoryUpsertPayload,
@@ -174,6 +174,7 @@ const SmartCategoriesPage: FC = () => {
     brandId: null,
     status: 'idle',
   });
+  const lookupsPromiseRef = useRef<Promise<SmartCategoryLookups> | null>(null);
 
   const treeLookup = useMemo(() => flattenTree(tree), [tree]);
   const filteredTree = useMemo(() => filterTree(tree, search), [tree, search]);
@@ -183,18 +184,23 @@ const SmartCategoriesPage: FC = () => {
     return lookups.buttonStyles;
   }, [lookups]);
 
-  const ensureLookups = useCallback(async () => {
-    if (!brandId) return;
-
-    if (lookupsRequestRef.current.brandId !== brandId) {
-      lookupsRequestRef.current = {
-        brandId,
-        status: 'idle',
-      };
+  const ensureLookups = useCallback(async (): Promise<SmartCategoryLookups | null> => {
+    if (!brandId) {
+      return null;
     }
 
-    if (lookupsRequestRef.current.status === 'pending' || lookupsRequestRef.current.status === 'done') {
-      return;
+    const { brandId: currentBrand, status: currentStatus } = lookupsRequestRef.current;
+
+    if (lookups && currentBrand === brandId && currentStatus === 'done') {
+      return lookups;
+    }
+
+    if (lookupsPromiseRef.current) {
+      try {
+        return await lookupsPromiseRef.current;
+      } catch {
+        return null;
+      }
     }
 
     lookupsRequestRef.current = {
@@ -202,9 +208,12 @@ const SmartCategoriesPage: FC = () => {
       status: 'pending',
     };
 
+    const promise = smartCategoryService.getLookups(brandId);
+    lookupsPromiseRef.current = promise;
     setLookupsLoading(true);
+
     try {
-      const result = await smartCategoryService.getLookups(brandId);
+      const result = await promise;
       setLookups(result);
       setFormState((prev) => ({
         ...prev,
@@ -214,6 +223,7 @@ const SmartCategoriesPage: FC = () => {
         brandId,
         status: 'done',
       };
+      return result;
     } catch (error) {
       console.error(error);
       notifications.show({
@@ -225,10 +235,12 @@ const SmartCategoriesPage: FC = () => {
         brandId,
         status: 'idle',
       };
+      return null;
     } finally {
+      lookupsPromiseRef.current = null;
       setLookupsLoading(false);
     }
-  }, [brandId]);
+  }, [brandId, lookups]);
 
   const fetchDetail = useCallback(
     async (categoryId: number) => {
@@ -293,11 +305,13 @@ const SmartCategoriesPage: FC = () => {
       setTree([]);
       setLookups(null);
       lookupsRequestRef.current = { brandId: null, status: 'idle' };
+      lookupsPromiseRef.current = null;
       return;
     }
 
     if (lookupsRequestRef.current.brandId !== brandId) {
       lookupsRequestRef.current = { brandId, status: 'idle' };
+      lookupsPromiseRef.current = null;
       setLookups(null);
     }
 
@@ -333,18 +347,24 @@ const SmartCategoriesPage: FC = () => {
   }, []);
 
   const openCreateModal = useCallback(
-    (parentId?: number | null) => {
-      ensureLookups();
+    async (parentId?: number | null) => {
+      const loadedLookups = await ensureLookups();
+      if (!loadedLookups) {
+        return;
+      }
       setFormMode('create');
-      setFormState(buildInitialFormState(lookups, parentId));
+      setFormState(buildInitialFormState(loadedLookups, parentId));
       openForm();
     },
-    [ensureLookups, lookups, openForm],
+    [ensureLookups, openForm],
   );
 
-  const openEditModal = useCallback(() => {
+  const openEditModal = useCallback(async () => {
     if (!detail) return;
-    ensureLookups();
+    const loadedLookups = await ensureLookups();
+    if (!loadedLookups) {
+      return;
+    }
     const { category } = detail;
     setFormMode('edit');
     setFormState({
@@ -476,7 +496,7 @@ const SmartCategoriesPage: FC = () => {
   }, [brandId, selectedCategoryId, detail, closeDeleteConfirm, fetchTree]);
 
   const renderTree = useCallback(
-    (nodes: SmartCategoryTreeNode[], depth = 0): JSX.Element[] => {
+    (nodes: SmartCategoryTreeNode[], depth = 0): React.ReactNode[] => {
       return nodes.flatMap((node) => {
         const hasChildren = node.children.length > 0;
         const isExpanded = expandedNodes.has(node.smartCategoryId) || !!search;
@@ -671,6 +691,7 @@ const SmartCategoriesPage: FC = () => {
                       detail={detail}
                       detailLoading={detailLoading}
                       buttonStyles={buttonStyleOptions}
+                      onReload={handleRefresh}
                     />
                   </Paper>
                 </Box>
@@ -861,44 +882,33 @@ const SmartCategoryDetailHeader: FC<DetailHeaderProps> = ({
   onDelete,
   onRefresh,
 }) => {
-  const selectedName = detail ? formatCategoryName(detail.category.name, detail.category.smartCategoryId) : null;
   const actionsDisabled = detailLoading || !detail;
 
   return (
-    <Group justify="space-between" align="flex-start">
-      <Stack gap={2}>
-        <Text fw={700} size="xl">
-          Smart Categories
-        </Text>
-        <Text size="sm" c="dimmed">
-          {selectedName ? `Viewing: ${selectedName}` : 'Select a smart category from the list to manage its items and display settings.'}
-        </Text>
-      </Stack>
-      <Group gap="xs">
-        <Button
-          variant="light"
-          onClick={onCreateChild}
-          leftSection={<IconPlus size={16} />}
-          disabled={actionsDisabled}
-        >
-          Add child
-        </Button>
-        <Button variant="light" onClick={onEdit} leftSection={<IconPencil size={16} />} disabled={actionsDisabled}>
-          Edit
-        </Button>
-        <Button
-          color="red"
-          variant="light"
-          onClick={onDelete}
-          leftSection={<IconTrash size={16} />}
-          disabled={actionsDisabled}
-        >
-          Delete
-        </Button>
-        <ActionIcon variant="subtle" onClick={onRefresh} aria-label="Refresh smart categories">
-          <IconRefresh size={18} />
-        </ActionIcon>
-      </Group>
+    <Group justify="flex-end" align="center" gap="xs">
+      <Button
+        variant="light"
+        onClick={onCreateChild}
+        leftSection={<IconPlus size={16} />}
+        disabled={actionsDisabled}
+      >
+        Add child
+      </Button>
+      <Button variant="light" onClick={onEdit} leftSection={<IconPencil size={16} />} disabled={actionsDisabled}>
+        Edit
+      </Button>
+      <Button
+        color="red"
+        variant="light"
+        onClick={onDelete}
+        leftSection={<IconTrash size={16} />}
+        disabled={actionsDisabled}
+      >
+        Delete
+      </Button>
+      <ActionIcon variant="subtle" onClick={onRefresh} aria-label="Refresh smart categories">
+        <IconRefresh size={18} />
+      </ActionIcon>
     </Group>
   );
 };
@@ -907,9 +917,10 @@ interface DetailContentProps {
   detail: SmartCategoryDetail | null;
   detailLoading: boolean;
   buttonStyles: ButtonStyle[];
+  onReload: () => void;
 }
 
-const SmartCategoryDetailContent: FC<DetailContentProps> = ({ detail, detailLoading, buttonStyles }) => {
+const SmartCategoryDetailContent: FC<DetailContentProps> = ({ detail, detailLoading, buttonStyles, onReload }) => {
   if (detailLoading) {
     return (
       <Center style={{ flex: 1 }}>
@@ -940,7 +951,11 @@ const SmartCategoryDetailContent: FC<DetailContentProps> = ({ detail, detailLoad
       </Tabs.List>
 
       <Tabs.Panel value="items" pt="md" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <ItemsTab items={detail.items} />
+        <SmartCategoryItemsTab
+          smartCategoryId={detail.category.smartCategoryId}
+          initialItems={detail.items}
+          onReload={onReload}
+        />
       </Tabs.Panel>
       <Tabs.Panel value="details" pt="md" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <DetailsTab detail={detail} buttonStyles={buttonStyles} />
@@ -952,89 +967,7 @@ const SmartCategoryDetailContent: FC<DetailContentProps> = ({ detail, detailLoad
   );
 };
 
-interface ItemsTabProps {
-  items: SmartCategoryItemAssignment[];
-}
 
-const ItemsTab: FC<ItemsTabProps> = ({ items }) => (
-  <Flex direction="column" gap="sm" style={{ flex: 1, minHeight: 0 }}>
-    <Group justify="space-between">
-      <Group gap="sm">
-        <Button leftSection={<IconPlus size={16} />} variant="light">
-          Add items
-        </Button>
-        <Button variant="light">Reorder items</Button>
-      </Group>
-      <Tooltip label="Refresh items">
-        <ActionIcon variant="subtle">
-          <IconRefresh size={18} />
-        </ActionIcon>
-      </Tooltip>
-    </Group>
-    <Divider />
-    {items.length === 0 ? (
-      <Center style={{ flex: 1 }}>
-        <Stack gap="xs" align="center">
-          <Text fw={600}>No items assigned yet</Text>
-          <Text size="sm" c="dimmed">
-            Use the &ldquo;Add items&rdquo; button to include menu items in this smart category.
-          </Text>
-        </Stack>
-      </Center>
-    ) : (
-      <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-        <Stack component="ul" gap="xs" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {items
-            .slice()
-            .sort((a, b) => a.displayIndex - b.displayIndex)
-            .map((item) => {
-              const modifiedByRaw = item.modifiedBy ? item.modifiedBy.trim() : '';
-              const modifiedByDisplay = modifiedByRaw || FALLBACK_ITEM_MODIFIER;
-              const modifiedAtDisplay = item.modifiedDate ? new Date(item.modifiedDate).toLocaleString() : '—';
-
-              return (
-                <Box
-                  key={item.itemId}
-                  component="li"
-                  px="md"
-                  py="sm"
-                style={{
-                  borderRadius: 10,
-                  border: '1px solid var(--mantine-color-gray-3)',
-                  backgroundColor: 'var(--mantine-color-gray-0)',
-                }}
-              >
-                <Group justify="space-between" align="center">
-                  <Stack gap={4}>
-                    <Group gap="xs" align="center">
-                      <Badge size="sm" variant="light" color="indigo">
-                        #{item.displayIndex}
-                      </Badge>
-                      <Text fw={600} size="sm">
-                        {item.itemName || 'Untitled item'}
-                      </Text>
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      Code: {item.itemCode}
-                    </Text>
-                  </Stack>
-                  <Stack gap={4} align="flex-end">
-                    <Badge color={item.enabled ? 'teal' : 'gray'} variant="light">
-                      {item.enabled ? 'Enabled' : 'Disabled'}
-                    </Badge>
-                    <Text size="xs" c="dimmed">
-                      {modifiedByDisplay} · {modifiedAtDisplay}
-                    </Text>
-                  </Stack>
-                </Group>
-              </Box>
-              );
-            })}
-        </Stack>
-      </ScrollArea>
-    )}
-  </Flex>
-);
 
 interface DetailsTabProps {
   detail: SmartCategoryDetail;
@@ -1320,7 +1253,7 @@ const SmartCategoryFormModal: FC<SmartCategoryFormModalProps> = ({
           data={parentOptions}
           searchable
           clearable
-          nothingFound="No categories"
+          nothingFoundMessage="No categories"
           value={
             formState.parentSmartCategoryId === null || formState.parentSmartCategoryId === undefined
               ? 'null'

@@ -1624,6 +1624,8 @@ export const ManageItemRelationshipsModal: FC<ManageItemRelationshipsModalProps>
               isPromoItem: false,
               isManualPrice: false,
               isManualName: false,
+              isNonDiscountItem: false,
+              isNonServiceChargeItem: false,
               displayIndex: previewItem.displayIndex,
               itemPublicDisplayName: previewItem.itemName ?? previewItem.itemCode,
             },
