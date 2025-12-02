@@ -202,6 +202,8 @@ export const DataTable = <TData,>({
     }
   };
 
+  const headerHeight = 40;
+
   return (
     <Paper shadow="none" p={0} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {enableSearch && (
@@ -251,7 +253,7 @@ export const DataTable = <TData,>({
           >
             <div
               style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
+                height: `${rowVirtualizer.getTotalSize() + headerHeight}px`,
                 width: totalTableWidth,
                 position: 'relative',
               }}
@@ -263,7 +265,7 @@ export const DataTable = <TData,>({
                   zIndex: 2,
                   display: 'flex',
                   width: totalTableWidth,
-                  height: 40,
+                  height: headerHeight,
                   backgroundColor: 'white',
                   borderBottom: '1px solid #dee2e6',
                 }}
@@ -356,18 +358,20 @@ export const DataTable = <TData,>({
                 ))}
               </div>
 
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const row = rows[virtualRow.index];
-                return (
-                  <VirtualTableRow
-                    key={row.id}
-                    row={row}
-                    virtualRow={virtualRow}
-                    totalTableWidth={totalTableWidth}
-                    showActionShadow={showActionShadow}
-                  />
-                );
-              })}
+              <div style={{ position: 'absolute', top: headerHeight, left: 0, width: '100%' }}>
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const row = rows[virtualRow.index];
+                  return (
+                    <VirtualTableRow
+                      key={row.id}
+                      row={row}
+                      virtualRow={virtualRow}
+                      totalTableWidth={totalTableWidth}
+                      showActionShadow={showActionShadow}
+                    />
+                  );
+                })}
+              </div>
             </div>
           </Box>
         )}
