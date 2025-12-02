@@ -1864,7 +1864,7 @@ const handleSubmit = async () => {
                       onColumnVisibilityChange={setColumnVisibility}
                       columnSizing={columnSizing}
                       onColumnSizingChange={setColumnSizing}
-                      hideFooter={false}
+                      hideFooter={true}
                     />
                   </Paper>
                 </Box>
