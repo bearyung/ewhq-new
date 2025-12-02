@@ -57,6 +57,7 @@ interface DataTableProps<TData> {
   onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
   columnSizing?: ColumnSizingState;
   onColumnSizingChange?: OnChangeFn<ColumnSizingState>;
+  hideFooter?: boolean; // New prop
 }
 
 export const DataTable = <TData,>({
@@ -78,6 +79,7 @@ export const DataTable = <TData,>({
   onColumnVisibilityChange,
   columnSizing,
   onColumnSizingChange,
+  hideFooter = true, // Default to true (hide)
 }: DataTableProps<TData>) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
@@ -377,32 +379,34 @@ export const DataTable = <TData,>({
         )}
       </Box>
 
-      <Box p="xs" style={{ borderTop: '1px solid #dee2e6' }}>
-        <Group justify="space-between">
-          <Text size="xs" c="dimmed">
-            {manualPagination ? totalItems : rows.length} items
-          </Text>
-          <Group gap="xs">
-            <ActionIcon
-              variant="subtle"
-              disabled={currentPage <= 1 || loading}
-              onClick={() => handlePageChange(currentPage - 1)}
-            >
-              <IconChevronLeft size={16} />
-            </ActionIcon>
-            <Text size="sm">
-              Page {currentPage} of {totalPages || 1}
+      {!hideFooter && (
+        <Box p="xs" style={{ borderTop: '1px solid #dee2e6' }}>
+          <Group justify="space-between">
+            <Text size="xs" c="dimmed">
+              {manualPagination ? totalItems : rows.length} items
             </Text>
-            <ActionIcon
-              variant="subtle"
-              disabled={currentPage >= totalPages || loading}
-              onClick={() => handlePageChange(currentPage + 1)}
-            >
-              <IconChevronRight size={16} />
-            </ActionIcon>
+            <Group gap="xs">
+              <ActionIcon
+                variant="subtle"
+                disabled={currentPage <= 1 || loading}
+                onClick={() => handlePageChange(currentPage - 1)}
+              >
+                <IconChevronLeft size={16} />
+              </ActionIcon>
+              <Text size="sm">
+                Page {currentPage} of {totalPages || 1}
+              </Text>
+              <ActionIcon
+                variant="subtle"
+                disabled={currentPage >= totalPages || loading}
+                onClick={() => handlePageChange(currentPage + 1)}
+              >
+                <IconChevronRight size={16} />
+              </ActionIcon>
+            </Group>
           </Group>
-        </Group>
-      </Box>
+        </Box>
+      )}
     </Paper>
   );
 };
