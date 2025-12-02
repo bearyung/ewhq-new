@@ -57,7 +57,11 @@ interface DataTableProps<TData> {
   onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
   columnSizing?: ColumnSizingState;
   onColumnSizingChange?: OnChangeFn<ColumnSizingState>;
-  hideFooter?: boolean; // New prop
+  hideFooter?: boolean;
+  sorting?: SortingState;
+  onSortingChange?: OnChangeFn<SortingState>;
+  globalFilter?: string;
+  onGlobalFilterChange?: OnChangeFn<string>;
 }
 
 export const DataTable = <TData,>({
@@ -79,13 +83,22 @@ export const DataTable = <TData,>({
   onColumnVisibilityChange,
   columnSizing,
   onColumnSizingChange,
-  hideFooter = true, // Default to true (hide)
+  hideFooter = true,
+  sorting,
+  onSortingChange,
+  globalFilter,
+  onGlobalFilterChange,
 }: DataTableProps<TData>) => {
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
-  // Internal state if not controlled
+  const [internalSorting, setInternalSorting] = useState<SortingState>([]);
+  const [internalGlobalFilter, setInternalGlobalFilter] = useState('');
   const [internalColumnVisibility, setInternalColumnVisibility] = useState<VisibilityState>({});
   const [internalColumnSizing, setInternalColumnSizing] = useState<ColumnSizingState>({});
+
+  const finalSorting = sorting ?? internalSorting;
+  const finalOnSortingChange = onSortingChange ?? setInternalSorting;
+
+  const finalGlobalFilter = globalFilter ?? internalGlobalFilter;
+  const finalOnGlobalFilterChange = onGlobalFilterChange ?? setInternalGlobalFilter;
 
   const finalColumnVisibility = columnVisibility ?? internalColumnVisibility;
   const finalOnColumnVisibilityChange = onColumnVisibilityChange ?? setInternalColumnVisibility;
@@ -102,8 +115,8 @@ export const DataTable = <TData,>({
     data,
     columns,
     state: {
-      sorting,
-      globalFilter,
+      sorting: finalSorting,
+      globalFilter: finalGlobalFilter,
       columnVisibility: finalColumnVisibility,
       columnSizing: finalColumnSizing,
       pagination: {
@@ -112,8 +125,8 @@ export const DataTable = <TData,>({
       },
     },
     manualPagination,
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
+    onSortingChange: finalOnSortingChange,
+    onGlobalFilterChange: finalOnGlobalFilterChange,
     onColumnVisibilityChange: finalOnColumnVisibilityChange,
     onColumnSizingChange: finalOnColumnSizingChange,
     getCoreRowModel: getCoreRowModel(),
@@ -212,12 +225,12 @@ export const DataTable = <TData,>({
         <Box p="md" style={{ borderBottom: '1px solid #dee2e6' }}>
           <TextInput
             placeholder={searchPlaceholder}
-            value={globalFilter ?? ''}
-            onChange={(e) => setGlobalFilter(e.target.value)}
+            value={finalGlobalFilter ?? ''}
+            onChange={(e) => finalOnGlobalFilterChange(e.target.value)}
             leftSection={<IconSearch size={16} />}
             rightSection={
-              globalFilter ? (
-                <ActionIcon variant="subtle" color="gray" onClick={() => setGlobalFilter('')}>
+              finalGlobalFilter ? (
+                <ActionIcon variant="subtle" color="gray" onClick={() => finalOnGlobalFilterChange('')}>
                   <IconX size={14} />
                 </ActionIcon>
               ) : null

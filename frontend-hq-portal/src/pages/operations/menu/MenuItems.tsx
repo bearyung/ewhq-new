@@ -81,6 +81,22 @@ const SORT_OPTIONS: Array<{
   { label: 'Name', value: 'name' },
 ];
 
+type MenuItemsColumnDef = ColumnDef<MenuItemSummary> & { accessorKey?: string | number };
+
+const getColumnId = (column: MenuItemsColumnDef): string => {
+  if (typeof column.accessorKey === 'string' || typeof column.accessorKey === 'number') {
+    return column.accessorKey.toString();
+  }
+  return column.id ?? '';
+};
+
+const getColumnLabel = (column: MenuItemsColumnDef): string => {
+  if (typeof column.header === 'string') {
+    return column.header;
+  }
+  return getColumnId(column) || 'Column';
+};
+
 const MenuItemsPage: FC = () => {
   const { selectedBrand } = useBrands();
   const brandId = selectedBrand ? parseInt(selectedBrand, 10) : null;
@@ -739,8 +755,11 @@ const MenuItemsPage: FC = () => {
     [totalPages],
   );
 
-  const toggleableColumns = useMemo(
-    () => columns.filter((col) => col.enableHiding !== false),
+  const toggleableColumns = useMemo<MenuItemsColumnDef[]>(
+    () =>
+      columns
+        .filter((col) => col.enableHiding !== false)
+        .map((col) => col as MenuItemsColumnDef),
     [columns],
   );
 
@@ -750,23 +769,30 @@ const MenuItemsPage: FC = () => {
       return toggleableColumns;
     }
 
-    return toggleableColumns.filter((column) => {
-      const header = column.header;
-      const label = typeof header === 'string' ? header : column.id || (column as any).accessorKey;
-      return label?.toLowerCase().includes(searchTerm);
-    });
+    return toggleableColumns.filter((column) => getColumnLabel(column).toLowerCase().includes(searchTerm));
   }, [toggleableColumns, columnSearch]);
 
   const allToggleColumnsSelected = toggleableColumns.length > 0
-    && toggleableColumns.every((column) => columnVisibility[(column as any).accessorKey || column.id!] !== false);
-  const anyToggleColumnsSelected = toggleableColumns.some((column) => columnVisibility[(column as any).accessorKey || column.id!] !== false);
+    && toggleableColumns.every((column) => {
+      const key = getColumnId(column);
+      if (!key) {
+        return true;
+      }
+      return columnVisibility[key] !== false;
+    });
+  const anyToggleColumnsSelected = toggleableColumns.some((column) => {
+    const key = getColumnId(column);
+    return key ? columnVisibility[key] !== false : true;
+  });
 
   const handleToggleAllColumns = useCallback(
     (visible: boolean) => {
       const newVisibility = { ...columnVisibility };
       toggleableColumns.forEach((column) => {
-        const key = (column as any).accessorKey || column.id!;
-        newVisibility[key] = visible;
+        const key = getColumnId(column);
+        if (key) {
+          newVisibility[key] = visible;
+        }
       });
       setColumnVisibility(newVisibility);
     },
@@ -1707,9 +1733,11 @@ const handleSubmit = async () => {
                                   </Text>
                                 ) : (
                                   filteredToggleColumns.map((column) => {
-                                    const header = column.header;
-                                    const label = typeof header === 'string' ? header : column.id || (column as any).accessorKey;
-                                    const colId = (column as any).accessorKey || column.id!;
+                                    const label = getColumnLabel(column);
+                                    const colId = getColumnId(column);
+                                    if (!colId) {
+                                      return null;
+                                    }
                                     const isVisible = columnVisibility[colId] !== false;
                                     return (
                                       <Checkbox
@@ -1854,7 +1882,7 @@ const handleSubmit = async () => {
                           <Text size="sm" c="dimmed" ta="center">
                             Adjust filters or add a new item to this category.
                           </Text>
-                        </Stack> as any
+                        </Stack>
                       }
                       totalItems={totalItems}
                       page={page}

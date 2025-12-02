@@ -161,6 +161,7 @@ const SmartCategoriesPage: FC = () => {
 
   const [search, setSearch] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set());
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const [formState, setFormState] = useState<SmartCategoryFormState>(() => buildInitialFormState(null));
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
@@ -582,11 +583,12 @@ const SmartCategoriesPage: FC = () => {
             paddingBlock: isDesktopLayout ? 0 : 'var(--mantine-spacing-md)',
           }}
         >
-          <Box
-            style={{
-              width: isDesktopLayout ? 320 : '100%',
-              flexShrink: isDesktopLayout ? 0 : undefined,
-              display: 'flex',
+          {!isSidebarCollapsed && (
+            <Box
+              style={{
+                width: isDesktopLayout ? 320 : '100%',
+                flexShrink: isDesktopLayout ? 0 : undefined,
+                display: 'flex',
                 flexDirection: 'column',
                 minHeight: 0,
               }}
@@ -634,6 +636,7 @@ const SmartCategoriesPage: FC = () => {
                 />
               </Paper>
             </Box>
+          )}
 
             <Box
               style={{
@@ -697,6 +700,8 @@ const SmartCategoriesPage: FC = () => {
                       detailLoading={detailLoading}
                       buttonStyles={buttonStyleOptions}
                       onReload={handleDetailRefresh}
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
                     />
                   </Paper>
                 </Box>
@@ -918,9 +923,18 @@ interface DetailContentProps {
   detailLoading: boolean;
   buttonStyles: ButtonStyle[];
   onReload: () => void;
+  isSidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
 }
 
-const SmartCategoryDetailContent: FC<DetailContentProps> = ({ detail, detailLoading, buttonStyles, onReload }) => {
+const SmartCategoryDetailContent: FC<DetailContentProps> = ({
+  detail,
+  detailLoading,
+  buttonStyles,
+  onReload,
+  isSidebarCollapsed,
+  onToggleSidebar,
+}) => {
   if (detailLoading) {
     return (
       <Center style={{ flex: 1 }}>
@@ -956,6 +970,8 @@ const SmartCategoryDetailContent: FC<DetailContentProps> = ({ detail, detailLoad
           categoryName={detail.category.name}
           initialItems={detail.items}
           onReload={onReload}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={onToggleSidebar}
         />
       </Tabs.Panel>
       <Tabs.Panel value="details" pt="md" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
