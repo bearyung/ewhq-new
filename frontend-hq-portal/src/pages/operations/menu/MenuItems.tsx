@@ -2099,14 +2099,12 @@ const handleSubmit = async () => {
                           position: 'relative',
                           height: `${rowVirtualizer.getTotalSize()}px`,
                         }}>
-                          <Table highlightOnHover withColumnBorders style={{
-                            tableLayout: 'fixed',
+                          <div style={{
                             width: totalTableWidth,
                             position: 'absolute',
                             top: 0,
                             left: 0,
                           }}>
-                            <Table.Tbody>
                               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                                 const row = rows[virtualRow.index];
                                 return (
@@ -2119,8 +2117,7 @@ const handleSubmit = async () => {
                                   />
                                 );
                               })}
-                            </Table.Tbody>
-                          </Table>
+                          </div>
                         </div>
                     </Box>
                   )}
