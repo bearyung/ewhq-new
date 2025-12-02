@@ -8,6 +8,7 @@ import {
   ActionIcon,
   Group,
   TextInput,
+  Flex,
 } from '@mantine/core';
 import {
   useReactTable,
@@ -21,6 +22,8 @@ import type {
   ColumnDef,
   SortingState,
   ColumnSizingState,
+  VisibilityState,
+  OnChangeFn,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
@@ -40,7 +43,7 @@ interface DataTableProps<TData> {
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
-  emptyMessage?: string;
+  emptyMessage?: string | React.ReactNode;
   totalItems?: number;
   page?: number;
   onPageChange?: (page: number) => void;
@@ -49,8 +52,11 @@ interface DataTableProps<TData> {
   manualPagination?: boolean;
   enableSearch?: boolean;
   searchPlaceholder?: string;
-  height?: number | string;
   actionColumnId?: string;
+  columnVisibility?: VisibilityState;
+  onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
+  columnSizing?: ColumnSizingState;
+  onColumnSizingChange?: OnChangeFn<ColumnSizingState>;
 }
 
 export const DataTable = <TData,>({
@@ -68,12 +74,27 @@ export const DataTable = <TData,>({
   enableSearch = false,
   searchPlaceholder = 'Search...',
   actionColumnId = 'actions',
+  columnVisibility,
+  onColumnVisibilityChange,
+  columnSizing,
+  onColumnSizingChange,
 }: DataTableProps<TData>) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+  // Internal state if not controlled
+  const [internalColumnVisibility, setInternalColumnVisibility] = useState<VisibilityState>({});
+  const [internalColumnSizing, setInternalColumnSizing] = useState<ColumnSizingState>({});
+
+  const finalColumnVisibility = columnVisibility ?? internalColumnVisibility;
+  const finalOnColumnVisibilityChange = onColumnVisibilityChange ?? setInternalColumnVisibility;
+  
+  const finalColumnSizing = columnSizing ?? internalColumnSizing;
+  const finalOnColumnSizingChange = onColumnSizingChange ?? setInternalColumnSizing;
+
   const [showActionShadow, setShowActionShadow] = useState(false);
+  const [hoveredResizeColumnId, setHoveredResizeColumnId] = useState<string | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const resizeCursorRestoreRef = useRef<string | null>(null);
 
   const table = useReactTable({
     data,
@@ -81,7 +102,8 @@ export const DataTable = <TData,>({
     state: {
       sorting,
       globalFilter,
-      columnSizing,
+      columnVisibility: finalColumnVisibility,
+      columnSizing: finalColumnSizing,
       pagination: {
         pageIndex: page - 1,
         pageSize,
@@ -90,7 +112,8 @@ export const DataTable = <TData,>({
     manualPagination,
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
-    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: finalOnColumnVisibilityChange,
+    onColumnSizingChange: finalOnColumnSizingChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -127,6 +150,23 @@ export const DataTable = <TData,>({
     setShowActionShadow(!isAtRightEdge);
   }, []);
 
+  const setBodyResizeCursor = useCallback((active: boolean) => {
+    const bodyStyle = document.body.style;
+    if (active) {
+      if (resizeCursorRestoreRef.current === null) {
+        resizeCursorRestoreRef.current = bodyStyle.cursor || '';
+      }
+      bodyStyle.cursor = 'col-resize';
+    } else {
+      if (resizeCursorRestoreRef.current !== null) {
+        bodyStyle.cursor = resizeCursorRestoreRef.current;
+        resizeCursorRestoreRef.current = null;
+      } else {
+        bodyStyle.cursor = '';
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const container = tableContainerRef.current;
     if (!container) return;
@@ -143,8 +183,10 @@ export const DataTable = <TData,>({
     return () => {
       container.removeEventListener('scroll', handleScroll);
       observer.disconnect();
+      setBodyResizeCursor(false);
+      setHoveredResizeColumnId(null);
     };
-  }, [updateActionShadow, rows.length, totalTableWidth]);
+  }, [updateActionShadow, rows.length, totalTableWidth, setBodyResizeCursor]);
 
   const totalPages = manualPagination 
     ? Math.ceil((totalItems || 0) / pageSize) 
@@ -222,7 +264,7 @@ export const DataTable = <TData,>({
                   display: 'flex',
                   width: totalTableWidth,
                   height: 40,
-                  backgroundColor: 'var(--mantine-color-gray-0)',
+                  backgroundColor: 'white',
                   borderBottom: '1px solid #dee2e6',
                 }}
               >
@@ -233,32 +275,83 @@ export const DataTable = <TData,>({
                       width: header.getSize(),
                       minWidth: header.getSize(),
                       maxWidth: header.getSize(),
-                      padding: '0 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      fontWeight: 600,
-                      fontSize: 12,
-                      color: 'var(--mantine-color-gray-7)',
-                      cursor: header.column.getCanSort() ? 'pointer' : 'default',
-                      userSelect: 'none',
+                      position: header.id === actionColumnId ? 'sticky' : 'relative',
+                      borderBottom: '1px solid #dee2e6',
                       ...(header.id === actionColumnId
                         ? {
-                            position: 'sticky',
                             right: 0,
-                            backgroundColor: 'var(--mantine-color-gray-0)',
+                            backgroundColor: 'white',
                             boxShadow: showActionShadow ? 'inset 3px 0 6px -4px rgba(15, 23, 42, 0.2)' : 'none',
                             zIndex: 3,
                             transition: 'box-shadow 120ms ease',
                           }
-                        : undefined),
+                        : { backgroundColor: 'white' }),
                     }}
-                    onClick={header.column.getToggleSortingHandler()}
                   >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                    {{
-                      asc: ' ▴',
-                      desc: ' ▾',
-                    }[header.column.getIsSorted() as string] ?? null}
+                    <Flex
+                      align="center"
+                      justify={header.column.id === actionColumnId ? 'flex-end' : 'flex-start'}
+                      gap="xs"
+                      style={{
+                        height: '100%',
+                        padding: '0 16px',
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: 'var(--mantine-color-gray-7)',
+                        cursor: header.column.getCanSort() ? 'pointer' : 'default',
+                        userSelect: 'none',
+                        width: '100%',
+                      }}
+                      onClick={header.column.getToggleSortingHandler()}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {{
+                        asc: ' ▴',
+                        desc: ' ▾',
+                      }[header.column.getIsSorted() as string] ?? null}
+                    </Flex>
+                    
+                    {header.column.getCanResize() && header.id !== actionColumnId && (
+                        <Box
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          onMouseEnter={() => {
+                            setHoveredResizeColumnId(header.id);
+                            setBodyResizeCursor(true);
+                          }}
+                          onMouseLeave={() => {
+                            setBodyResizeCursor(false);
+                            setHoveredResizeColumnId((current) => (current === header.id ? null : current));
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            right: -4,
+                            height: '100%',
+                            width: 8,
+                            cursor: 'col-resize',
+                            userSelect: 'none',
+                            touchAction: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1,
+                          }}
+                        >
+                          <Box
+                            style={{
+                              width: 2,
+                              height: '60%',
+                              borderRadius: 1,
+                              backgroundColor:
+                                header.column.getIsResizing() || hoveredResizeColumnId === header.id
+                                  ? 'var(--mantine-color-indigo-5)'
+                                  : 'transparent',
+                              transition: 'background-color 120ms ease',
+                            }}
+                          />
+                        </Box>
+                      )}
                   </div>
                 ))}
               </div>
