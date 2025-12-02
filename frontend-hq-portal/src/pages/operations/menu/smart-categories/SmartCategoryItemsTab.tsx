@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { FC } from 'react';
 import {
   ActionIcon,
@@ -28,6 +28,7 @@ import {
   IconTrash,
   IconArrowsSort,
 } from '@tabler/icons-react';
+import type { ColumnDef } from '@tanstack/react-table';
 
 import smartCategoryService from '../../../../services/smartCategoryService';
 import menuItemService from '../../../../services/menuItemService';
@@ -36,6 +37,7 @@ import type { SmartCategoryItemAssignment, SmartCategoryItemAssignmentEntry } fr
 import type { MenuItemSummary } from '../../../../types/menuItem';
 import type { ItemCategory } from '../../../../types/itemCategory';
 import { SmartCategoryItemsReorderModal } from './SmartCategoryItemsReorderModal';
+import { DataTable } from '../../../../components/DataTable';
 
 interface ItemsTabProps {
   smartCategoryId: number;
@@ -43,8 +45,6 @@ interface ItemsTabProps {
   initialItems: SmartCategoryItemAssignment[];
   onReload: () => void;
 }
-
-const FALLBACK_ITEM_MODIFIER = 'Unknown';
 
 export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, categoryName, initialItems, onReload }) => {
   const { selectedBrand } = useBrands();
@@ -92,7 +92,7 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, cate
     }
   };
 
-  const handleRemoveItem = async (itemId: number) => {
+  const handleRemoveItem = useCallback(async (itemId: number) => {
       if (!brandId) return;
       
       const confirm = window.confirm('Are you sure you want to remove this item from the smart category?');
@@ -116,7 +116,90 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, cate
       } finally {
           setIsSaving(false);
       }
-  };
+  }, [brandId, items, smartCategoryId, onReload]);
+
+  const columns = useMemo<ColumnDef<SmartCategoryItemAssignment>[]>(
+    () => [
+      {
+        accessorKey: 'displayIndex',
+        header: 'Display Index',
+        size: 120,
+        cell: ({ row }) => <Text size="sm">{row.original.displayIndex}</Text>,
+      },
+      {
+        accessorKey: 'itemCode',
+        header: 'Code',
+        size: 100,
+        cell: ({ row }) => (
+          <Text size="sm" fw={500}>
+            {row.original.itemCode}
+          </Text>
+        ),
+      },
+      {
+        accessorKey: 'itemName',
+        header: 'Item Name',
+        size: 250,
+        cell: ({ row }) => (
+          <Stack gap={0}>
+            <Text size="sm" fw={600} truncate>
+              {row.original.itemName || 'Untitled Item'}
+            </Text>
+            {row.original.itemNameAlt && (
+              <Text size="xs" c="dimmed" truncate>
+                {row.original.itemNameAlt}
+              </Text>
+            )}
+          </Stack>
+        ),
+      },
+      {
+        accessorKey: 'enabled',
+        header: 'Enabled',
+        size: 100,
+        cell: ({ row }) => (
+          <Badge variant="light" color={row.original.enabled ? 'green' : 'gray'} size="sm">
+            {row.original.enabled ? 'Yes' : 'No'}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: 'modifiedDate',
+        header: 'Last Updated',
+        size: 200,
+        cell: ({ row }) => {
+            const date = row.original.modifiedDate ? new Date(row.original.modifiedDate).toLocaleString() : '—';
+            const by = row.original.modifiedBy || 'Unknown';
+            return (
+                <Stack gap={0}>
+                    <Text size="sm">{date}</Text>
+                    <Text size="xs" c="dimmed">by {by}</Text>
+                </Stack>
+            );
+        },
+      },
+      {
+        id: 'actions',
+        header: '',
+        size: 80,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <Group justify="flex-end">
+            <Tooltip label="Remove item">
+              <ActionIcon
+                color="red"
+                variant="subtle"
+                onClick={() => handleRemoveItem(row.original.itemId)}
+              >
+                <IconTrash size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        ),
+      },
+    ],
+    [handleRemoveItem]
+  );
 
   return (
     <Flex direction="column" gap="sm" style={{ flex: 1, minHeight: 0 }}>
@@ -142,28 +225,17 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, cate
       </Group>
       <Divider />
       
-      {items.length === 0 ? (
-        <Center style={{ flex: 1 }}>
-          <Stack gap="xs" align="center">
-            <Text fw={600}>No items assigned yet</Text>
-            <Text size="sm" c="dimmed">
-              Use the "Add items" button to include menu items in this smart category.
-            </Text>
-          </Stack>
-        </Center>
-      ) : (
-        <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-            <Stack component="ul" gap="xs" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {items.map((item) => (
-                <ItemRow 
-                    key={item.itemId} 
-                    item={item} 
-                    onRemove={() => handleRemoveItem(item.itemId)}
-                />
-            ))}
-            </Stack>
-        </ScrollArea>
-      )}
+      <Box style={{ flex: 1, minHeight: 0 }}>
+        <DataTable
+            data={items}
+            columns={columns}
+            emptyMessage="No items assigned to this category."
+            enableSearch
+            searchPlaceholder="Search assigned items..."
+            manualPagination={false} // Client-side pagination
+            pageSize={100} // Show many items by default since we have them all
+        />
+      </Box>
 
       <AddItemsModal 
         opened={addModalOpened} 
@@ -189,70 +261,6 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({ smartCategoryId, cate
     </Flex>
   );
 };
-
-interface ItemRowProps {
-    item: SmartCategoryItemAssignment;
-    onRemove?: () => void;
-}
-
-const ItemRow: FC<ItemRowProps> = ({ item, onRemove }) => {
-    const modifiedByRaw = item.modifiedBy ? item.modifiedBy.trim() : '';
-    const modifiedByDisplay = modifiedByRaw || FALLBACK_ITEM_MODIFIER;
-    const modifiedAtDisplay = item.modifiedDate ? new Date(item.modifiedDate).toLocaleString() : '—';
-
-    return (
-        <Box
-            component="li"
-            px="md"
-            py="sm"
-            style={{
-                borderRadius: 10,
-                border: '1px solid var(--mantine-color-gray-3)',
-                backgroundColor: 'var(--mantine-color-gray-0)',
-            }}
-        >
-            <Group justify="space-between" align="center">
-                <Group gap="sm" style={{ flex: 1 }}>
-                    <Stack gap={4}>
-                        <Group gap="xs" align="center">
-                            <Badge size="sm" variant="light" color="indigo">
-                                #{item.displayIndex}
-                            </Badge>
-                            <Text fw={600} size="sm">
-                                {item.itemName || 'Untitled item'}
-                            </Text>
-                        </Group>
-                        <Text size="xs" c="dimmed">
-                            Code: {item.itemCode}
-                        </Text>
-                    </Stack>
-                </Group>
-                
-                <Group gap="md">
-                    <Stack gap={4} align="flex-end" visibleFrom="xs">
-                        <Badge color={item.enabled ? 'teal' : 'gray'} variant="light">
-                            {item.enabled ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                        <Text size="xs" c="dimmed">
-                            {modifiedByDisplay} · {modifiedAtDisplay}
-                        </Text>
-                    </Stack>
-                    {onRemove && (
-                        <ActionIcon 
-                            color="red" 
-                            variant="subtle" 
-                            onClick={onRemove}
-                            aria-label="Remove item"
-                        >
-                            <IconTrash size={18} />
-                        </ActionIcon>
-                    )}
-                </Group>
-            </Group>
-        </Box>
-    );
-};
-
 
 interface AddItemsModalProps {
     opened: boolean;

@@ -20,7 +20,7 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { IconAdjustments, IconCheck, IconChevronRight, IconX } from '@tabler/icons-react';
-import { CenterLoader } from './CenterLoader';
+import { CenterLoader } from '../../../../components/CenterLoader';
 import { formatDateTime } from './menuItemsUtils';
 import type {
   MenuItemDetail,

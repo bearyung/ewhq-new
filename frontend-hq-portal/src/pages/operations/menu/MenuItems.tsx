@@ -59,10 +59,10 @@ import type {
   MenuItemPrice,
   MenuItemShopAvailability,
 } from '../../../types/menuItem';
-import { CenterLoader } from './menu-items/CenterLoader';
+import { CenterLoader } from '../../../components/CenterLoader';
 import { MenuItemDrawer } from './menu-items/MenuItemDrawer';
 import { MenuItemsCategorySidebar } from './menu-items/MenuItemsCategorySidebar';
-import { VirtualTableRow } from './menu-items/VirtualTableRow';
+import { VirtualTableRow } from '../../../components/VirtualTableRow';
 import { ManageItemRelationshipsModal } from './menu-items/ManageItemRelationshipsModal';
 import { MenuItemsReorderModal } from './menu-items/MenuItemsReorderModal';
 import {

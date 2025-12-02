@@ -56,7 +56,7 @@ import {
   type UpdateItemRelationshipTreePayload,
 } from '../../../../types/menuItem';
 import menuItemService from '../../../../services/menuItemService';
-import { CenterLoader } from './CenterLoader';
+import { CenterLoader } from '../../../../components/CenterLoader';
 import { NodePropertiesDrawer, type NodePropertiesDrawerState } from './NodePropertiesDrawer';
 
 const MODE_NEW_MODIFIER = 'NEW_MODIFIER_MODE';
