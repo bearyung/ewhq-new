@@ -44,6 +44,8 @@ import type {
   LookupOptions,
   SmartCategoryTreeNode,
   SmartCategoryUpsertPayload,
+  SmartCategoryShopSchedule,
+  SmartCategoryOrderChannel,
 } from '../../../../types/smartCategory';
 import type { ButtonStyle } from '../../../../types/buttonStyle';
 
@@ -683,7 +685,9 @@ const SmartCategoriesPage: FC = () => {
                   <Paper
                     shadow="none"
                     radius={0}
-                    p="md"
+                    pt="md"
+                    px={0}
+                    pb={0}
                     style={{
                       flex: 1,
                       minHeight: 0,
@@ -959,7 +963,8 @@ const SmartCategoryDetailContent: FC<DetailContentProps> = ({
       <Tabs.List>
         <Tabs.Tab value="items">Items</Tabs.Tab>
         <Tabs.Tab value="details">Details</Tabs.Tab>
-        <Tabs.Tab value="display">Display settings</Tabs.Tab>
+        <Tabs.Tab value="shop-schedules">Shop schedules</Tabs.Tab>
+        <Tabs.Tab value="order-channels">Order channel visibility</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="items" pt="md" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -975,8 +980,11 @@ const SmartCategoryDetailContent: FC<DetailContentProps> = ({
       <Tabs.Panel value="details" pt="md" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <DetailsTab detail={detail} buttonStyles={buttonStyles} />
       </Tabs.Panel>
-      <Tabs.Panel value="display" pt="md" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <DisplayTab detail={detail} />
+      <Tabs.Panel value="shop-schedules" pt="md" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <ShopSchedulesTab schedules={detail.shopSchedules} />
+      </Tabs.Panel>
+      <Tabs.Panel value="order-channels" pt="md" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <OrderChannelsTab channels={detail.orderChannels} />
       </Tabs.Panel>
     </Tabs>
   );
@@ -1097,33 +1105,89 @@ const DetailsTab: FC<DetailsTabProps> = ({ detail, buttonStyles }) => {
   );
 };
 
-interface DisplayTabProps {
-  detail: SmartCategoryDetail;
+interface ShopSchedulesTabProps {
+  schedules: SmartCategoryShopSchedule[];
 }
 
-const DisplayTab: FC<DisplayTabProps> = ({ detail }) => {
-  const hasSchedules = detail.shopSchedules.length > 0;
-  const hasChannels = detail.orderChannels.length > 0;
+const ShopSchedulesTab: FC<ShopSchedulesTabProps> = ({ schedules }) => {
+  const hasSchedules = schedules.length > 0;
 
   return (
     <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-    <Stack gap="md">
-      <Group justify="space-between">
-        <Text fw={600}>Shop schedules</Text>
-        <Button variant="light" leftSection={<IconPencil size={16} />}>
-          Manage schedules
-        </Button>
-      </Group>
-      {hasSchedules ? (
-        <Stack gap="xs">
-          {detail.shopSchedules
-            .slice()
-            .sort((a, b) => a.displayIndex - b.displayIndex)
-            .map((schedule) => {
-              const shopName = formatShopName(schedule.shopName, schedule.shopId);
+      <Stack gap="md">
+        <Group justify="space-between">
+          <Text fw={600}>Shop schedules</Text>
+          <Button variant="light" leftSection={<IconPencil size={16} />}>
+            Manage schedules
+          </Button>
+        </Group>
+        {hasSchedules ? (
+          <Stack gap="xs">
+            {schedules
+              .slice()
+              .sort((a, b) => a.displayIndex - b.displayIndex)
+              .map((schedule) => {
+                const shopName = formatShopName(schedule.shopName, schedule.shopId);
+                return (
+                  <Box
+                    key={`${schedule.shopId}-${schedule.displayIndex}`}
+                    px="md"
+                    py="sm"
+                    style={{
+                      borderRadius: 10,
+                      border: '1px solid var(--mantine-color-gray-3)',
+                      backgroundColor: 'var(--mantine-color-gray-0)',
+                    }}
+                  >
+                    <Group justify="space-between" align="center">
+                      <Stack gap={4}>
+                        <Text fw={600}>{shopName}</Text>
+                        <Text size="xs" c="dimmed">
+                          Display index {schedule.displayIndex}
+                        </Text>
+                      </Stack>
+                      <Badge color={schedule.enabled ? 'teal' : 'gray'} variant="light">
+                        {schedule.enabled ? 'Enabled' : 'Disabled'}
+                      </Badge>
+                    </Group>
+                  </Box>
+                );
+              })}
+          </Stack>
+        ) : (
+          <Text size="sm" c="dimmed">
+            No shop display schedules configured yet.
+          </Text>
+        )}
+      </Stack>
+    </ScrollArea>
+  );
+};
+
+interface OrderChannelsTabProps {
+  channels: SmartCategoryOrderChannel[];
+}
+
+const OrderChannelsTab: FC<OrderChannelsTabProps> = ({ channels }) => {
+  const hasChannels = channels.length > 0;
+
+  return (
+    <ScrollArea style={{ flex: 1, minHeight: 0 }}>
+      <Stack gap="md">
+        <Group justify="space-between">
+          <Text fw={600}>Order channel visibility</Text>
+          <Button variant="light" leftSection={<IconPencil size={16} />}>
+            Manage order channels
+          </Button>
+        </Group>
+        {hasChannels ? (
+          <Stack gap="xs">
+            {channels.map((channel) => {
+              const channelName = formatOrderChannelName(channel.name, channel.orderChannelId);
+              const shopName = formatShopName(channel.shopName, channel.shopId);
               return (
                 <Box
-                  key={`${schedule.shopId}-${schedule.displayIndex}`}
+                  key={`${channel.shopId}-${channel.orderChannelId}`}
                   px="md"
                   py="sm"
                   style={{
@@ -1132,74 +1196,29 @@ const DisplayTab: FC<DisplayTabProps> = ({ detail }) => {
                     backgroundColor: 'var(--mantine-color-gray-0)',
                   }}
                 >
-                  <Group justify="space-between" align="center">
+                  <Group justify="space-between">
                     <Stack gap={4}>
-                      <Text fw={600}>{shopName}</Text>
-                      <Text size="xs" c="dimmed">
-                        Display index {schedule.displayIndex}
+                      <Text fw={600}>
+                        {channelName}{' '}
+                        <Text span size="xs" c="dimmed">
+                          (Shop {shopName})
+                        </Text>
                       </Text>
                     </Stack>
-                    <Badge color={schedule.enabled ? 'teal' : 'gray'} variant="light">
-                      {schedule.enabled ? 'Enabled' : 'Disabled'}
+                    <Badge color={channel.enabled ? 'teal' : 'gray'} variant="light">
+                      {channel.enabled ? 'Enabled' : 'Disabled'}
                     </Badge>
                   </Group>
                 </Box>
               );
             })}
-        </Stack>
-      ) : (
-        <Text size="sm" c="dimmed">
-          No shop display schedules configured yet.
-        </Text>
-      )}
-
-      <Divider />
-
-      <Group justify="space-between">
-        <Text fw={600}>Order channel visibility</Text>
-        <Button variant="light" leftSection={<IconPencil size={16} />}>
-          Manage order channels
-        </Button>
-      </Group>
-      {hasChannels ? (
-        <Stack gap="xs">
-          {detail.orderChannels.map((channel) => {
-            const channelName = formatOrderChannelName(channel.name, channel.orderChannelId);
-            const shopName = formatShopName(channel.shopName, channel.shopId);
-            return (
-              <Box
-                key={`${channel.shopId}-${channel.orderChannelId}`}
-                px="md"
-                py="sm"
-                style={{
-                  borderRadius: 10,
-                  border: '1px solid var(--mantine-color-gray-3)',
-                  backgroundColor: 'var(--mantine-color-gray-0)',
-                }}
-              >
-                <Group justify="space-between">
-                  <Stack gap={4}>
-                    <Text fw={600}>
-                      {channelName}{' '}
-                      <Text span size="xs" c="dimmed">
-                        (Shop {shopName})
-                      </Text>
-                    </Text>
-                  </Stack>
-                  <Badge color={channel.enabled ? 'teal' : 'gray'} variant="light">
-                    {channel.enabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
-                </Group>
-              </Box>
-            );
-          })}
-        </Stack>
-      ) : (
-        <Text size="sm" c="dimmed">
-          No order channels configured.
-        </Text>
-      )}
-    </Stack>
+          </Stack>
+        ) : (
+          <Text size="sm" c="dimmed">
+            No order channels configured.
+          </Text>
+        )}
+      </Stack>
     </ScrollArea>
   );
 };

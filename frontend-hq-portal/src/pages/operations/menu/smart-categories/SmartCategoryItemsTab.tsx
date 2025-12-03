@@ -392,10 +392,21 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({
   }, []);
 
   const sidebarIsCollapsed = Boolean(isSidebarCollapsed);
+  const toolbarHorizontalPadding = 'var(--mantine-spacing-md)';
 
   return (
     <Flex direction="column" gap="sm" style={{ flex: 1, minHeight: 0 }}>
-      <Group justify="space-between" align="center" gap="md" wrap="wrap">
+      <Group
+        justify="space-between"
+        align="center"
+        gap="md"
+        wrap="wrap"
+        style={{
+          width: '100%',
+          paddingLeft: toolbarHorizontalPadding,
+          paddingRight: toolbarHorizontalPadding,
+        }}
+      >
         <Group gap="xs" align="center" wrap="wrap">
           {onToggleSidebar && (
             <Tooltip
