@@ -51,12 +51,12 @@ public class SmartCategoryShopDetail
     public bool? IsHolidayHide { get; set; }
 
     [MaxLength(100)]
-    public string DaysOfWeek { get; set; }
+    public string? DaysOfWeek { get; set; }
 
     [MaxLength(100)]
-    public string Months { get; set; }
+    public string? Months { get; set; }
 
     [MaxLength(150)]
-    public string Dates { get; set; }
+    public string? Dates { get; set; }
 
 }

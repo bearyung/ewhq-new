@@ -1,6 +1,5 @@
 import type { CSSProperties } from 'react';
 import { useState } from 'react';
-import { Table } from '@mantine/core';
 import type { Row } from '@tanstack/react-table';
 import type { VirtualItem } from '@tanstack/react-virtual';
 import { flexRender } from '@tanstack/react-table';
@@ -25,12 +24,15 @@ export const VirtualTableRow = <TData,>({
   const baseCellStyle: CSSProperties = {
     overflow: 'hidden',
     height: 48,
-    verticalAlign: 'middle',
+    display: 'flex',
+    alignItems: 'center',
     borderBottom: '1px solid #dee2e6',
+    padding: '0 16px',
+    boxSizing: 'border-box',
   };
 
   return (
-    <Table.Tr
+    <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -41,13 +43,13 @@ export const VirtualTableRow = <TData,>({
         height: 48,
         transform: `translateY(${virtualRow.start}px)`,
         borderBottom: '1px solid #dee2e6',
-        borderTop: 'none',
         backgroundColor: isHovered ? 'var(--mantine-color-gray-0)' : 'transparent',
         transition: 'background-color 100ms ease',
+        display: 'flex',
       }}
     >
       {row.getVisibleCells().map((cell) => (
-        <Table.Td
+        <div
           key={cell.id}
           style={{
             ...baseCellStyle,
@@ -67,8 +69,8 @@ export const VirtualTableRow = <TData,>({
           }}
         >
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </Table.Td>
+        </div>
       ))}
-    </Table.Tr>
+    </div>
   );
 };

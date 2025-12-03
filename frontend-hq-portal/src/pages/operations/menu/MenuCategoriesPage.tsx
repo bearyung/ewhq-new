@@ -54,13 +54,13 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { AutoBreadcrumb } from '../components/AutoBreadcrumb';
-import { ScrollingHeader } from '../components/ScrollingHeader';
-import { useBrands } from '../contexts/BrandContext';
-import itemCategoryService from '../services/itemCategoryService';
-import buttonStyleService from '../services/buttonStyleService';
-import type { ItemCategory, CreateItemCategory, UpdateItemCategory } from '../types/itemCategory';
-import type { ButtonStyle } from '../types/buttonStyle';
+import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
+import { ScrollingHeader } from '../../../components/ScrollingHeader';
+import { useBrands } from '../../../contexts/BrandContext';
+import itemCategoryService from '../../../services/itemCategoryService';
+import buttonStyleService from '../../../services/buttonStyleService';
+import type { ItemCategory, CreateItemCategory, UpdateItemCategory } from '../../../types/itemCategory';
+import type { ButtonStyle } from '../../../types/buttonStyle';
 
 interface CategoryTreeNode extends ItemCategory {
   children: CategoryTreeNode[];

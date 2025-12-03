@@ -10,9 +10,10 @@ import { ProfilePage } from './pages/ProfilePage'
 import { OrganizationManagementPage } from './pages/OrganizationManagementPage'
 import OnboardingWizard from './pages/OnboardingWizard'
 import { MenuPage } from './pages/MenuPage'
-import { MenuCategoriesPage } from './pages/MenuCategoriesPage'
+import { MenuCategoriesPage } from './pages/operations/menu/MenuCategoriesPage'
 import ButtonStylesPage from './pages/operations/menu/ButtonStyles'
 import MenuItemsPage from './pages/operations/menu/MenuItems'
+import { SmartCategoriesPage } from './pages/operations/menu/smart-categories'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { useAuth0 } from '@auth0/auth0-react'
 import { useEffect } from 'react'
@@ -97,6 +98,7 @@ function AppContent() {
         <Route path="organization-management" element={<OrganizationManagementPage />} />
         <Route path="menus" element={<MenuPage />} />
         <Route path="menus/categories" element={<MenuCategoriesPage />} />
+        <Route path="menus/smart-categories" element={<SmartCategoriesPage />} />
         <Route path="menus/items" element={<MenuItemsPage />} />
         <Route path="menus/button-styles" element={<ButtonStylesPage />} />
       </Route>

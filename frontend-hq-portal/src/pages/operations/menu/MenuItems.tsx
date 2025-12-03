@@ -15,12 +15,12 @@ import {
   ScrollArea,
   Select,
   Stack,
-  Table,
   Text,
   TextInput,
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
+import type { ColumnDef, ColumnSizingState, VisibilityState } from '@tanstack/react-table';
 import { useDebouncedValue, useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
@@ -36,15 +36,26 @@ import {
   IconPencil,
   IconPlus,
   IconSearch,
-  IconSparkles,
   IconSortAscending,
   IconSortDescending,
   IconList,
   IconX,
 } from '@tabler/icons-react';
-import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table';
-import type { ColumnDef, ColumnSizingState, VisibilityState } from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { DataTable } from '../../../components/DataTable';
+import { MenuItemDrawer } from './menu-items/MenuItemDrawer';
+import { MenuItemsCategorySidebar } from './menu-items/MenuItemsCategorySidebar';
+import { ManageItemRelationshipsModal } from './menu-items/ManageItemRelationshipsModal';
+import { MenuItemsReorderModal } from './menu-items/MenuItemsReorderModal';
+import {
+  PAGE_SIZE,
+  PANEL_BORDER_COLOR,
+  buildCategoryTree,
+  createBasePayload,
+  formatDateTime,
+  normalizePayload,
+  mapDetailToPayload,
+  type CategoryNode,
+} from './menu-items/menuItemsUtils';
 import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../contexts/BrandContext';
 import menuItemService from '../../../services/menuItemService';
@@ -59,22 +70,6 @@ import type {
   MenuItemPrice,
   MenuItemShopAvailability,
 } from '../../../types/menuItem';
-import { CenterLoader } from './menu-items/CenterLoader';
-import { MenuItemDrawer } from './menu-items/MenuItemDrawer';
-import { MenuItemsCategorySidebar } from './menu-items/MenuItemsCategorySidebar';
-import { VirtualTableRow } from './menu-items/VirtualTableRow';
-import { ManageItemRelationshipsModal } from './menu-items/ManageItemRelationshipsModal';
-import { MenuItemsReorderModal } from './menu-items/MenuItemsReorderModal';
-import {
-  PAGE_SIZE,
-  PANEL_BORDER_COLOR,
-  buildCategoryTree,
-  createBasePayload,
-  formatDateTime,
-  normalizePayload,
-  mapDetailToPayload,
-  type CategoryNode,
-} from './menu-items/menuItemsUtils';
 
 const SORT_OPTIONS: Array<{
   label: string;
@@ -85,6 +80,22 @@ const SORT_OPTIONS: Array<{
   { label: 'Item code', value: 'itemCode' },
   { label: 'Name', value: 'name' },
 ];
+
+type MenuItemsColumnDef = ColumnDef<MenuItemSummary> & { accessorKey?: string | number };
+
+const getColumnId = (column: MenuItemsColumnDef): string => {
+  if (typeof column.accessorKey === 'string' || typeof column.accessorKey === 'number') {
+    return column.accessorKey.toString();
+  }
+  return column.id ?? '';
+};
+
+const getColumnLabel = (column: MenuItemsColumnDef): string => {
+  if (typeof column.header === 'string') {
+    return column.header;
+  }
+  return getColumnId(column) || 'Column';
+};
 
 const MenuItemsPage: FC = () => {
   const { selectedBrand } = useBrands();
@@ -101,7 +112,6 @@ const MenuItemsPage: FC = () => {
 
   const [categorySearch, setCategorySearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [showActionShadow, setShowActionShadow] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebouncedValue(search, 800);
@@ -132,7 +142,6 @@ const MenuItemsPage: FC = () => {
     showPriceOnReceipt: false,
   }));
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
-  const [hoveredResizeColumnId, setHoveredResizeColumnId] = useState<string | null>(null);
   const [modifierModalItem, setModifierModalItem] = useState<MenuItemSummary | null>(null);
   const [reorderModalOpen, setReorderModalOpen] = useState(false);
   const [reorderItems, setReorderItems] = useState<MenuItemSummary[]>([]);
@@ -162,10 +171,7 @@ const MenuItemsPage: FC = () => {
   const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Table virtualization setup
-  const tableContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const resizeCursorRestoreRef = useRef<string | null>(null);
 
   const totalItems = itemsResponse?.totalItems ?? 0;
   const totalPages = useMemo(() => {
@@ -250,28 +256,6 @@ const MenuItemsPage: FC = () => {
       return prev;
     });
   }, [totalPages]);
-
-  const setBodyResizeCursor = useCallback((active: boolean) => {
-    const bodyStyle = document.body.style;
-    if (active) {
-      if (resizeCursorRestoreRef.current === null) {
-        resizeCursorRestoreRef.current = bodyStyle.cursor || '';
-      }
-      bodyStyle.cursor = 'col-resize';
-    } else {
-      if (resizeCursorRestoreRef.current !== null) {
-        bodyStyle.cursor = resizeCursorRestoreRef.current;
-        resizeCursorRestoreRef.current = null;
-      } else {
-        bodyStyle.cursor = '';
-      }
-    }
-  }, []);
-
-  useEffect(() => () => {
-    setBodyResizeCursor(false);
-    setHoveredResizeColumnId(null);
-  }, [setBodyResizeCursor]);
 
   const getCategoryLabel = useCallback((categoryId?: number | null) => {
     if (categoryId === null || categoryId === undefined || !lookups) return '—';
@@ -762,21 +746,6 @@ const MenuItemsPage: FC = () => {
     ];
   }, [getButtonStyleById, getButtonStyleColor, getCategoryLabel, getDepartmentName, handleEdit, handleOpenModifiers]);
 
-  const table = useReactTable({
-    data: itemsResponse?.items ?? [],
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    manualPagination: true,
-    pageCount: totalPages,
-    columnResizeMode: 'onChange',
-    state: {
-      columnVisibility,
-      columnSizing,
-    },
-    onColumnVisibilityChange: setColumnVisibility,
-    onColumnSizingChange: setColumnSizing,
-  });
-
   const pageOptions = useMemo(
     () =>
       Array.from({ length: totalPages }, (_, index) => ({
@@ -786,9 +755,12 @@ const MenuItemsPage: FC = () => {
     [totalPages],
   );
 
-  const toggleableColumns = useMemo(
-    () => table.getAllLeafColumns().filter((column) => column.getCanHide()),
-    [table],
+  const toggleableColumns = useMemo<MenuItemsColumnDef[]>(
+    () =>
+      columns
+        .filter((col) => col.enableHiding !== false)
+        .map((col) => col as MenuItemsColumnDef),
+    [columns],
   );
 
   const filteredToggleColumns = useMemo(() => {
@@ -797,53 +769,43 @@ const MenuItemsPage: FC = () => {
       return toggleableColumns;
     }
 
-    return toggleableColumns.filter((column) => {
-      const header = column.columnDef.header;
-      const label = typeof header === 'string' ? header : column.id;
-      return label.toLowerCase().includes(searchTerm);
-    });
+    return toggleableColumns.filter((column) => getColumnLabel(column).toLowerCase().includes(searchTerm));
   }, [toggleableColumns, columnSearch]);
 
   const allToggleColumnsSelected = toggleableColumns.length > 0
-    && toggleableColumns.every((column) => column.getIsVisible());
-  const anyToggleColumnsSelected = toggleableColumns.some((column) => column.getIsVisible());
+    && toggleableColumns.every((column) => {
+      const key = getColumnId(column);
+      if (!key) {
+        return true;
+      }
+      return columnVisibility[key] !== false;
+    });
+  const anyToggleColumnsSelected = toggleableColumns.some((column) => {
+    const key = getColumnId(column);
+    return key ? columnVisibility[key] !== false : true;
+  });
 
   const handleToggleAllColumns = useCallback(
     (visible: boolean) => {
-      toggleableColumns.forEach((column) => column.toggleVisibility(visible));
+      const newVisibility = { ...columnVisibility };
+      toggleableColumns.forEach((column) => {
+        const key = getColumnId(column);
+        if (key) {
+          newVisibility[key] = visible;
+        }
+      });
+      setColumnVisibility(newVisibility);
     },
-    [toggleableColumns],
+    [columnVisibility, toggleableColumns],
   );
 
-  const { rows } = table.getRowModel();
-
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 48,
-    overscan: 5,
-  });
-
-  // Calculate total width from all columns for fixed layout
-  const totalTableWidth = table.getVisibleLeafColumns().reduce((sum, col) => sum + col.getSize(), 0);
-
-  const updateActionShadow = useCallback(() => {
-    const container = tableContainerRef.current;
-    if (!container) {
-      setShowActionShadow(false);
-      return;
-    }
-
-    const { scrollWidth, clientWidth, scrollLeft } = container;
-    const hasHorizontalScroll = scrollWidth - clientWidth > 1;
-    if (!hasHorizontalScroll) {
-      setShowActionShadow(false);
-      return;
-    }
-
-    const isAtRightEdge = scrollLeft + clientWidth >= scrollWidth - 1;
-    setShowActionShadow(!isAtRightEdge);
-  }, []);
+  // Helper to toggle single column visibility
+  const toggleColumnVisibility = (columnId: string, visible: boolean) => {
+    setColumnVisibility(prev => ({
+      ...prev,
+      [columnId]: visible
+    }));
+  };
 
   useEffect(() => {
     if (!brandId) {
@@ -1038,40 +1000,6 @@ const MenuItemsPage: FC = () => {
     () => (itemsResponse?.categoryCounts ?? []).reduce((acc, entry) => acc + entry.itemCount, 0),
     [itemsResponse?.categoryCounts],
   );
-
-  useEffect(() => {
-    const container = tableContainerRef.current;
-    if (!container) {
-      return;
-    }
-
-    const handleScroll = () => updateActionShadow();
-
-    container.addEventListener('scroll', handleScroll);
-
-    let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => updateActionShadow());
-      resizeObserver.observe(container);
-    } else {
-      window.addEventListener('resize', handleScroll);
-    }
-
-    updateActionShadow();
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      } else {
-        window.removeEventListener('resize', handleScroll);
-      }
-    };
-  }, [updateActionShadow]);
-
-  useEffect(() => {
-    updateActionShadow();
-  }, [updateActionShadow, rows.length, totalTableWidth, isDesktopLayout]);
 
   const updatePriceEdit = (shopId: number, changes: Partial<{ price: number | null; enabled: boolean }>) => {
     const base = selectedDetail?.prices.find((price) => price.shopId === shopId);
@@ -1805,14 +1733,18 @@ const handleSubmit = async () => {
                                   </Text>
                                 ) : (
                                   filteredToggleColumns.map((column) => {
-                                    const header = column.columnDef.header;
-                                    const label = typeof header === 'string' ? header : column.id;
+                                    const label = getColumnLabel(column);
+                                    const colId = getColumnId(column);
+                                    if (!colId) {
+                                      return null;
+                                    }
+                                    const isVisible = columnVisibility[colId] !== false;
                                     return (
                                       <Checkbox
-                                        key={column.id}
+                                        key={colId}
                                         label={label}
-                                        checked={column.getIsVisible()}
-                                        onChange={(event) => column.toggleVisibility(event.currentTarget.checked)}
+                                        checked={isVisible}
+                                        onChange={(event) => toggleColumnVisibility(colId, event.currentTarget.checked)}
                                       />
                                     );
                                   })
@@ -1938,192 +1870,30 @@ const handleSubmit = async () => {
                         : {}
                     }
                   >
-                  {itemsLoading ? (
-                    <Box
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        ...(isDesktopLayout
-                          ? { flex: 1, minHeight: 0 }
-                          : { padding: 'var(--mantine-spacing-xl) 0' }),
-                      }}
-                    >
-                      <CenterLoader message="Loading menu items" />
-                    </Box>
-                  ) : fetchError ? (
-                    <Stack
-                      align="center"
-                      justify="center"
-                      p="xl"
-                      gap="sm"
-                      style={isDesktopLayout ? { flex: 1, minHeight: 0 } : undefined}
-                    >
-                      <IconAlertCircle size={24} color="var(--mantine-color-red-6)" />
-                      <Text fw={600}>{fetchError}</Text>
-                      <Button variant="light" onClick={handleRetry} disabled={itemsLoading}>
-                        Retry
-                      </Button>
-                    </Stack>
-                  ) : rows.length === 0 ? (
-                    <Stack
-                      align="center"
-                      justify="center"
-                      p="xl"
-                      gap="sm"
-                      style={isDesktopLayout ? { flex: 1, minHeight: 0 } : undefined}
-                    >
-                      <IconSparkles size={24} color="var(--mantine-color-gray-6)" />
-                      <Text fw={600}>No items found</Text>
-                      <Text size="sm" c="dimmed" ta="center">
-                        Adjust filters or add a new item to this category.
-                      </Text>
-                    </Stack>
-                  ) : (
-                    <Box
-                      ref={tableContainerRef}
-                      style={{
-                        overflow: 'auto',
-                        position: 'relative',
-                        isolation: 'isolate',
-                        WebkitOverflowScrolling: 'touch',
-                        ...(isDesktopLayout
-                          ? {
-                              flex: 1,
-                              minHeight: 0,
-                            }
-                          : { maxHeight: 600 }),
-                      }}
-                    >
-                      <div style={{
-                        position: 'sticky',
-                        top: 0,
-                        left: 0,
-                        zIndex: 10,
-                        backgroundColor: 'white',
-                        borderBottom: '1px solid #dee2e6',
-                        transform: 'translateZ(0)',
-                        WebkitTransform: 'translateZ(0)',
-                        willChange: 'transform',
-                        width: totalTableWidth,
-                      }}>
-                        <Table highlightOnHover withColumnBorders style={{
-                          tableLayout: 'fixed',
-                          width: totalTableWidth,
-                        }}>
-                            <Table.Thead>
-                              {table.getHeaderGroups().map((headerGroup) => (
-                                <Table.Tr key={headerGroup.id}>
-                                  {headerGroup.headers.map((header) => (
-                                    <Table.Th
-                                      key={header.id}
-                                      style={{
-                                        backgroundColor: 'white',
-                                        borderBottom: '1px solid #dee2e6',
-                                        width: header.column.getSize(),
-                                        minWidth: header.column.getSize(),
-                                        maxWidth: header.column.getSize(),
-                                        position: header.id === 'actions' ? 'sticky' : 'relative',
-                                        ...(header.id === 'actions' ? {
-                                          right: 0,
-                                          backgroundColor: 'white',
-                                          boxShadow: showActionShadow ? 'inset 3px 0 6px -4px rgba(15, 23, 42, 0.2)' : 'none',
-                                          zIndex: 1,
-                                          borderBottom: '1px solid #dee2e6',
-                                          transition: 'box-shadow 120ms ease',
-                                        } : {}),
-                                      }}
-                                    >
-                                      {header.isPlaceholder ? null : (
-                                        <Flex align="center" justify={header.column.id === 'actions' ? 'flex-end' : 'flex-start'} gap="xs">
-                                          {flexRender(
-                                            header.column.columnDef.header,
-                                            header.getContext()
-                                          )}
-                                        </Flex>
-                                      )}
-                                      {header.column.getCanResize() && header.id !== 'actions' && (
-                                        <Box
-                                          onMouseDown={header.getResizeHandler()}
-                                          onTouchStart={header.getResizeHandler()}
-                                          onMouseEnter={() => {
-                                            setHoveredResizeColumnId(header.id);
-                                            setBodyResizeCursor(true);
-                                          }}
-                                          onMouseLeave={() => {
-                                            setBodyResizeCursor(false);
-                                            setHoveredResizeColumnId((current) => (current === header.id ? null : current));
-                                          }}
-                                          style={{
-                                            position: 'absolute',
-                                            top: -6,
-                                            right: -8,
-                                            height: 'calc(100% + 12px)',
-                                            width: 20,
-                                            cursor: 'col-resize',
-                                            userSelect: 'none',
-                                            touchAction: 'none',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            borderRadius: 6,
-                                            transition: 'background-color 120ms ease',
-                                            backgroundColor:
-                                              header.column.getIsResizing() || hoveredResizeColumnId === header.id
-                                                ? 'var(--mantine-color-indigo-0)'
-                                                : 'transparent',
-                                          }}
-                                        >
-                                          <Box
-                                            style={{
-                                              width: 2,
-                                              height: '100%',
-                                              borderRadius: 1,
-                                              backgroundColor:
-                                                header.column.getIsResizing() || hoveredResizeColumnId === header.id
-                                                  ? 'var(--mantine-color-indigo-5)'
-                                                  : 'transparent',
-                                            }}
-                                          />
-                                        </Box>
-                                      )}
-                                    </Table.Th>
-                                  ))}
-                                </Table.Tr>
-                              ))}
-                            </Table.Thead>
-                          </Table>
-                        </div>
-
-                        <div style={{
-                          position: 'relative',
-                          height: `${rowVirtualizer.getTotalSize()}px`,
-                        }}>
-                          <Table highlightOnHover withColumnBorders style={{
-                            tableLayout: 'fixed',
-                            width: totalTableWidth,
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                          }}>
-                            <Table.Tbody>
-                              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                                const row = rows[virtualRow.index];
-                                return (
-                                  <VirtualTableRow<MenuItemSummary>
-                                    key={row.id}
-                                    row={row}
-                                    virtualRow={virtualRow}
-                                    totalTableWidth={totalTableWidth}
-                                    showActionShadow={showActionShadow}
-                                  />
-                                );
-                              })}
-                            </Table.Tbody>
-                          </Table>
-                        </div>
-                    </Box>
-                  )}
+                    <DataTable
+                      data={itemsResponse?.items ?? []}
+                      columns={columns}
+                      loading={itemsLoading}
+                      error={fetchError}
+                      onRetry={handleRetry}
+                      emptyMessage={
+                        <Stack align="center" gap="xs">
+                          <Text fw={600}>No items found</Text>
+                          <Text size="sm" c="dimmed" ta="center">
+                            Adjust filters or add a new item to this category.
+                          </Text>
+                        </Stack>
+                      }
+                      totalItems={totalItems}
+                      page={page}
+                      onPageChange={setPage}
+                      manualPagination
+                      columnVisibility={columnVisibility}
+                      onColumnVisibilityChange={setColumnVisibility}
+                      columnSizing={columnSizing}
+                      onColumnSizingChange={setColumnSizing}
+                      hideFooter={true}
+                    />
                   </Paper>
                 </Box>
               </Stack>

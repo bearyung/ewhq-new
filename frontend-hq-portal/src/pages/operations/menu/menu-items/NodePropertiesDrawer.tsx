@@ -43,7 +43,7 @@ import type {
   ModifierGroupProperties,
 } from '../../../../types/modifierGroup';
 import { mapDetailToPayload, normalizePayload, formatDateTime } from './menuItemsUtils';
-import { CenterLoader } from './CenterLoader';
+import { CenterLoader } from '../../../../components/CenterLoader';
 
 export type NodePropertiesDrawerState =
   | { kind: 'item'; itemId: number }

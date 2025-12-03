@@ -1,7 +1,7 @@
 import type { FC, ReactNode } from 'react';
 import { Button, Divider, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { IconSearch, IconSparkles } from '@tabler/icons-react';
-import { CenterLoader } from './CenterLoader';
+import { CenterLoader } from '../../../../components/CenterLoader';
 import type { CategoryNode } from './menuItemsUtils';
 
 interface MenuItemsCategorySidebarProps {
