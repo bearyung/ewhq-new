@@ -11,10 +11,13 @@ import {
   Group,
   Loader,
   Modal,
+  NumberInput,
   Paper,
   ScrollArea,
   Select,
+  SimpleGrid,
   Stack,
+  Switch,
   Tabs,
   Text,
   TextInput,
@@ -38,7 +41,7 @@ import smartCategoryService from '../../../../services/smartCategoryService';
 import { SmartCategoryItemsTab } from './SmartCategoryItemsTab';
 import type {
   SmartCategoryDetail,
-  SmartCategoryLookups,
+  LookupOptions,
   SmartCategoryTreeNode,
   SmartCategoryUpsertPayload,
 } from '../../../../types/smartCategory';
@@ -75,11 +78,15 @@ interface SmartCategoryFormState extends Omit<SmartCategoryUpsertPayload, 'displ
   displayIndex: number | '';
 }
 
-const buildInitialFormState = (lookups: SmartCategoryLookups | null, parentId?: number | null): SmartCategoryFormState => ({
+const buildInitialFormState = (
+  lookups: LookupOptions | null,
+  parentId?: number | null,
+  displayIndexHint: number | '' = '',
+): SmartCategoryFormState => ({
   name: '',
   nameAlt: '',
   parentSmartCategoryId: parentId ?? null,
-  displayIndex: '',
+  displayIndex: displayIndexHint,
   enabled: true,
   isTerminal: false,
   isPublicDisplay: true,
@@ -145,7 +152,7 @@ const SmartCategoriesPage: FC = () => {
   const brandId = selectedBrand ? parseInt(selectedBrand, 10) : null;
   const isDesktopLayout = useMediaQuery('(min-width: 62em)');
 
-  const [lookups, setLookups] = useState<SmartCategoryLookups | null>(null);
+  const [lookups, setLookups] = useState<LookupOptions | null>(null);
   const [lookupsLoading, setLookupsLoading] = useState(false);
 
   const [tree, setTree] = useState<SmartCategoryTreeNode[]>([]);
@@ -173,7 +180,7 @@ const SmartCategoriesPage: FC = () => {
     brandId: null,
     status: 'idle',
   });
-  const lookupsPromiseRef = useRef<Promise<SmartCategoryLookups> | null>(null);
+  const lookupsPromiseRef = useRef<Promise<LookupOptions> | null>(null);
 
   const treeLookup = useMemo(() => flattenTree(tree), [tree]);
   const filteredTree = useMemo(() => filterTree(tree, search), [tree, search]);
@@ -183,7 +190,18 @@ const SmartCategoriesPage: FC = () => {
     return lookups.buttonStyles;
   }, [lookups]);
 
-  const ensureLookups = useCallback(async (): Promise<SmartCategoryLookups | null> => {
+  const getNextDisplayIndex = useCallback(
+    (parentId?: number | null) => {
+      if (typeof parentId === 'number' && treeLookup[parentId]) {
+        return (treeLookup[parentId].children.length ?? 0) + 1;
+      }
+
+      return tree.length + 1;
+    },
+    [tree, treeLookup],
+  );
+
+  const ensureLookups = useCallback(async (): Promise<LookupOptions | null> => {
     if (!brandId) {
       return null;
     }
@@ -357,11 +375,14 @@ const SmartCategoriesPage: FC = () => {
       if (!loadedLookups) {
         return;
       }
+
+      const displayIndexHint = getNextDisplayIndex(parentId);
+
       setFormMode('create');
-      setFormState(buildInitialFormState(loadedLookups, parentId));
+      setFormState(buildInitialFormState(loadedLookups, parentId, displayIndexHint));
       openForm();
     },
-    [ensureLookups, openForm],
+    [ensureLookups, openForm, getNextDisplayIndex],
   );
 
   const openEditModal = useCallback(async () => {
@@ -696,6 +717,7 @@ const SmartCategoriesPage: FC = () => {
         submitting={formSubmitting}
         buttonStyles={buttonStyleOptions}
         treeLookup={treeLookup}
+        currentCategoryId={formMode === 'edit' ? selectedCategoryId : null}
       />
 
       <Modal
@@ -1192,7 +1214,28 @@ interface SmartCategoryFormModalProps {
   submitting: boolean;
   buttonStyles: ButtonStyle[];
   treeLookup: Record<number, SmartCategoryTreeNode>;
+  currentCategoryId?: number | null;
 }
+
+const displayPreferenceOptions = [
+  { value: 'inherit', label: 'Inherit default' },
+  { value: 'true', label: 'Show' },
+  { value: 'false', label: 'Hide' },
+];
+
+const toTriStateValue = (value?: boolean | null): string => {
+  if (value === null || value === undefined) {
+    return 'inherit';
+  }
+  return value ? 'true' : 'false';
+};
+
+const fromTriStateValue = (value: string | null): boolean | null => {
+  if (!value || value === 'inherit') {
+    return null;
+  }
+  return value === 'true';
+};
 
 const SmartCategoryFormModal: FC<SmartCategoryFormModalProps> = ({
   opened,
@@ -1204,82 +1247,232 @@ const SmartCategoryFormModal: FC<SmartCategoryFormModalProps> = ({
   submitting,
   buttonStyles,
   treeLookup,
+  currentCategoryId,
 }) => {
   const handleFieldChange = <K extends keyof SmartCategoryFormState>(key: K, value: SmartCategoryFormState[K]) => {
     onChange({ ...formState, [key]: value });
   };
 
   const parentOptions = useMemo(() => {
-    const entries = Object.values(treeLookup).map((node) => ({
-      value: String(node.smartCategoryId),
-      label: formatCategoryName(node.name, node.smartCategoryId),
-    }));
+    const entries = Object.values(treeLookup)
+      .filter((node) => (currentCategoryId ? node.smartCategoryId !== currentCategoryId : true))
+      .map((node) => ({
+        value: String(node.smartCategoryId),
+        label: formatCategoryName(node.name, node.smartCategoryId),
+      }));
 
     return [{ value: 'null', label: 'Root (no parent)' }, ...entries];
-  }, [treeLookup]);
+  }, [treeLookup, currentCategoryId]);
 
-  const buttonStyleHint = buttonStyles[0]?.styleName?.trim();
+  const buttonStyleSelectData = useMemo(
+    () =>
+      buttonStyles.map((style) => ({
+        value: String(style.buttonStyleId),
+        label: style.styleName ? `${style.styleName} (#${style.buttonStyleId})` : `Style #${style.buttonStyleId}`,
+      })),
+    [buttonStyles],
+  );
+
+  const buttonStyleValue =
+    formState.buttonStyleId && formState.buttonStyleId > 0 ? String(formState.buttonStyleId) : null;
+
+  const handleTriStateChange =
+    (field: keyof Pick<
+      SmartCategoryFormState,
+      | 'isSelfOrderingDisplay'
+      | 'isOnlineStoreDisplay'
+      | 'isOdoDisplay'
+      | 'isKioskDisplay'
+      | 'isTableOrderingDisplay'
+    >) =>
+    (value: string | null) => {
+      handleFieldChange(field, fromTriStateValue(value));
+    };
 
   return (
-    <Modal opened={opened} onClose={onClose} title={mode === 'create' ? 'Create smart category' : 'Edit smart category'} size="lg">
-      <Stack gap="md">
-        <TextInput
-          label="Name"
-          required
-          value={formState.name}
-          onChange={(event) => handleFieldChange('name', event.currentTarget.value)}
-        />
-        <TextInput
-          label="Alternative name"
-          value={formState.nameAlt ?? ''}
-          onChange={(event) => handleFieldChange('nameAlt', event.currentTarget.value)}
-        />
-        <TextInput
-          label="Display index"
-          type="number"
-          min={0}
-          value={formState.displayIndex === '' ? '' : String(formState.displayIndex)}
-          onChange={(event) => handleFieldChange('displayIndex', event.currentTarget.value ? Number(event.currentTarget.value) : '')}
-        />
-        <Select
-          label="Parent smart category"
-          data={parentOptions}
-          searchable
-          clearable
-          nothingFoundMessage="No categories"
-          value={
-            formState.parentSmartCategoryId === null || formState.parentSmartCategoryId === undefined
-              ? 'null'
-              : String(formState.parentSmartCategoryId)
-          }
-          onChange={(value) => {
-            if (!value || value === 'null') {
-              handleFieldChange('parentSmartCategoryId', null);
-            } else {
-              handleFieldChange('parentSmartCategoryId', Number(value));
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={mode === 'create' ? 'Create smart category' : 'Edit smart category'}
+      size="lg"
+    >
+      <Stack gap="lg">
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <TextInput
+            label="Name"
+            required
+            value={formState.name}
+            onChange={(event) => handleFieldChange('name', event.currentTarget.value)}
+          />
+          <TextInput
+            label="Alternative name"
+            value={formState.nameAlt ?? ''}
+            onChange={(event) => handleFieldChange('nameAlt', event.currentTarget.value)}
+          />
+        </SimpleGrid>
+
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <NumberInput
+            label="Display index"
+            min={0}
+            value={formState.displayIndex === '' ? undefined : formState.displayIndex}
+            onChange={(value) => handleFieldChange('displayIndex', typeof value === 'number' ? value : '')}
+          />
+          <Select
+            label="Parent smart category"
+            data={parentOptions}
+            searchable
+            clearable
+            comboboxProps={{ withinPortal: true }}
+            nothingFoundMessage="No categories"
+            value={
+              formState.parentSmartCategoryId === null || formState.parentSmartCategoryId === undefined
+                ? 'null'
+                : String(formState.parentSmartCategoryId)
             }
-          }}
-        />
-        <TextInput
-          label="Button style ID"
-          type="number"
-          value={String(formState.buttonStyleId)}
-          onChange={(event) => handleFieldChange('buttonStyleId', Number(event.currentTarget.value))}
-          description={buttonStyleHint ? `e.g. ${buttonStyleHint}` : undefined}
-        />
-        <Textarea
-          label="Description"
-          minRows={2}
-          value={formState.description ?? ''}
-          onChange={(event) => handleFieldChange('description', event.currentTarget.value)}
-        />
-        <Textarea
-          label="Remark"
-          minRows={2}
-          value={formState.remark ?? ''}
-          onChange={(event) => handleFieldChange('remark', event.currentTarget.value)}
-        />
-        <Group justify="flex-end" mt="md">
+            onChange={(value) => {
+              if (!value || value === 'null') {
+                handleFieldChange('parentSmartCategoryId', null);
+              } else {
+                handleFieldChange('parentSmartCategoryId', Number(value));
+              }
+            }}
+          />
+        </SimpleGrid>
+
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <Select
+            label="Button style"
+            placeholder={buttonStyleSelectData.length ? 'Select button style' : 'No button styles available'}
+            data={buttonStyleSelectData}
+            searchable
+            comboboxProps={{ withinPortal: true }}
+            value={buttonStyleValue}
+            onChange={(value) => {
+              if (value) {
+                handleFieldChange('buttonStyleId', Number(value));
+              }
+            }}
+            disabled={buttonStyleSelectData.length === 0}
+            required
+          />
+          <TextInput
+            label="Online store reference category ID"
+            type="number"
+            value={
+              formState.onlineStoreRefCategoryId === null || formState.onlineStoreRefCategoryId === undefined
+                ? ''
+                : String(formState.onlineStoreRefCategoryId)
+            }
+            onChange={(event) =>
+              handleFieldChange(
+                'onlineStoreRefCategoryId',
+                event.currentTarget.value ? Number(event.currentTarget.value) : null,
+              )
+            }
+          />
+        </SimpleGrid>
+
+        <Group grow align="flex-start">
+          <Switch
+            label="Enabled"
+            checked={formState.enabled}
+            onChange={(event) => handleFieldChange('enabled', event.currentTarget.checked)}
+          />
+          <Switch
+            label="Terminal node"
+            checked={formState.isTerminal}
+            onChange={(event) => handleFieldChange('isTerminal', event.currentTarget.checked)}
+          />
+          <Switch
+            label="Public display"
+            checked={formState.isPublicDisplay}
+            onChange={(event) => handleFieldChange('isPublicDisplay', event.currentTarget.checked)}
+          />
+        </Group>
+
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <Select
+            label="Self-ordering display"
+            data={displayPreferenceOptions}
+            value={toTriStateValue(formState.isSelfOrderingDisplay)}
+            onChange={handleTriStateChange('isSelfOrderingDisplay')}
+          />
+          <Select
+            label="Online store display"
+            data={displayPreferenceOptions}
+            value={toTriStateValue(formState.isOnlineStoreDisplay)}
+            onChange={handleTriStateChange('isOnlineStoreDisplay')}
+          />
+          <Select
+            label="ODO display"
+            data={displayPreferenceOptions}
+            value={toTriStateValue(formState.isOdoDisplay)}
+            onChange={handleTriStateChange('isOdoDisplay')}
+          />
+          <Select
+            label="Kiosk display"
+            data={displayPreferenceOptions}
+            value={toTriStateValue(formState.isKioskDisplay)}
+            onChange={handleTriStateChange('isKioskDisplay')}
+          />
+          <Select
+            label="Table ordering display"
+            data={displayPreferenceOptions}
+            value={toTriStateValue(formState.isTableOrderingDisplay)}
+            onChange={handleTriStateChange('isTableOrderingDisplay')}
+          />
+        </SimpleGrid>
+
+        <SimpleGrid cols={{ base: 1, sm: 3 }}>
+          <TextInput
+            label="Image filename"
+            value={formState.imageFileName ?? ''}
+            onChange={(event) => handleFieldChange('imageFileName', event.currentTarget.value)}
+          />
+          <TextInput
+            label="Image filename 2"
+            value={formState.imageFileName2 ?? ''}
+            onChange={(event) => handleFieldChange('imageFileName2', event.currentTarget.value)}
+          />
+          <TextInput
+            label="Image filename 3"
+            value={formState.imageFileName3 ?? ''}
+            onChange={(event) => handleFieldChange('imageFileName3', event.currentTarget.value)}
+          />
+        </SimpleGrid>
+
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <Textarea
+            label="Description"
+            minRows={2}
+            value={formState.description ?? ''}
+            onChange={(event) => handleFieldChange('description', event.currentTarget.value)}
+          />
+          <Textarea
+            label="Description (alt)"
+            minRows={2}
+            value={formState.descriptionAlt ?? ''}
+            onChange={(event) => handleFieldChange('descriptionAlt', event.currentTarget.value)}
+          />
+        </SimpleGrid>
+
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <Textarea
+            label="Remark"
+            minRows={2}
+            value={formState.remark ?? ''}
+            onChange={(event) => handleFieldChange('remark', event.currentTarget.value)}
+          />
+          <Textarea
+            label="Remark (alt)"
+            minRows={2}
+            value={formState.remarkAlt ?? ''}
+            onChange={(event) => handleFieldChange('remarkAlt', event.currentTarget.value)}
+          />
+        </SimpleGrid>
+
+        <Group justify="flex-end" mt="sm">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
