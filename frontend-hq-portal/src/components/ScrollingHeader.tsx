@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Box, Container, Title, Group, Text } from '@mantine/core';
 import type { ReactNode, FC } from 'react';
 
-const BREADCRUMB_HEIGHT = 48;
+const COMPACT_HEADER_OFFSET = 0;
 
 const getScrollParent = (element: HTMLElement | null): HTMLElement | Window => {
   if (!element) {
@@ -76,7 +76,7 @@ const ScrollingHeader: FC<ScrollingHeaderProps> = ({
       }
 
       const { bottom } = headerRef.current.getBoundingClientRect();
-      const headerHidden = bottom <= BREADCRUMB_HEIGHT;
+      const headerHidden = bottom <= COMPACT_HEADER_OFFSET;
 
       setIsCompact((prev) => (prev === headerHidden ? prev : headerHidden));
     };
@@ -110,7 +110,7 @@ const ScrollingHeader: FC<ScrollingHeaderProps> = ({
       <Box
         style={{
           position: 'sticky',
-          top: BREADCRUMB_HEIGHT,
+          top: COMPACT_HEADER_OFFSET,
           zIndex: 99,
           height: 0,
           pointerEvents: 'none',

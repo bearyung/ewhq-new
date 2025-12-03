@@ -6,7 +6,6 @@ import {
   Box,
   Button,
   Center,
-  Container,
   Divider,
   Flex,
   Group,
@@ -34,7 +33,6 @@ import {
   IconSearch,
   IconTrash,
 } from '@tabler/icons-react';
-import { AutoBreadcrumb } from '../../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../../contexts/BrandContext';
 import smartCategoryService from '../../../../services/smartCategoryService';
 import { SmartCategoryItemsTab } from './SmartCategoryItemsTab';
@@ -541,28 +539,6 @@ const SmartCategoriesPage: FC = () => {
         overflow: 'hidden',
       }}
     >
-      <Box
-        style={{
-          flexShrink: 0,
-          backgroundColor: 'white',
-          borderBottom: '1px solid #E3E8EE',
-          minHeight: 48,
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <Container
-          size="xl"
-          px="xl"
-          style={{
-            marginInline: 0,
-            flex: 1,
-          }}
-        >
-          <AutoBreadcrumb />
-        </Container>
-      </Box>
-
       <Box
         style={{
           flex: 1,

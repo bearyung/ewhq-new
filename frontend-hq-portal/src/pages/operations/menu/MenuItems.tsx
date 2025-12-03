@@ -6,7 +6,6 @@ import {
   Box,
   Button,
   Checkbox,
-  Container,
   Divider,
   Flex,
   Group,
@@ -56,7 +55,6 @@ import {
   mapDetailToPayload,
   type CategoryNode,
 } from './menu-items/menuItemsUtils';
-import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { useBrands } from '../../../contexts/BrandContext';
 import menuItemService from '../../../services/menuItemService';
 import type { ButtonStyle } from '../../../types/buttonStyle';
@@ -1418,28 +1416,6 @@ const handleSubmit = async () => {
         overflow: 'hidden',
       }}
     >
-      <Box
-        style={{
-          flexShrink: 0,
-          backgroundColor: 'white',
-          borderBottom: '1px solid #E3E8EE',
-          minHeight: 48,
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <Container
-          size="xl"
-          px="xl"
-          style={{
-            marginInline: 0,
-            flex: 1,
-          }}
-        >
-          <AutoBreadcrumb />
-        </Container>
-      </Box>
-
       <Box
         style={{
           flex: 1,
