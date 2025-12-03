@@ -191,37 +191,72 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({
   const columns = useMemo<ColumnDef<SmartCategoryItemAssignment>[]>(
     () => [
       {
-        accessorKey: 'displayIndex',
-        header: 'Display Index',
+        accessorKey: 'itemId',
+        header: 'Item ID',
         size: 120,
-        cell: ({ row }) => <Text size="sm">{row.original.displayIndex}</Text>,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Text size="sm" fw={600} lineClamp={1}>
+            {row.original.itemId}
+          </Text>
+        ),
       },
       {
         accessorKey: 'itemCode',
         header: 'Code',
         size: 100,
         cell: ({ row }) => (
-          <Text size="sm" fw={500}>
+          <Text size="sm" fw={500} lineClamp={1}>
             {row.original.itemCode}
           </Text>
         ),
       },
       {
+        accessorKey: 'displayIndex',
+        header: 'Display Index',
+        size: 140,
+        cell: ({ row }) => <Text size="sm">{row.original.displayIndex}</Text>,
+      },
+      {
         accessorKey: 'itemName',
         header: 'Item Name',
-        size: 250,
-        cell: ({ row }) => (
-          <Stack gap={0}>
-            <Text size="sm" fw={600} truncate>
-              {row.original.itemName || 'Untitled Item'}
+        size: 280,
+        cell: ({ row }) => {
+          const primaryName = row.original.itemName?.trim() || 'Untitled Item';
+          const altName = row.original.itemNameAlt?.trim();
+          const title = altName ? `${primaryName} (${altName})` : primaryName;
+          return (
+            <Text size="sm" fw={600} truncate title={title} lineClamp={1}>
+              {primaryName}
             </Text>
-            {row.original.itemNameAlt && (
-              <Text size="xs" c="dimmed" truncate>
-                {row.original.itemNameAlt}
-              </Text>
-            )}
-          </Stack>
-        ),
+          );
+        },
+      },
+      {
+        accessorKey: 'modifiedDate',
+        header: 'Last Updated',
+        size: 180,
+        cell: ({ row }) => {
+            const date = row.original.modifiedDate ? new Date(row.original.modifiedDate).toLocaleString() : '—';
+            return (
+                <Text size="sm" truncate title={date} lineClamp={1}>
+                    {date}
+                </Text>
+            );
+        },
+      },
+      {
+        accessorKey: 'modifiedBy',
+        header: 'Last Updated By',
+        size: 160,
+        cell: ({ row }) => {
+            const by = row.original.modifiedBy?.trim() || 'Unknown';
+            return (
+                <Text size="sm" truncate title={by} lineClamp={1}>
+                    {by}
+                </Text>
+            );
+        },
       },
       {
         accessorKey: 'enabled',
@@ -232,21 +267,6 @@ export const SmartCategoryItemsTab: FC<ItemsTabProps> = ({
             {row.original.enabled ? 'Yes' : 'No'}
           </Badge>
         ),
-      },
-      {
-        accessorKey: 'modifiedDate',
-        header: 'Last Updated',
-        size: 200,
-        cell: ({ row }) => {
-            const date = row.original.modifiedDate ? new Date(row.original.modifiedDate).toLocaleString() : '—';
-            const by = row.original.modifiedBy || 'Unknown';
-            return (
-                <Stack gap={0}>
-                    <Text size="sm">{date}</Text>
-                    <Text size="xs" c="dimmed">by {by}</Text>
-                </Stack>
-            );
-        },
       },
       {
         id: 'actions',
