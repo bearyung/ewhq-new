@@ -54,7 +54,6 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { ScrollingHeader } from '../../../components/ScrollingHeader';
 import { useBrands } from '../../../contexts/BrandContext';
 import itemCategoryService from '../../../services/itemCategoryService';
@@ -854,24 +853,6 @@ const MenuCategoriesPage: FC = () => {
         }
       `}</style>
 
-      {/* Sticky Breadcrumbs */}
-      <Box
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          backgroundColor: 'white',
-          borderBottom: '1px solid #E3E8EE',
-          minHeight: 48,
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <Container size="xl" px="xl" style={{ marginInline: 0 }}>
-          <AutoBreadcrumb />
-        </Container>
-      </Box>
-
       {/* Page Header with Scrolling Behavior */}
       <ScrollingHeader
         title="Menu Categories"
@@ -903,7 +884,7 @@ const MenuCategoriesPage: FC = () => {
           <Box
             style={{
               position: 'sticky',
-              top: 96, // Position below breadcrumb (48px) + compact header (48px)
+              top: 48, // Align below compact header
               zIndex: 97,
               backgroundColor: '#FFF8E1',
               borderBottom: '1px solid #FFD54F',

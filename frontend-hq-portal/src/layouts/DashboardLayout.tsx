@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Box, Group, TextInput, ActionIcon, Burger, Tooltip } from '@mantine/core'
+import { Box, Group, TextInput, ActionIcon, Burger, Tooltip, Modal, Stack, Text } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../components/Sidebar'
+import { AutoBreadcrumb } from '../components/AutoBreadcrumb'
 import {
   IconSearch,
-  IconApps,
   IconHelp,
   IconBell,
   IconSettings,
@@ -14,8 +14,15 @@ import {
 } from '@tabler/icons-react'
 
 export function DashboardLayout() {
-  const [opened, { toggle }] = useDisclosure()
+  const [mobileSidebarOpened, { toggle: toggleMobileSidebar }] = useDisclosure(false)
+  const [searchModalOpened, { open: openSearchModal, close: closeSearchModal }] = useDisclosure(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const handleOpenSearch = () => {
+    setSearchQuery('')
+    openSearchModal()
+  }
 
   return (
     <Box style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -40,7 +47,7 @@ export function DashboardLayout() {
       </Box>
 
       {/* Mobile Sidebar Overlay */}
-      {opened && (
+      {mobileSidebarOpened && (
         <Box
           hiddenFrom="sm"
           style={{
@@ -52,7 +59,7 @@ export function DashboardLayout() {
             backgroundColor: 'rgba(0,0,0,0.5)',
             zIndex: 100,
           }}
-          onClick={toggle}
+          onClick={toggleMobileSidebar}
         >
           <Box
             style={{
@@ -64,7 +71,7 @@ export function DashboardLayout() {
             p="md"
             onClick={(e) => e.stopPropagation()}
           >
-            <Sidebar onClose={toggle} />
+            <Sidebar onClose={toggleMobileSidebar} />
           </Box>
         </Box>
       )}
@@ -80,77 +87,54 @@ export function DashboardLayout() {
             flexShrink: 0,
           }}
         >
-          <Group h="100%" px="md" gap="md" style={{ flex: 1 }}>
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+          <Group
+            h="100%"
+            px="md"
+            gap="md"
+            justify="space-between"
+            style={{ flex: 1 }}
+          >
+            <Group gap="sm" style={{ flex: 1, minWidth: 0 }} align="center">
+              <Burger opened={mobileSidebarOpened} onClick={toggleMobileSidebar} hiddenFrom="sm" size="sm" />
 
-            {/* Search - Mobile (icon only) */}
-            <ActionIcon
-              hiddenFrom="sm"
-              variant="subtle"
-              color="gray"
-              size="lg"
-            >
-              <IconSearch size={20} />
-            </ActionIcon>
-
-            <Tooltip
-              label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              withArrow
-            >
-              <ActionIcon
-                visibleFrom="sm"
-                variant={isSidebarCollapsed ? 'filled' : 'light'}
-                color={isSidebarCollapsed ? 'indigo' : 'gray'}
-                size="lg"
-                aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                aria-pressed={isSidebarCollapsed}
-                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+              <Tooltip
+                label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                withArrow
               >
-                {isSidebarCollapsed ? (
-                  <IconLayoutSidebarLeftExpand size={18} />
-                ) : (
-                  <IconLayoutSidebarLeftCollapse size={18} />
-                )}
-              </ActionIcon>
-            </Tooltip>
+                <ActionIcon
+                  visibleFrom="sm"
+                  variant={isSidebarCollapsed ? 'filled' : 'light'}
+                  color={isSidebarCollapsed ? 'indigo' : 'gray'}
+                  size="lg"
+                  aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                  aria-pressed={isSidebarCollapsed}
+                  onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                >
+                  {isSidebarCollapsed ? (
+                    <IconLayoutSidebarLeftExpand size={18} />
+                  ) : (
+                    <IconLayoutSidebarLeftCollapse size={18} />
+                  )}
+                </ActionIcon>
+              </Tooltip>
 
-            {/* Search - Desktop (flexible width) */}
-            <Box visibleFrom="sm" style={{ flex: 1 }}>
-              <TextInput
-                placeholder="Search"
-                leftSection={<IconSearch size={16} />}
-                rightSection={
-                  <Box
-                    style={{
-                      padding: '2px 6px',
-                      backgroundColor: '#F6F9FC',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      color: '#697386',
-                      fontWeight: 500,
-                    }}
-                  >
-                    /
-                  </Box>
-                }
-                styles={{
-                  input: {
-                    borderRadius: 6,
-                    border: '1px solid #E3E8EE',
-                    fontSize: 14,
-                    '&:focus': {
-                      borderColor: '#5469D4',
-                    },
-                  },
-                }}
-              />
-            </Box>
+              <Box visibleFrom="sm" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                <AutoBreadcrumb />
+              </Box>
+            </Group>
 
-            {/* Right side tools */}
             <Group gap="xs">
-              <ActionIcon variant="subtle" color="gray" size="lg">
-                <IconApps size={20} />
-              </ActionIcon>
+              <Tooltip label="Search (/)" withArrow>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  onClick={handleOpenSearch}
+                  aria-label="Open search"
+                >
+                  <IconSearch size={20} />
+                </ActionIcon>
+              </Tooltip>
 
               <ActionIcon variant="subtle" color="gray" size="lg">
                 <IconHelp size={20} />
@@ -166,6 +150,33 @@ export function DashboardLayout() {
             </Group>
           </Group>
         </Box>
+
+        <Modal
+          opened={searchModalOpened}
+          onClose={closeSearchModal}
+          title="Search"
+          centered
+          size="md"
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+            }}
+          >
+            <Stack>
+              <TextInput
+                autoFocus
+                placeholder="Search across the portal"
+                leftSection={<IconSearch size={16} />}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.currentTarget.value)}
+              />
+              <Text size="sm" c="dimmed">
+                Global search is under construction.
+              </Text>
+            </Stack>
+          </form>
+        </Modal>
 
         {/* Scrollable Content */}
         <Box

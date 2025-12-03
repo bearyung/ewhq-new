@@ -31,7 +31,6 @@ import {
   IconChevronDown,
   IconSearch
 } from '@tabler/icons-react';
-import { AutoBreadcrumb } from '../../../components/AutoBreadcrumb';
 import { ScrollingHeader } from '../../../components/ScrollingHeader';
 import { useBrands } from '../../../contexts/BrandContext';
 import buttonStyleService from '../../../services/buttonStyleService';
@@ -317,24 +316,6 @@ const ButtonStylesPage: FC = () => {
 
   return (
     <Box>
-      {/* Sticky Breadcrumbs */}
-      <Box
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          backgroundColor: 'white',
-          borderBottom: '1px solid #E3E8EE',
-          minHeight: 48,
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <Container size="xl" px="xl" style={{ marginInline: 0 }}>
-          <AutoBreadcrumb />
-        </Container>
-      </Box>
-
       {/* Page Header with Scrolling Behavior */}
       <ScrollingHeader
         title="Button Styles"
